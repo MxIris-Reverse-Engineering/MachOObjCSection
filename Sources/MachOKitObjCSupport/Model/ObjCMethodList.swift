@@ -54,7 +54,6 @@ extension ObjCMethodList {
                 basePointer: start.assumingMemoryBound(to: ObjCMethod.Big.self),
                 numberOfElements: count
             )
-            let size = MemoryLayout<ObjCMethod.Big>.size
             return AnyRandomAccessCollection(
                 sequence
                     .map { ObjCMethod($0) }
@@ -65,7 +64,6 @@ extension ObjCMethodList {
                 basePointer: start.assumingMemoryBound(to: ObjCMethod.BigSigned.self),
                 numberOfElements: count
             )
-            let size = MemoryLayout<ObjCMethod.BigSigned>.size
             return AnyRandomAccessCollection(
                 sequence
                     .map { ObjCMethod($0) }
