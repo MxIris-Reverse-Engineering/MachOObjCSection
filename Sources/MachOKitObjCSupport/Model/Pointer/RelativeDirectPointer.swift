@@ -11,7 +11,7 @@
 public struct RelativeDirectPointer<T> {
     public typealias Offset = UInt32
 
-    public var rawPointer: RelativeDirectRawPointer
+    public var rawPointer: RelativeRawPointer
 
     public var isNull: Bool {
         rawPointer.isNull
@@ -26,18 +26,8 @@ public struct RelativeDirectPointer<T> {
             .assumingMemoryBound(to: T.self)
             .pointee
     }
-}
 
-public struct RelativeDirectRawPointer {
-    public typealias Offset = UInt32
-
-    public var offset: Offset
-
-    public var isNull: Bool {
-        offset == 0
-    }
-
-    public func address(from ptr: UnsafeRawPointer) -> UnsafeRawPointer {
-        ptr + numericCast(offset)
+    var indirect: RelativeIndirectPointer<T> {
+        .init(rawPointer: rawPointer)
     }
 }
