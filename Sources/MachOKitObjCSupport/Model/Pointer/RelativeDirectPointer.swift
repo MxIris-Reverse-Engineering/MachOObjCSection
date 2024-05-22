@@ -9,9 +9,13 @@
 // https://github.com/apple/swift/blob/98e65d015979c7b5a58a6ecf2d8598a6f7c85794/include/swift/Basic/RelativePointer.h#L391
 
 public struct RelativeDirectPointer<T> {
-    public typealias Offset = UInt32
+    public typealias Offset = Int32
 
     public var rawPointer: RelativeRawPointer
+
+    public var offset: Offset {
+        rawPointer.offset
+    }
 
     public var isNull: Bool {
         rawPointer.isNull

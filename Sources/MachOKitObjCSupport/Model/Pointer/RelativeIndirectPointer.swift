@@ -9,9 +9,13 @@
 import Foundation
 
 public struct RelativeIndirectPointer<T> {
-    public typealias Offset = UInt32
+    public typealias Offset = Int32
 
     public var rawPointer: RelativeRawPointer
+
+    public var offset: Offset {
+        rawPointer.offset
+    }
 
     public var isNull: Bool {
         rawPointer.isNull

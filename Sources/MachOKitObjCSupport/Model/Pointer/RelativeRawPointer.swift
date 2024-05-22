@@ -9,7 +9,7 @@
 import Foundation
 
 public struct RelativeRawPointer {
-    public typealias Offset = UInt32
+    public typealias Offset = Int32
 
     public var offset: Offset
 
