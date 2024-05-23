@@ -7,9 +7,3 @@
 //
 
 #include <stdio.h>
-#include <objc/runtime.h>
-
-void a() {
-    IMP a;
-
-}

@@ -10,8 +10,19 @@ import Foundation
 
 // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L707
 
+// https://github.com/apple-oss-distributions/dyld/blob/25174f1accc4d352d9e7e6294835f9e6e9b3c7bf/common/ObjCVisitor.h#L191
+
 public struct ObjCMethodList {
-    static let FlagMask: UInt32 = 0xffff0003
+    enum Mask {
+        static let isUniqued: UInt32 = 0x1
+        static let isSorted: UInt32 = 0x2
+
+        static let usesSelectorOffsets: UInt32 = 0x40000000
+        static let isRelative: UInt32 = 0x80000000
+
+        static let sizeMask: UInt32 = 0x0000FFFC
+        static var flagMask: UInt32 { ~sizeMask }
+    }
 
     struct Header {
         let entsizeAndFlags: UInt32
@@ -23,11 +34,11 @@ public struct ObjCMethodList {
 
 extension ObjCMethodList {
     public var entrySize: Int {
-        numericCast(header.entsizeAndFlags & ~Self.FlagMask)
+        numericCast(header.entsizeAndFlags & Mask.sizeMask)
     }
 
     public var flags: UInt32 {
-        header.entsizeAndFlags & Self.FlagMask
+        header.entsizeAndFlags & Mask.flagMask
     }
 
     public var count: Int {
@@ -35,23 +46,34 @@ extension ObjCMethodList {
     }
 
     public var listKind: ObjCMethod.Kind {
-        if header.entsizeAndFlags & numericCast(bigSignedMethodListFlag >> 8) != 0 {
-            return .bigSigned
+        if usesRelativeOffsets {
+            return usesOffsetsFromSelectorBuffer ? .relativeDirect : .relativeIndirect
         }
-        if flags & 0x80000000 != 0 {
-            return .small
-        }
-        return .big
+        return .pointer
+    }
+
+    public var usesOffsetsFromSelectorBuffer: Bool {
+        header.entsizeAndFlags & Mask.usesSelectorOffsets != 0
+    }
+
+    public var usesRelativeOffsets: Bool {
+        header.entsizeAndFlags & Mask.isRelative != 0
+    }
+
+    public func isListOfLists(at address: UnsafeRawPointer) -> Bool {
+        UInt(bitPattern: address) & 1 != 0
     }
 }
 
 extension ObjCMethodList {
-    public func methods(sectionStart: UnsafeRawPointer) -> AnyRandomAccessCollection<ObjCMethod> {
-        let start = sectionStart.advanced(by: MemoryLayout<Header>.size)
+    public func methods(listStart: UnsafeRawPointer) -> AnyRandomAccessCollection<ObjCMethod> {
+        let start = listStart.advanced(by: MemoryLayout<Header>.size)
         switch listKind {
-        case .big:
+        case .pointer:
             let sequence = MemorySequence(
-                basePointer: start.assumingMemoryBound(to: ObjCMethod.Big.self),
+                basePointer: start.assumingMemoryBound(
+                    to: ObjCMethod.Pointer.self
+                ),
                 numberOfElements: count
             )
             return AnyRandomAccessCollection(
@@ -59,22 +81,30 @@ extension ObjCMethodList {
                     .map { ObjCMethod($0) }
             )
 
-        case .bigSigned:
+        case .relativeDirect:
             let sequence = MemorySequence(
-                basePointer: start.assumingMemoryBound(to: ObjCMethod.BigSigned.self),
+                basePointer: start.assumingMemoryBound(
+                    to: ObjCMethod.RelativeDirect.self
+                ),
                 numberOfElements: count
             )
+            let size = MemoryLayout<ObjCMethod.RelativeInDirect>.size
             return AnyRandomAccessCollection(
                 sequence
-                    .map { ObjCMethod($0) }
+                    .enumerated()
+                    .map {
+                        ObjCMethod($1, at: start.advanced(by: size * $0))
+                    }
             )
 
-        case .small:
+        case .relativeIndirect:
             let sequence = MemorySequence(
-                basePointer: start.assumingMemoryBound(to: ObjCMethod.Small.self),
+                basePointer: start.assumingMemoryBound(
+                    to: ObjCMethod.RelativeInDirect.self
+                ),
                 numberOfElements: count
             )
-            let size = MemoryLayout<ObjCMethod.Small>.size
+            let size = MemoryLayout<ObjCMethod.RelativeInDirect>.size
             return AnyRandomAccessCollection(
                 sequence
                     .enumerated()
