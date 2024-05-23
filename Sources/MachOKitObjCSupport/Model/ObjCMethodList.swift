@@ -12,25 +12,11 @@ import Foundation
 
 // https://github.com/apple-oss-distributions/dyld/blob/25174f1accc4d352d9e7e6294835f9e6e9b3c7bf/common/ObjCVisitor.h#L191
 
-public struct ObjCMethodList {
-    enum Mask {
-        static let isUniqued: UInt32 = 0x1
-        static let isSorted: UInt32 = 0x2
-
-        static let usesSelectorOffsets: UInt32 = 0x40000000
-        static let isRelative: UInt32 = 0x80000000
-
-        static let sizeMask: UInt32 = 0x0000FFFC
-        static var flagMask: UInt32 { ~sizeMask }
-    }
-
-    struct Header {
-        let entsizeAndFlags: UInt32
-        let count: UInt32
-    }
+public struct ObjCMethodList: ObjCMethodListProtocol {
+    public typealias Header = ObjCMethodListHeader
 
     public let ptr: UnsafeRawPointer
-    let header: Header
+    public let header: Header
 
     init(ptr: UnsafeRawPointer) {
         self.ptr = ptr
@@ -39,39 +25,8 @@ public struct ObjCMethodList {
 }
 
 extension ObjCMethodList {
-    public var entrySize: Int {
-        numericCast(header.entsizeAndFlags & Mask.sizeMask)
-    }
-
-    public var flags: UInt32 {
-        header.entsizeAndFlags & Mask.flagMask
-    }
-
-    public var count: Int {
-        numericCast(header.count)
-    }
-
-    public var listKind: ObjCMethod.Kind {
-        if usesRelativeOffsets {
-            return usesOffsetsFromSelectorBuffer ? .relativeDirect : .relativeIndirect
-        }
-        return .pointer
-    }
-
-    public var usesOffsetsFromSelectorBuffer: Bool {
-        header.entsizeAndFlags & Mask.usesSelectorOffsets != 0
-    }
-
-    public var usesRelativeOffsets: Bool {
-        header.entsizeAndFlags & Mask.isRelative != 0
-    }
-
     public var isListOfLists: Bool {
         (ptr.load(as: uintptr_t.self) & 1) != 0
-    }
-
-    public var size: Int {
-        MemoryLayout<Header>.size + entrySize * count
     }
 }
 
