@@ -29,7 +29,13 @@ public struct ObjCMethodList {
         let count: UInt32
     }
 
+    public let ptr: UnsafeRawPointer
     let header: Header
+
+    init(ptr: UnsafeRawPointer) {
+        self.ptr = ptr
+        self.header = ptr.load(as: Header.self)
+    }
 }
 
 extension ObjCMethodList {
@@ -60,14 +66,18 @@ extension ObjCMethodList {
         header.entsizeAndFlags & Mask.isRelative != 0
     }
 
-    public func isListOfLists(at address: UnsafeRawPointer) -> Bool {
-        UInt(bitPattern: address) & 1 != 0
+    public var isListOfLists: Bool {
+        (ptr.load(as: uintptr_t.self) & 1) != 0
+    }
+
+    public var size: Int {
+        MemoryLayout<Header>.size + entrySize * count
     }
 }
 
 extension ObjCMethodList {
-    public func methods(listStart: UnsafeRawPointer) -> AnyRandomAccessCollection<ObjCMethod> {
-        let start = listStart.advanced(by: MemoryLayout<Header>.size)
+    public var methods: AnyRandomAccessCollection<ObjCMethod> {
+        let start = ptr.advanced(by: MemoryLayout<Header>.size)
         switch listKind {
         case .pointer:
             let sequence = MemorySequence(
