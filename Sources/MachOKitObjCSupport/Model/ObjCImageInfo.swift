@@ -44,8 +44,8 @@ extension ObjCImageInfoFlags {
         .init(rawValue: (rawValue & (0xff << 8)) >> 8)
     }
 
-    public var swiftStableVersion: UInt32 {
-        (rawValue & (0xffff << 16)) >> 16
+    public var swiftStableVersion: Version {
+        Version((rawValue & (0xffff << 16)) >> 8)
     }
 }
 
