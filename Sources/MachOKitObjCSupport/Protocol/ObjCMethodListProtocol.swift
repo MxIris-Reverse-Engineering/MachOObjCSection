@@ -8,12 +8,16 @@
 
 import Foundation
 
+// https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L707
+
+// https://github.com/apple-oss-distributions/dyld/blob/25174f1accc4d352d9e7e6294835f9e6e9b3c7bf/common/ObjCVisitor.h#L191
+
 public protocol ObjCMethodListProtocol {
     var header: ObjCMethodListHeader { get }
 
     var isListOfLists: Bool { get }
 
-    var methods: AnyRandomAccessCollection<ObjCMethod> { get }
+    var methods: [ObjCMethod] { get }
 }
 
 extension ObjCMethodListProtocol {
