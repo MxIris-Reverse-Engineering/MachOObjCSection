@@ -12,9 +12,9 @@ import Foundation
 // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L925
 
 public struct ObjCMethod {
-    let name: String
-    let types: String
-    let imp: IMP?
+    public let name: String
+    public let types: String
+    public let imp: IMP?
 
     init(name: String, types: String, imp: IMP?) {
         self.name = name
