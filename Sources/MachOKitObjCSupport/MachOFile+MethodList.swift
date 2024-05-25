@@ -14,12 +14,14 @@ extension MachOFile {
         public let data: Data
         public let offset: Int
         public let align: Int // 2^align
+        public let is64Bit: Bool
 
         public func makeIterator() -> Iterator {
             .init(
                 data: data,
                 offset: offset,
-                align: align
+                align: align,
+                is64Bit: is64Bit
             )
         }
     }
@@ -32,13 +34,20 @@ extension MachOFile.ObjcMethodLists {
         private let tableStartOffset: Int
         private let data: Data
         private let align: Int
+        private let is64Bit: Bool
 
         private var nextOffset: Int = 0
 
-        init(data: Data, offset: Int, align: Int) {
+        init(
+            data: Data,
+            offset: Int,
+            align: Int,
+            is64Bit: Bool
+        ) {
             self.data = data
             self.tableStartOffset = offset
             self.align = align
+            self.is64Bit = is64Bit
         }
 
         public mutating func next() -> Element? {
@@ -66,11 +75,12 @@ extension MachOFile.ObjcMethodLists {
                 }
                 return Element(
                     ptr: ptr,
-                    offset: tableStartOffset + nextOffset
+                    offset: tableStartOffset + nextOffset,
+                    is64Bit: is64Bit
                 )
             }) else { return nil }
 
-            guard list.isValidEntrySize else {
+            guard list.isValidEntrySize(is64Bit: is64Bit) else {
                 preconditionFailure()
             }
 

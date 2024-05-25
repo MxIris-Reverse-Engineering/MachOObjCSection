@@ -21,10 +21,18 @@ public struct ObjCMethodList {
     public let header: Header
     public let isListOfLists: Bool
 
-    init(ptr: UnsafeRawPointer, offset: Int) {
+    init(
+        ptr: UnsafeRawPointer,
+        offset: Int,
+        is64Bit: Bool
+    ) {
         self.offset = offset
         self.header = ptr.assumingMemoryBound(to: Header.self).pointee
-        self.isListOfLists = (ptr.load(as: uintptr_t.self) & 1) != 0
+        if is64Bit {
+            self.isListOfLists = (ptr.assumingMemoryBound(to: UInt64.self).pointee & 1) != 0
+        } else {
+            self.isListOfLists = (ptr.assumingMemoryBound(to: UInt32.self).pointee & 1) != 0
+        }
     }
 }
 
@@ -58,10 +66,12 @@ extension ObjCMethodList {
 }
 
 extension ObjCMethodList {
-    var isValidEntrySize: Bool {
+    func isValidEntrySize(is64Bit: Bool) -> Bool {
         switch listKind {
+        case .pointer where is64Bit:
+            MemoryLayout<ObjCMethod.Pointer64>.size == entrySize
         case .pointer:
-            MemoryLayout<ObjCMethod.Pointer>.size == entrySize
+            MemoryLayout<ObjCMethod.Pointer32>.size == entrySize
         case .relativeDirect:
             MemoryLayout<ObjCMethod.RelativeDirect>.size == entrySize
         case .relativeIndirect:
@@ -127,8 +137,8 @@ extension ObjCMethodList {
         in machO: MachOFile
     ) -> AnyRandomAccessCollection<ObjCMethod>? {
         switch listKind {
-        case .pointer:
-            let sequence: DataSequence<ObjCMethod.Pointer> = machO.fileHandle.readDataSequence(
+        case .pointer where machO.is64Bit:
+            let sequence: DataSequence<ObjCMethod.Pointer64> = machO.fileHandle.readDataSequence(
                 offset: numericCast(offset + MemoryLayout<Header>.size),
                 numberOfElements: count, 
                 swapHandler: nil
@@ -137,8 +147,33 @@ extension ObjCMethodList {
             return AnyRandomAccessCollection(
                 sequence
                     .map {
-                        let name = UInt(bitPattern: $0.name) & 0x7ffffffff
-                        let types = UInt(bitPattern: $0.types) & 0x7ffffffff
+                        let name = UInt($0.name) & 0x7ffffffff
+                        let types = UInt($0.types) & 0x7ffffffff
+                        return ObjCMethod(
+                            name: machO.fileHandle.readString(
+                                offset: numericCast(offset) + numericCast(name),
+                                size: 1000
+                            ) ?? "",
+                            types: machO.fileHandle.readString(
+                                offset: numericCast(offset) + numericCast(types),
+                                size: 1000
+                            ) ?? "",
+                            imp: nil
+                        )
+                    }
+            )
+        case .pointer:
+            let sequence: DataSequence<ObjCMethod.Pointer32> = machO.fileHandle.readDataSequence(
+                offset: numericCast(offset + MemoryLayout<Header>.size),
+                numberOfElements: count,
+                swapHandler: nil
+            )
+            let offset = machO.headerStartOffset + machO.headerStartOffsetInCache
+            return AnyRandomAccessCollection(
+                sequence
+                    .map {
+                        let name = UInt($0.name)
+                        let types = UInt($0.types)
                         return ObjCMethod(
                             name: machO.fileHandle.readString(
                                 offset: numericCast(offset) + numericCast(name),

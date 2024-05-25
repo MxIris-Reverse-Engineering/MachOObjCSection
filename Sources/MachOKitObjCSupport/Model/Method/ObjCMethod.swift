@@ -48,6 +48,48 @@ extension ObjCMethod {
 }
 
 extension ObjCMethod {
+    public struct Pointer32 {
+        public let name: UInt32 // UnsafePointer<CChar>
+        public let types: UInt32 // UnsafePointer<CChar>
+        public let imp: UInt32 // IMP
+    }
+
+    init(_ pointer: Pointer32) {
+        let name = UnsafeRawPointer(bitPattern: UInt(pointer.name))?
+            .assumingMemoryBound(to: CChar.self)
+        let types = UnsafeRawPointer(bitPattern: UInt(pointer.types))?
+            .assumingMemoryBound(to: CChar.self)
+        let imp = OpaquePointer(bitPattern: UInt(pointer.imp))
+        self.init(
+            name: .init(cString: name!),
+            types: .init(cString: types!),
+            imp: imp
+        )
+    }
+}
+
+extension ObjCMethod {
+    public struct Pointer64 {
+        public let name: UInt64 // UnsafePointer<CChar>
+        public let types: UInt64 // UnsafePointer<CChar>
+        public let imp: UInt64 // IMP
+    }
+
+    init(_ pointer: Pointer64) {
+        let name = UnsafeRawPointer(bitPattern: UInt(pointer.name))?
+            .assumingMemoryBound(to: CChar.self)
+        let types = UnsafeRawPointer(bitPattern: UInt(pointer.types))?
+            .assumingMemoryBound(to: CChar.self)
+        let imp = OpaquePointer(bitPattern: UInt(pointer.imp))
+        self.init(
+            name: .init(cString: name!),
+            types: .init(cString: types!),
+            imp: imp
+        )
+    }
+}
+
+extension ObjCMethod {
     public struct RelativeDirect {
         public let name: RelativeDirectPointer<CChar>
         public let types: RelativeDirectPointer<CChar>

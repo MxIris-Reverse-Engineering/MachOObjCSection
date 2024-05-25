@@ -15,13 +15,15 @@ extension MachOImage {
         public let basePointer: UnsafeRawPointer
         public let tableSize: Int
         public let align: Int // 2^align
+        public let is64Bit: Bool
 
         public func makeIterator() -> Iterator {
             .init(
                 offset: offset,
                 basePointer: basePointer,
                 tableSize: tableSize,
-                align: align
+                align: align,
+                is64Bit: is64Bit
             )
         }
     }
@@ -35,6 +37,7 @@ extension MachOImage.ObjcMethodLists {
         private let basePointer: UnsafeRawPointer
         private let tableSize: Int
         private let align: Int
+        private let is64Bit: Bool
 
         private var nextOffset: Int = 0
 
@@ -42,12 +45,14 @@ extension MachOImage.ObjcMethodLists {
             offset: Int,
             basePointer: UnsafeRawPointer,
             tableSize: Int,
-            align: Int
+            align: Int,
+            is64Bit: Bool
         ) {
             self.tableStartOffset = offset
             self.basePointer = basePointer
             self.tableSize = tableSize
             self.align = align
+            self.is64Bit = is64Bit
         }
 
         public mutating func next() -> Element? {
@@ -65,9 +70,10 @@ extension MachOImage.ObjcMethodLists {
 
             let list = ObjCMethodList(
                 ptr: ptr,
-                offset: tableStartOffset + nextOffset
+                offset: tableStartOffset + nextOffset,
+                is64Bit: is64Bit
             )
-            guard list.isValidEntrySize else {
+            guard list.isValidEntrySize(is64Bit: is64Bit) else {
                 preconditionFailure()
             }
 
