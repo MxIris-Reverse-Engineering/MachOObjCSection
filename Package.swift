@@ -3,11 +3,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "MachOKitObjCSupport",
+    name: "MachOObjCSection",
     products: [
         .library(
-            name: "MachOKitObjCSupport",
-            targets: ["MachOKitObjCSupport"]
+            name: "MachOObjCSection",
+            targets: ["MachOObjCSection"]
         ),
     ],
     dependencies: [
@@ -15,18 +15,18 @@ let package = Package(
     ],
     targets: [
         .target(
-            name: "MachOKitObjCSupport",
+            name: "MachOObjCSection",
             dependencies: [
-                "MachOKitObjCSupportC",
+                "MachOObjCSectionC",
                 "MachOKit",
             ]
         ),
         .target(
-            name: "MachOKitObjCSupportC"
+            name: "MachOObjCSectionC"
         ),
         .testTarget(
-            name: "MachOKitObjCSupportTests",
-            dependencies: ["MachOKitObjCSupport"]
+            name: "MachOObjCSectionTests",
+            dependencies: ["MachOObjCSection"]
         ),
     ]
 )
