@@ -7,6 +7,7 @@
 //
 
 import Foundation
+@testable import MachOKit
 
 public struct ObjCPropertyList {
     public typealias Header = ObjCPropertyListHeader
@@ -65,5 +66,62 @@ extension ObjCPropertyList {
             sequence
                 .map { ObjCProperty($0) }
         )
+    }
+
+    public func properties(
+        in machO: MachOFile
+    ) -> AnyRandomAccessCollection<ObjCProperty> {
+        let headerStartOffset = machO.headerStartOffset + machO.headerStartOffsetInCache
+        let start = headerStartOffset + offset
+        let size = if machO.is64Bit {
+            MemoryLayout<ObjCProperty.Property64>.size
+        } else { MemoryLayout<ObjCProperty.Property32>.size
+        }
+        let data = machO.fileHandle.readData(
+            offset: numericCast(start + MemoryLayout<Header>.size),
+            size: size * count
+        )
+
+        if machO.is64Bit {
+            let sequence: DataSequence<ObjCProperty.Property64> = .init(
+                data: data,
+                numberOfElements: count
+            )
+            return AnyRandomAccessCollection(
+                sequence
+                    .map {
+                        ObjCProperty(
+                            name: machO.fileHandle.readString(
+                                offset: numericCast(headerStartOffset) + ($0.name & 0x7ffffffff),
+                                size: 1000 // FIXME: length
+                            ) ?? "",
+                            attributes: machO.fileHandle.readString(
+                                offset: numericCast(headerStartOffset) + ($0.attributes & 0x7ffffffff),
+                                size: 1000 // FIXME: length
+                            ) ?? ""
+                        )
+                    }
+            )
+        } else {
+            let sequence: DataSequence<ObjCProperty.Property64> = .init(
+                data: data,
+                numberOfElements: count
+            )
+            return AnyRandomAccessCollection(
+                sequence
+                    .map {
+                        ObjCProperty(
+                            name: machO.fileHandle.readString(
+                                offset: numericCast(headerStartOffset) + $0.name,
+                                size: 1000 // FIXME: length
+                            ) ?? "",
+                            attributes: machO.fileHandle.readString(
+                                offset: numericCast(headerStartOffset) + $0.attributes,
+                                size: 1000 // FIXME: length
+                            ) ?? ""
+                        )
+                    }
+            )
+        }
     }
 }
