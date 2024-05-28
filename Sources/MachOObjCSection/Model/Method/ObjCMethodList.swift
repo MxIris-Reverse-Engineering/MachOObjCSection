@@ -136,14 +136,14 @@ extension ObjCMethodList {
     public func methods(
         in machO: MachOFile
     ) -> AnyRandomAccessCollection<ObjCMethod>? {
+        let headerStartOffset = machO.headerStartOffset + machO.headerStartOffsetInCache
         switch listKind {
         case .pointer where machO.is64Bit:
             let sequence: DataSequence<ObjCMethod.Pointer64> = machO.fileHandle.readDataSequence(
-                offset: numericCast(offset + MemoryLayout<Header>.size),
-                numberOfElements: count, 
+                offset: numericCast(headerStartOffset + offset + MemoryLayout<Header>.size),
+                numberOfElements: count,
                 swapHandler: nil
             )
-            let offset = machO.headerStartOffset + machO.headerStartOffsetInCache
             return AnyRandomAccessCollection(
                 sequence
                     .map {
@@ -151,11 +151,11 @@ extension ObjCMethodList {
                         let types = UInt($0.types) & 0x7ffffffff
                         return ObjCMethod(
                             name: machO.fileHandle.readString(
-                                offset: numericCast(offset) + numericCast(name),
+                                offset: numericCast(headerStartOffset) + numericCast(name),
                                 size: 1000
                             ) ?? "",
                             types: machO.fileHandle.readString(
-                                offset: numericCast(offset) + numericCast(types),
+                                offset: numericCast(headerStartOffset) + numericCast(types),
                                 size: 1000
                             ) ?? "",
                             imp: nil
@@ -164,11 +164,10 @@ extension ObjCMethodList {
             )
         case .pointer:
             let sequence: DataSequence<ObjCMethod.Pointer32> = machO.fileHandle.readDataSequence(
-                offset: numericCast(offset + MemoryLayout<Header>.size),
+                offset: numericCast(headerStartOffset + offset + MemoryLayout<Header>.size),
                 numberOfElements: count,
                 swapHandler: nil
             )
-            let offset = machO.headerStartOffset + machO.headerStartOffsetInCache
             return AnyRandomAccessCollection(
                 sequence
                     .map {
@@ -176,11 +175,11 @@ extension ObjCMethodList {
                         let types = UInt($0.types)
                         return ObjCMethod(
                             name: machO.fileHandle.readString(
-                                offset: numericCast(offset) + numericCast(name),
+                                offset: numericCast(headerStartOffset) + numericCast(name),
                                 size: 1000
                             ) ?? "",
                             types: machO.fileHandle.readString(
-                                offset: numericCast(offset) + numericCast(types),
+                                offset: numericCast(headerStartOffset) + numericCast(types),
                                 size: 1000
                             ) ?? "",
                             imp: nil
@@ -188,7 +187,7 @@ extension ObjCMethodList {
                     }
             )
         case .relativeIndirect:
-            let offset = offset + MemoryLayout<Header>.size
+            let offset = headerStartOffset + offset + MemoryLayout<Header>.size
             let sequence: DataSequence<ObjCMethod.RelativeInDirect> = machO.fileHandle.readDataSequence(
                 offset: numericCast(offset),
                 numberOfElements: count,
@@ -205,7 +204,7 @@ extension ObjCMethodList {
                         let types: Int = numericCast(offset) + numericCast($1.types.offset) + 4
                         return ObjCMethod(
                             name: machO.fileHandle.readString(
-                                offset: numericCast(machO.headerStartOffset + machO.headerStartOffsetInCache) + numericCast(name),
+                                offset: numericCast(headerStartOffset) + numericCast(name),
                                 size: 1000 // FIXME: length
                             ) ?? "",
                             types: machO.fileHandle.readString(
