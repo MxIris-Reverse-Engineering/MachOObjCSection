@@ -3,10 +3,11 @@
 //
 //
 //  Created by p-x9 on 2024/05/25
-//  
+//
 //
 
 import Foundation
+@testable import MachOKit
 
 public struct ObjCProtocolList64 {
     public typealias Header = ObjCProtocolListHeader64
@@ -37,6 +38,30 @@ extension ObjCProtocolList64 {
                 UnsafeRawPointer(bitPattern: UInt($0))!
                     .assumingMemoryBound(to: ObjCProtocol64.self)
                     .pointee
+            }
+    }
+
+    public func protocols(
+        in machO: MachOFile
+    ) -> [ObjCProtocol64]? {
+        let headerStartOffset = machO.headerStartOffset + machO.headerStartOffsetInCache
+        let start = headerStartOffset + offset
+        let data = machO.fileHandle.readData(
+            offset: numericCast(start + MemoryLayout<Header>.size),
+            size: MemoryLayout<UInt64>.size * numericCast(header.count)
+        )
+        let sequnece: DataSequence<UInt64> = .init(
+            data: data,
+            numberOfElements: numericCast(header.count)
+        )
+
+        return sequnece
+            .map {
+                let offset = $0 & 0x7ffffffff
+                return machO.fileHandle.read<ObjCProtocol64>(
+                    offset: numericCast(headerStartOffset) + numericCast(offset),
+                    swapHandler: { _ in }
+                )
             }
     }
 }
@@ -70,6 +95,30 @@ extension ObjCProtocolList32 {
                 UnsafeRawPointer(bitPattern: UInt($0))!
                     .assumingMemoryBound(to: ObjCProtocol32.self)
                     .pointee
+            }
+    }
+
+    public func protocols(
+        in machO: MachOFile
+    ) -> [ObjCProtocol32]? {
+        let headerStartOffset = machO.headerStartOffset + machO.headerStartOffsetInCache
+        let start = headerStartOffset + offset
+        let data = machO.fileHandle.readData(
+            offset: numericCast(start + MemoryLayout<Header>.size),
+            size: MemoryLayout<UInt32>.size * numericCast(header.count)
+        )
+        let sequnece: DataSequence<UInt32> = .init(
+            data: data,
+            numberOfElements: numericCast(header.count)
+        )
+
+        return sequnece
+            .map {
+                let offset = $0
+                return machO.fileHandle.read<ObjCProtocol32>(
+                    offset: numericCast(headerStartOffset) + numericCast(offset),
+                    swapHandler: { _ in }
+                )
             }
     }
 }
