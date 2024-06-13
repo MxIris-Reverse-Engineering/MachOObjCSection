@@ -7,7 +7,7 @@
 //
 
 import Foundation
-@testable import MachOKit
+@testable @_spi(Support) import MachOKit
 
 // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L707
 

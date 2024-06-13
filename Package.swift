@@ -11,7 +11,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/p-x9/MachOKit.git", exact: "0.17.1")
+        .package(url: "https://github.com/p-x9/MachOKit.git", exact: "0.18.0")
     ],
     targets: [
         .target(

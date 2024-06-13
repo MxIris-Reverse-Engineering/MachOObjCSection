@@ -7,7 +7,7 @@
 //
 
 import Foundation
-@testable import MachOKit
+@testable @_spi(Support) import MachOKit
 
 public struct ObjCPropertyList {
     public typealias Header = ObjCPropertyListHeader
