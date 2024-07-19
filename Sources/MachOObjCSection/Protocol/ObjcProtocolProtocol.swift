@@ -11,13 +11,13 @@ import Foundation
 
 public protocol ObjcProtocolProtocol {
     associatedtype Layout: _ObjcProtocolLayoutProtocol
+    associatedtype ObjCProtocolList: ObjCProtocolListProtocol where ObjCProtocolList.ObjCProtocol == Self
 
     var layout: Layout { get }
 
     func mangledName(in machO: MachOImage) -> String
 
-    func protocols32(in machO: MachOImage) -> ObjCProtocolList32?
-    func protocols64(in machO: MachOImage) -> ObjCProtocolList64?
+    func protocols(in machO: MachOImage) -> ObjCProtocolList?
 
     func instanceMethods(in machO: MachOImage) -> ObjCMethodList?
     func classMethods(in machO: MachOImage) -> ObjCMethodList?
@@ -40,32 +40,6 @@ extension ObjcProtocolProtocol {
             bitPattern: UInt(layout.mangledName)
         )
         return .init(cString: ptr!.assumingMemoryBound(to: CChar.self))
-    }
-
-    public func protocols32(in machO: MachOImage) -> ObjCProtocolList32? {
-        guard !machO.is64Bit,
-              let ptr = UnsafeRawPointer(
-                bitPattern: UInt(layout.protocols)
-              ) else {
-            return nil
-        }
-        return .init(
-            ptr: ptr,
-            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
-        )
-    }
-
-    public func protocols64(in machO: MachOImage) -> ObjCProtocolList64? {
-        guard machO.is64Bit,
-              let ptr = UnsafeRawPointer(
-                bitPattern: UInt(layout.protocols)
-              ) else {
-            return nil
-        }
-        return .init(
-            ptr: ptr,
-            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
-        )
     }
 
     public func instanceMethods(in machO: MachOImage) -> ObjCMethodList? {
@@ -193,45 +167,6 @@ extension ObjcProtocolProtocol {
         return machO.fileHandle.readString(
             offset: numericCast(layout.mangledName & 0x7ffffffff) + numericCast(headerStartOffset)
         ) ?? ""
-    }
-
-    public func protocols32(in machO: MachOFile) -> ObjCProtocolList32? {
-        guard !machO.is64Bit else { return nil }
-        guard layout.protocols > 0 else { return nil }
-        let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
-        let protocols = layout.protocols
-        let data = machO.fileHandle.readData(
-            offset: numericCast(headerStartOffset) + numericCast(protocols),
-            size: MemoryLayout<ObjCProtocolList32.Header>.size
-        )
-        return data.withUnsafeBytes {
-            guard let baseAddress = $0.baseAddress else { return nil }
-            return .init(
-                ptr: baseAddress,
-                offset: numericCast(protocols)
-            )
-        }
-    }
-
-    public func protocols64(in machO: MachOFile) -> ObjCProtocolList64? {
-        guard machO.is64Bit else { return nil }
-        guard layout.protocols > 0 else { return nil }
-        let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
-        var protocols = layout.protocols & 0x7ffffffff
-        if let cache = machO.cache {
-            protocols = numericCast(cache.fileOffset(of: numericCast(protocols) + cache.header.sharedRegionStart) ?? 0)
-        }
-        let data = machO.fileHandle.readData(
-            offset: numericCast(headerStartOffset) + numericCast(protocols),
-            size: MemoryLayout<ObjCProtocolList64.Header>.size
-        )
-        return data.withUnsafeBytes {
-            guard let baseAddress = $0.baseAddress else { return nil }
-            return .init(
-                ptr: baseAddress,
-                offset: numericCast(protocols)
-            )
-        }
     }
 
     public func instanceMethods(in machO: MachOFile) -> ObjCMethodList? {

@@ -9,8 +9,9 @@
 import Foundation
 @testable @_spi(Support) import MachOKit
 
-public struct ObjCProtocolList64 {
+public struct ObjCProtocolList64: ObjCProtocolListProtocol {
     public typealias Header = ObjCProtocolListHeader64
+    public typealias ObjcProtocol = ObjCProtocol64
 
     public let offset: Int
     public let header: Header
@@ -24,7 +25,7 @@ public struct ObjCProtocolList64 {
 extension ObjCProtocolList64 {
     public func protocols(
         in machO: MachOImage
-    ) -> [ObjCProtocol64]? {
+    ) -> [ObjcProtocol]? {
         let ptr = machO.ptr.advanced(by: offset)
         let sequnece = MemorySequence(
             basePointer: ptr
@@ -43,7 +44,7 @@ extension ObjCProtocolList64 {
 
     public func protocols(
         in machO: MachOFile
-    ) -> [ObjCProtocol64]? {
+    ) -> [ObjcProtocol]? {
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         let start = headerStartOffset + offset
         let data = machO.fileHandle.readData(
@@ -69,8 +70,9 @@ extension ObjCProtocolList64 {
     }
 }
 
-public struct ObjCProtocolList32 {
+public struct ObjCProtocolList32: ObjCProtocolListProtocol {
     public typealias Header = ObjCProtocolListHeader32
+    public typealias ObjcProtocol = ObjCProtocol32
 
     public let offset: Int
     public let header: Header
@@ -84,7 +86,7 @@ public struct ObjCProtocolList32 {
 extension ObjCProtocolList32 {
     public func protocols(
         in machO: MachOImage
-    ) -> [ObjCProtocol32]? {
+    ) -> [ObjcProtocol]? {
         let ptr = machO.ptr.advanced(by: offset)
         let sequnece = MemorySequence(
             basePointer: ptr
@@ -103,7 +105,7 @@ extension ObjCProtocolList32 {
 
     public func protocols(
         in machO: MachOFile
-    ) -> [ObjCProtocol32]? {
+    ) -> [ObjcProtocol]? {
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         let start = headerStartOffset + offset
         let data = machO.fileHandle.readData(
