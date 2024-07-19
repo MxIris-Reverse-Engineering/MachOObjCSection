@@ -136,7 +136,7 @@ extension ObjCMethodList {
     public func methods(
         in machO: MachOFile
     ) -> AnyRandomAccessCollection<ObjCMethod>? {
-        let headerStartOffset = machO.headerStartOffset + machO.headerStartOffsetInCache
+        let headerStartOffset = machO.headerStartOffset /* + machO.headerStartOffsetInCache*/
         switch listKind {
         case .pointer where machO.is64Bit:
             let sequence: DataSequence<ObjCMethod.Pointer64> = machO.fileHandle.readDataSequence(
@@ -200,42 +200,42 @@ extension ObjCMethodList {
                         let types: Int = numericCast(offset) + numericCast($1.types.offset) + 4
                         return ObjCMethod(
                             name: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + numericCast(name),
-                                size: 1000 // FIXME: length
+                                offset: numericCast(headerStartOffset) + numericCast(name)
                             ) ?? "",
                             types: machO.fileHandle.readString(
-                                offset: numericCast(types),
-                                size: 1000 // FIXME: length
+                                offset: numericCast(types)
                             ) ?? "",
                             imp: nil
                         )
                     }
             )
-        default:
-            return nil
-        }
-    }
-}
+        case .relativeDirect:
+            let offset = headerStartOffset + offset + MemoryLayout<Header>.size
+            let sequence: DataSequence<ObjCMethod.RelativeDirect> = machO.fileHandle.readDataSequence(
+                offset: numericCast(offset),
+                numberOfElements: count,
+                swapHandler: nil
+            )
+            let size = MemoryLayout<ObjCMethod.RelativeDirect>.size
+            return AnyRandomAccessCollection(
+                sequence.enumerated()
+                    .map {
+                        let offset = offset + $0 * size
+                        let name: Int64 = numericCast($1.name.offset)
+                        let types: Int64 = numericCast(offset) + numericCast($1.types.offset) + 4
 
-extension FileHandle {
-    func readDataSequence<Element>(
-        offset: UInt64,
-        numberOfElements: Int,
-        swapHandler: ((inout Data) -> Void)? = nil
-    ) -> DataSequence<Element> {
-        seek(toFileOffset: offset)
-        let size = MemoryLayout<Element>.size * numberOfElements
-        var data = readData(
-            ofLength: size
-        )
-        precondition(
-            data.count >= size,
-            "Invalid Data Size"
-        )
-        if let swapHandler { swapHandler(&data) }
-        return .init(
-            data: data,
-            numberOfElements: numberOfElements
-        )
+                        let nameOffsetInCache = machO.cahce?.objcOptimization?.relativeMethodSelectorBaseAddressOffset ?? 0
+                        return ObjCMethod(
+                            name: machO.fileHandle.readString(
+                                offset: numericCast(name) + numericCast(nameOffsetInCache)
+                            ) ?? "",
+                            types: machO.fileHandle.readString(
+                                offset: numericCast(types)
+                            ) ?? "",
+                            imp: nil
+                        )
+                    }
+            )
+        }
     }
 }
