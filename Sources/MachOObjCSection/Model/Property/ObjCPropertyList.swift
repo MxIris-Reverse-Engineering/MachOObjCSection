@@ -71,7 +71,7 @@ extension ObjCPropertyList {
     public func properties(
         in machO: MachOFile
     ) -> AnyRandomAccessCollection<ObjCProperty> {
-        let headerStartOffset = machO.headerStartOffset + machO.headerStartOffsetInCache
+        let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         let start = headerStartOffset + offset
         let size = if machO.is64Bit {
             MemoryLayout<ObjCProperty.Property64>.size

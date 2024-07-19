@@ -224,7 +224,7 @@ extension ObjCMethodList {
                         let name: Int64 = numericCast($1.name.offset)
                         let types: Int64 = numericCast(offset) + numericCast($1.types.offset) + 4
 
-                        let nameOffsetInCache = machO.cahce?.objcOptimization?.relativeMethodSelectorBaseAddressOffset ?? 0
+                        let nameOffsetInCache = machO.cache?.objcOptimization?.relativeMethodSelectorBaseAddressOffset ?? 0
                         return ObjCMethod(
                             name: machO.fileHandle.readString(
                                 offset: numericCast(name) + numericCast(nameOffsetInCache)

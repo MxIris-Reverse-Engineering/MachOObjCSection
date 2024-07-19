@@ -44,7 +44,7 @@ extension ObjCProtocolList64 {
     public func protocols(
         in machO: MachOFile
     ) -> [ObjCProtocol64]? {
-        let headerStartOffset = machO.headerStartOffset + machO.headerStartOffsetInCache
+        let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         let start = headerStartOffset + offset
         let data = machO.fileHandle.readData(
             offset: numericCast(start + MemoryLayout<Header>.size),
@@ -57,7 +57,10 @@ extension ObjCProtocolList64 {
 
         return sequnece
             .map {
-                let offset = $0 & 0x7ffffffff
+                var offset = $0 & 0x7ffffffff
+                if let cache = machO.cache {
+                    offset = numericCast(cache.fileOffset(of: numericCast(offset) + cache.header.sharedRegionStart) ?? 0)
+                }
                 return machO.fileHandle.read<ObjCProtocol64>(
                     offset: numericCast(headerStartOffset) + numericCast(offset),
                     swapHandler: { _ in }
@@ -101,7 +104,7 @@ extension ObjCProtocolList32 {
     public func protocols(
         in machO: MachOFile
     ) -> [ObjCProtocol32]? {
-        let headerStartOffset = machO.headerStartOffset + machO.headerStartOffsetInCache
+        let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         let start = headerStartOffset + offset
         let data = machO.fileHandle.readData(
             offset: numericCast(start + MemoryLayout<Header>.size),

@@ -10,7 +10,7 @@ import Foundation
 import MachOKit
 
 extension MachOFile {
-    var cahce: DyldCache? {
+    var cache: DyldCache? {
         guard isLoadedFromDyldCache else { return nil }
         return try? DyldCache(url: url)
     }
