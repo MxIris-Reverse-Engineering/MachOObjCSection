@@ -151,12 +151,10 @@ extension ObjCMethodList {
                         let types = UInt($0.types) & 0x7ffffffff
                         return ObjCMethod(
                             name: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + numericCast(name),
-                                size: 1000
+                                offset: numericCast(headerStartOffset) + numericCast(name)
                             ) ?? "",
                             types: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + numericCast(types),
-                                size: 1000
+                                offset: numericCast(headerStartOffset) + numericCast(types)
                             ) ?? "",
                             imp: nil
                         )
@@ -175,12 +173,10 @@ extension ObjCMethodList {
                         let types = UInt($0.types)
                         return ObjCMethod(
                             name: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + numericCast(name),
-                                size: 1000
+                                offset: numericCast(headerStartOffset) + numericCast(name)
                             ) ?? "",
                             types: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + numericCast(types),
-                                size: 1000
+                                offset: numericCast(headerStartOffset) + numericCast(types)
                             ) ?? "",
                             imp: nil
                         )

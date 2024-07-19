@@ -92,12 +92,10 @@ extension ObjCPropertyList {
                     .map {
                         ObjCProperty(
                             name: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + ($0.name & 0x7ffffffff),
-                                size: 1000 // FIXME: length
+                                offset: numericCast(headerStartOffset) + ($0.name & 0x7ffffffff)
                             ) ?? "",
                             attributes: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + ($0.attributes & 0x7ffffffff),
-                                size: 1000 // FIXME: length
+                                offset: numericCast(headerStartOffset) + ($0.attributes & 0x7ffffffff)
                             ) ?? ""
                         )
                     }
@@ -112,12 +110,10 @@ extension ObjCPropertyList {
                     .map {
                         ObjCProperty(
                             name: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + $0.name,
-                                size: 1000 // FIXME: length
+                                offset: numericCast(headerStartOffset) + $0.name
                             ) ?? "",
                             attributes: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + $0.attributes,
-                                size: 1000 // FIXME: length
+                                offset: numericCast(headerStartOffset) + $0.attributes
                             ) ?? ""
                         )
                     }
