@@ -7,7 +7,7 @@
 //
 
 import Foundation
-@testable @_spi(Support) import MachOKit
+@_spi(Support) import MachOKit
 
 public struct ObjCProtocol64: LayoutWrapper, ObjcProtocolProtocol {
     public typealias Pointer = UInt64
