@@ -1,5 +1,5 @@
 //
-//  ObjcProtocol.swift
+//  ObjCProtocol.swift
 //
 //
 //  Created by p-x9 on 2024/05/27
@@ -9,11 +9,11 @@
 import Foundation
 @_spi(Support) import MachOKit
 
-public struct ObjCProtocol64: LayoutWrapper, ObjcProtocolProtocol {
+public struct ObjCProtocol64: LayoutWrapper, ObjCProtocolProtocol {
     public typealias Pointer = UInt64
     public typealias ObjCProtocolList = ObjCProtocolList64
 
-    public struct Layout: _ObjcProtocolLayoutProtocol {
+    public struct Layout: _ObjCProtocolLayoutProtocol {
         public let isa: Pointer // UnsafeRawPointer?
         public let mangledName: Pointer // UnsafePointer<CChar>
         public let protocols: Pointer // UnsafeRawPointer?
@@ -69,11 +69,11 @@ extension ObjCProtocol64 {
     }
 }
 
-public struct ObjCProtocol32: LayoutWrapper, ObjcProtocolProtocol {
+public struct ObjCProtocol32: LayoutWrapper, ObjCProtocolProtocol {
     public typealias Pointer = UInt32
     public typealias ObjCProtocolList = ObjCProtocolList32
 
-    public struct Layout: _ObjcProtocolLayoutProtocol {
+    public struct Layout: _ObjCProtocolLayoutProtocol {
         public let isa: Pointer // UnsafeRawPointer?
         public let mangledName: Pointer // UnsafePointer<CChar>
         public let protocols: Pointer // UnsafeRawPointer?

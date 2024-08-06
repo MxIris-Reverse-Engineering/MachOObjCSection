@@ -10,7 +10,7 @@ import Foundation
 import MachOKit
 
 extension MachOImage {
-    public struct ObjcMethodLists: Sequence {
+    public struct ObjCMethodLists: Sequence {
         public let offset: Int
         public let basePointer: UnsafeRawPointer
         public let tableSize: Int
@@ -29,7 +29,7 @@ extension MachOImage {
     }
 }
 
-extension MachOImage.ObjcMethodLists {
+extension MachOImage.ObjCMethodLists {
     public struct Iterator: IteratorProtocol {
         public typealias Element = ObjCMethodList
 

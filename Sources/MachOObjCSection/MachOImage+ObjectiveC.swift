@@ -25,7 +25,7 @@ extension MachOImage {
 
 extension MachOImage.ObjectiveC {
     /// __TEXT.__objc_methlist
-    public var methods: MachOImage.ObjcMethodLists? {
+    public var methods: MachOImage.ObjCMethodLists? {
         let loadCommands = machO.loadCommands
 
         guard let vmaddrSlide = machO.vmaddrSlide else { return nil }

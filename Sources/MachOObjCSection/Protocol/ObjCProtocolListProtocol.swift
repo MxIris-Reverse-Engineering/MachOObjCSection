@@ -14,7 +14,7 @@ public protocol ObjCProtocolListHeaderProtocol {
 
 public protocol ObjCProtocolListProtocol {
     associatedtype Header: ObjCProtocolListHeaderProtocol
-    associatedtype ObjCProtocol: ObjcProtocolProtocol
+    associatedtype ObjCProtocol: ObjCProtocolProtocol
 
     var offset: Int { get }
     var header: Header { get }

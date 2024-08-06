@@ -1,5 +1,5 @@
 //
-//  ObjcProtocolProtocol.swift
+//  ObjCProtocolProtocol.swift
 //
 //
 //  Created by p-x9 on 2024/05/27
@@ -9,32 +9,14 @@
 import Foundation
 @_spi(Support) import MachOKit
 
-public protocol ObjcProtocolProtocol {
-    associatedtype Layout: _ObjcProtocolLayoutProtocol
+public protocol ObjCProtocolProtocol {
+    associatedtype Layout: _ObjCProtocolLayoutProtocol
     associatedtype ObjCProtocolList: ObjCProtocolListProtocol where ObjCProtocolList.ObjCProtocol == Self
 
     var layout: Layout { get }
-
-    func mangledName(in machO: MachOImage) -> String
-
-    func protocols(in machO: MachOImage) -> ObjCProtocolList?
-
-    func instanceMethods(in machO: MachOImage) -> ObjCMethodList?
-    func classMethods(in machO: MachOImage) -> ObjCMethodList?
-    func optionalInstanceMethods(in machO: MachOImage) -> ObjCMethodList?
-    func optionalClassMethods(in machO: MachOImage) -> ObjCMethodList?
-
-    func instanceProperties(in machO: MachOImage) -> ObjCPropertyList?
-
-    var size: UInt32 { get }
-    var flags: UInt32 { get }
-
-    func extendedMethodTypes(in machO: MachOImage) -> String?
-    func demangledName(in machO: MachOImage) -> String?
-    func classProperties(in machO: MachOImage) -> ObjCPropertyList?
 }
 
-extension ObjcProtocolProtocol {
+extension ObjCProtocolProtocol {
     public func mangledName(in machO: MachOImage) -> String {
         let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.mangledName)
@@ -161,7 +143,7 @@ extension ObjcProtocolProtocol {
     }
 }
 
-extension ObjcProtocolProtocol {
+extension ObjCProtocolProtocol {
     public func mangledName(in machO: MachOFile) -> String {
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         return machO.fileHandle.readString(
@@ -170,29 +152,29 @@ extension ObjcProtocolProtocol {
     }
 
     public func instanceMethods(in machO: MachOFile) -> ObjCMethodList? {
-        _readObjcMethodList(in: machO, offset: numericCast(layout.instanceMethods))
+        _readObjCMethodList(in: machO, offset: numericCast(layout.instanceMethods))
     }
 
     public func classMethods(in machO: MachOFile) -> ObjCMethodList? {
-        _readObjcMethodList(in: machO, offset: numericCast(layout.classMethods))
+        _readObjCMethodList(in: machO, offset: numericCast(layout.classMethods))
     }
 
     public func optionalInstanceMethods(in machO: MachOFile) -> ObjCMethodList? {
-        _readObjcMethodList(
+        _readObjCMethodList(
             in: machO,
             offset: numericCast(layout.optionalInstanceMethods)
         )
     }
 
     public func optionalClassMethods(in machO: MachOFile) -> ObjCMethodList? {
-        _readObjcMethodList(
+        _readObjCMethodList(
             in: machO,
             offset: numericCast(layout.optionalClassMethods)
         )
     }
 
     public func instanceProperties(in machO: MachOFile) -> ObjCPropertyList? {
-        _readObjcPropertyList(
+        _readObjCPropertyList(
             in: machO,
             offset: numericCast(layout.instanceProperties)
         )
@@ -243,15 +225,15 @@ extension ObjcProtocolProtocol {
     }
 
     public func classProperties(in machO: MachOFile) -> ObjCPropertyList? {
-        _readObjcPropertyList(
+        _readObjCPropertyList(
             in: machO,
             offset: numericCast(layout._classProperties)
         )
     }
 }
 
-extension ObjcProtocolProtocol {
-    fileprivate func _readObjcMethodList(
+extension ObjCProtocolProtocol {
+    fileprivate func _readObjCMethodList(
         in machO: MachOFile,
         offset: UInt64
     ) -> ObjCMethodList? {
@@ -275,7 +257,7 @@ extension ObjcProtocolProtocol {
         }
     }
 
-    fileprivate func _readObjcPropertyList(
+    fileprivate func _readObjCPropertyList(
         in machO: MachOFile,
         offset: UInt64
     ) -> ObjCPropertyList? {

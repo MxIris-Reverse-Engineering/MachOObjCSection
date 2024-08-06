@@ -1,5 +1,5 @@
 //
-//  _ObjcProtocolLayoutProtocol.swift
+//  _ObjCProtocolLayoutProtocol.swift
 //
 //
 //  Created by p-x9 on 2024/05/27
@@ -8,7 +8,7 @@
 
 import Foundation
 
-public protocol _ObjcProtocolLayoutProtocol {
+public protocol _ObjCProtocolLayoutProtocol {
     associatedtype Pointer: FixedWidthInteger
 
     var isa: Pointer { get } // UnsafeRawPointer?

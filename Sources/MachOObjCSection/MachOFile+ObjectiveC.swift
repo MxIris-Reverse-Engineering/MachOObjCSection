@@ -25,7 +25,7 @@ extension MachOFile {
 
 extension MachOFile.ObjectiveC {
     /// __TEXT.__objc_methlist
-    public var methods: MachOFile.ObjcMethodLists? {
+    public var methods: MachOFile.ObjCMethodLists? {
         let loadCommands = machO.loadCommands
 
         let __objc_methlist: any SectionProtocol

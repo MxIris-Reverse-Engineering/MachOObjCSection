@@ -11,7 +11,7 @@ import Foundation
 
 public struct ObjCProtocolList64: ObjCProtocolListProtocol {
     public typealias Header = ObjCProtocolListHeader64
-    public typealias ObjcProtocol = ObjCProtocol64
+    public typealias ObjCProtocol = ObjCProtocol64
 
     public let offset: Int
     public let header: Header
@@ -25,7 +25,7 @@ public struct ObjCProtocolList64: ObjCProtocolListProtocol {
 extension ObjCProtocolList64 {
     public func protocols(
         in machO: MachOImage
-    ) -> [ObjcProtocol]? {
+    ) -> [ObjCProtocol]? {
         let ptr = machO.ptr.advanced(by: offset)
         let sequnece = MemorySequence(
             basePointer: ptr
@@ -44,7 +44,7 @@ extension ObjCProtocolList64 {
 
     public func protocols(
         in machO: MachOFile
-    ) -> [ObjcProtocol]? {
+    ) -> [ObjCProtocol]? {
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         let start = headerStartOffset + offset
         let data = machO.fileHandle.readData(
@@ -72,7 +72,7 @@ extension ObjCProtocolList64 {
 
 public struct ObjCProtocolList32: ObjCProtocolListProtocol {
     public typealias Header = ObjCProtocolListHeader32
-    public typealias ObjcProtocol = ObjCProtocol32
+    public typealias ObjCProtocol = ObjCProtocol32
 
     public let offset: Int
     public let header: Header
@@ -86,7 +86,7 @@ public struct ObjCProtocolList32: ObjCProtocolListProtocol {
 extension ObjCProtocolList32 {
     public func protocols(
         in machO: MachOImage
-    ) -> [ObjcProtocol]? {
+    ) -> [ObjCProtocol]? {
         let ptr = machO.ptr.advanced(by: offset)
         let sequnece = MemorySequence(
             basePointer: ptr
@@ -105,7 +105,7 @@ extension ObjCProtocolList32 {
 
     public func protocols(
         in machO: MachOFile
-    ) -> [ObjcProtocol]? {
+    ) -> [ObjCProtocol]? {
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         let start = headerStartOffset + offset
         let data = machO.fileHandle.readData(

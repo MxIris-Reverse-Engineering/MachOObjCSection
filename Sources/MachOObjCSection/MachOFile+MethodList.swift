@@ -10,7 +10,7 @@ import Foundation
 import MachOKit
 
 extension MachOFile {
-    public struct ObjcMethodLists: Sequence {
+    public struct ObjCMethodLists: Sequence {
         public let data: Data
         public let offset: Int
         public let align: Int // 2^align
@@ -27,7 +27,7 @@ extension MachOFile {
     }
 }
 
-extension MachOFile.ObjcMethodLists {
+extension MachOFile.ObjCMethodLists {
     public struct Iterator: IteratorProtocol {
         public typealias Element = ObjCMethodList
 
