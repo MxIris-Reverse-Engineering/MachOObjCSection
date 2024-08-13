@@ -24,6 +24,47 @@ extension MachOImage {
 }
 
 extension MachOImage.ObjectiveC {
+    /// __DATA.__objc_imageinfo or __DATA_CONST.__objc_imageinfo
+    public var imageInfo: ObjCImageInfo? {
+        let loadCommands = machO.loadCommands
+
+        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
+
+        let segment: any SegmentCommandProtocol
+        let __objc_imageinfo: any SectionProtocol
+
+        if let data = loadCommands.data64,
+           let section = data.sections(cmdsStart: machO.cmdsStartPtr).first(
+            where: {
+                $0.sectionName == "__objc_imageinfo"
+            }
+           ) {
+            segment = data
+            __objc_imageinfo = section
+        } else if let dataConst = loadCommands.dataConst64,
+                  let section = dataConst.sections(cmdsStart: machO.cmdsStartPtr).first(
+                    where: {
+                        $0.sectionName == "__objc_imageinfo"
+                    }
+                  ) {
+            segment = dataConst
+            __objc_imageinfo = section
+        } else {
+            return nil
+        }
+
+        guard let start = __objc_imageinfo.startPtr(
+            in: segment,
+            vmaddrSlide: vmaddrSlide
+        ) else { return nil }
+
+        return start
+            .assumingMemoryBound(to: ObjCImageInfo.self)
+            .pointee
+    }
+}
+
+extension MachOImage.ObjectiveC {
     /// __TEXT.__objc_methlist
     public var methods: MachOImage.ObjCMethodLists? {
         let loadCommands = machO.loadCommands
