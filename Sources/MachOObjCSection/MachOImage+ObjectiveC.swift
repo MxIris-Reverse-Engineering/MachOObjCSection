@@ -49,6 +49,22 @@ extension MachOImage.ObjectiveC {
                   ) {
             segment = dataConst
             __objc_imageinfo = section
+        } else if let data = loadCommands.data,
+                  let section = data.sections(cmdsStart: machO.cmdsStartPtr).first(
+                    where: {
+                        $0.sectionName == "__objc_imageinfo"
+                    }
+                  ) {
+            segment = data
+            __objc_imageinfo = section
+        } else if let dataConst = loadCommands.dataConst,
+                  let section = dataConst.sections(cmdsStart: machO.cmdsStartPtr).first(
+                    where: {
+                        $0.sectionName == "__objc_imageinfo"
+                    }
+                  ) {
+            segment = dataConst
+            __objc_imageinfo = section
         } else {
             return nil
         }

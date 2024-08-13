@@ -43,6 +43,20 @@ extension MachOFile.ObjectiveC {
                     }
                   ) {
             __objc_imageinfo = section
+        } else if let data = loadCommands.data,
+                  let section = data.sections(in: machO).first(
+                    where: {
+                        $0.sectionName == "__objc_imageinfo"
+                    }
+                  ) {
+            __objc_imageinfo = section
+        } else if let dataConst = loadCommands.dataConst,
+                  let section = dataConst.sections(in: machO).first(
+                    where: {
+                        $0.sectionName == "__objc_imageinfo"
+                    }
+                  ) {
+            __objc_imageinfo = section
         } else {
             return nil
         }
