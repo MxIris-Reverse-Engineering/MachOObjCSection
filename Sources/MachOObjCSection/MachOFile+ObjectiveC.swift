@@ -24,6 +24,36 @@ extension MachOFile {
 }
 
 extension MachOFile.ObjectiveC {
+    /// __DATA.__objc_imageinfo or __DATA_CONST.__objc_imageinfo
+    public var imageInfo: ObjCImageInfo? {
+        let loadCommands = machO.loadCommands
+
+        let __objc_imageinfo: any SectionProtocol
+        if let data = loadCommands.data64,
+           let section = data.sections(in: machO).first(
+            where: {
+                $0.sectionName == "__objc_imageinfo"
+            }
+           ) {
+            __objc_imageinfo = section
+        } else if let dataConst = loadCommands.dataConst64,
+                  let section = dataConst.sections(in: machO).first(
+                    where: {
+                        $0.sectionName == "__objc_imageinfo"
+                    }
+                  ) {
+            __objc_imageinfo = section
+        } else {
+            return nil
+        }
+
+        return machO.fileHandle.read(
+            offset: numericCast(__objc_imageinfo.offset + machO.headerStartOffset)
+        )
+    }
+}
+
+extension MachOFile.ObjectiveC {
     /// __TEXT.__objc_methlist
     public var methods: MachOFile.ObjCMethodLists? {
         let loadCommands = machO.loadCommands
