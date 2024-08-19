@@ -17,6 +17,11 @@ public protocol ObjCClassDataProtocol {
 }
 
 extension ObjCClassDataProtocol {
+    public var isRootClass: Bool {
+        let RO_ROOT: UInt32 = (1 << 1)
+        return (layout.flags & RO_ROOT) != 0
+    }
+
     public func ivarLayout(in machO: MachOFile) -> [UInt8]? {
         _ivarLayout(in: machO, at: numericCast(layout.ivarLayout))
     }
