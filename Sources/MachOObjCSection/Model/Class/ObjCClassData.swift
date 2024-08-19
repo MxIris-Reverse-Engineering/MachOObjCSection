@@ -30,3 +30,23 @@ public struct ObjCClassData64: LayoutWrapper, ObjCClassDataProtocol {
 
     public var layout: Layout
 }
+
+public struct ObjCClassData32: LayoutWrapper, ObjCClassDataProtocol {
+    public typealias Pointer = UInt32
+    public typealias ObjCProtocolList = ObjCProtocolList32
+
+    public struct Layout: _ObjCClassDataLayoutProtocol {
+        public let flags: UInt32
+        public let instanceStart: UInt32
+        public let instanceSize: Pointer // union { uint32_t instanceSize; PtrTy pad; }
+        public let ivarLayout: Pointer // union { const uint8_t * ivarLayout; Class nonMetaclass; };
+        public let name: Pointer
+        public let baseMethods: Pointer
+        public let baseProtocols: Pointer
+        public let ivars: Pointer
+        public let weakIvarLayout: Pointer
+        public let baseProperties: Pointer
+    }
+
+    public var layout: Layout
+}
