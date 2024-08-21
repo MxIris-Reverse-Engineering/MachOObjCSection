@@ -3,7 +3,7 @@
 //
 //
 //  Created by p-x9 on 2024/05/25
-//  
+//
 //
 
 import Foundation
@@ -71,11 +71,12 @@ extension ObjCPropertyList {
     public func properties(
         in machO: MachOFile
     ) -> AnyRandomAccessCollection<ObjCProperty> {
-        let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
+        let headerStartOffset = machO.headerStartOffset
         let start = headerStartOffset + offset
         let size = if machO.is64Bit {
             MemoryLayout<ObjCProperty.Property64>.size
-        } else { MemoryLayout<ObjCProperty.Property32>.size
+        } else {
+            MemoryLayout<ObjCProperty.Property32>.size
         }
         let data = machO.fileHandle.readData(
             offset: numericCast(start + MemoryLayout<Header>.size),
