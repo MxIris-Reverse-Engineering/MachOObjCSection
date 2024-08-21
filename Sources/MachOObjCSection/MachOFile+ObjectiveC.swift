@@ -196,3 +196,106 @@ extension MachOFile.ObjectiveC {
             }
     }
 }
+
+extension MachOFile.ObjectiveC {
+    /// __DATA.__objc_classlist or __DATA_CONST.__objc_classlist
+    public var classes64: [ObjCClass64]? {
+        guard machO.is64Bit else { return nil }
+        let loadCommands = machO.loadCommands
+
+        let __objc_classlist: any SectionProtocol
+
+        if let data = loadCommands.data64,
+           let section = data.sections(in: machO).first(
+            where: {
+                $0.sectionName == "__objc_classlist"
+            }
+           ) {
+            __objc_classlist = section
+        } else if let dataConst = loadCommands.dataConst64,
+                  let section = dataConst.sections(in: machO).first(
+                    where: {
+                        $0.sectionName == "__objc_classlist"
+                    }
+                  ) {
+            __objc_classlist = section
+        } else {
+            return nil
+        }
+
+        let data = machO.fileHandle.readData(
+            offset: numericCast(__objc_classlist.offset + machO.headerStartOffset),
+            size: __objc_classlist.size
+        )
+
+        let offsets: DataSequence<UInt64> = .init(
+            data: data,
+            numberOfElements: __objc_classlist.size / 8
+        )
+
+        return offsets
+            .map { $0 & 0x7ffffffff }
+            .compactMap {
+                if let cache = machO.cache {
+                    return cache.fileOffset(of: $0 + cache.header.sharedRegionStart)
+                }
+                return $0
+            }
+            .map {
+                let layout: ObjCClass64.Layout = machO.fileHandle.read(
+                    offset: $0 + numericCast(machO.headerStartOffset)
+                )
+                return .init(layout: layout, offset: numericCast($0))
+            }
+    }
+
+    /// __DATA.__objc_classlist or __DATA_CONST.__objc_classlist
+    public var classes32: [ObjCClass32]? {
+        guard !machO.is64Bit else { return nil }
+        let loadCommands = machO.loadCommands
+
+        let __objc_classlist: any SectionProtocol
+
+        if let data = loadCommands.data,
+           let section = data.sections(in: machO).first(
+            where: {
+                $0.sectionName == "__objc_classlist"
+            }
+           ) {
+            __objc_classlist = section
+        } else if let dataConst = loadCommands.dataConst,
+                  let section = dataConst.sections(in: machO).first(
+                    where: {
+                        $0.sectionName == "__objc_classlist"
+                    }
+                  ) {
+            __objc_classlist = section
+        } else {
+            return nil
+        }
+
+        let data = machO.fileHandle.readData(
+            offset: numericCast(__objc_classlist.offset + machO.headerStartOffset),
+            size: __objc_classlist.size
+        )
+
+        let offsets: DataSequence<UInt32> = .init(
+            data: data,
+            numberOfElements: __objc_classlist.size / 4
+        )
+
+        return offsets
+            .compactMap {
+                if let cache = machO.cache {
+                    return cache.fileOffset(of: numericCast($0) + cache.header.sharedRegionStart)
+                }
+                return numericCast($0)
+            }
+            .map {
+                let layout: ObjCClass32.Layout = machO.fileHandle.read(
+                    offset: $0 + numericCast(machO.headerStartOffset)
+                )
+                return .init(layout: layout, offset: numericCast($0))
+            }
+    }
+}
