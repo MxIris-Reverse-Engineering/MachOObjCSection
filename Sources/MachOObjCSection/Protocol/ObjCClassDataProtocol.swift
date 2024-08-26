@@ -12,8 +12,19 @@ import Foundation
 public protocol ObjCClassDataProtocol {
     associatedtype Layout: _ObjCClassDataLayoutProtocol
     associatedtype ObjCProtocolList: ObjCProtocolListProtocol
+    associatedtype ObjCIvarList: ObjCIvarListProtocol
 
     var layout: Layout { get }
+
+    var isRootClass: Bool { get }
+
+    func ivarLayout(in machO: MachOFile) -> [UInt8]?
+    func weakIvarLayout(in machO: MachOFile) -> [UInt8]?
+    func name(in machO: MachOFile) -> String?
+    func methods(in machO: MachOFile) -> ObjCMethodList?
+    func properties(in machO: MachOFile) -> ObjCPropertyList?
+    func protocols(in machO: MachOFile) -> ObjCProtocolList?
+    func ivars(in machO: MachOFile) -> ObjCIvarList?
 }
 
 extension ObjCClassDataProtocol {
@@ -141,6 +152,60 @@ extension ObjCClassDataProtocol where ObjCProtocolList == ObjCProtocolList32 {
             }
             return .init(
                 ptr: ptr,
+                offset: numericCast(offset) - machO.headerStartOffset
+            )
+        }
+        return list
+    }
+}
+
+extension ObjCClassDataProtocol where ObjCIvarList == ObjCIvarList64 {
+    public func ivars(in machO: MachOFile) -> ObjCIvarList? {
+        guard layout.ivars > 0 else { return nil }
+        var offset: UInt64 = numericCast(layout.ivars) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+                return nil
+            }
+            offset = _offset
+        }
+        let data = machO.fileHandle.readData(
+            offset: offset,
+            size: MemoryLayout<ObjCIvarList64.Header>.size
+        )
+        let list: ObjCIvarList64? = data.withUnsafeBytes {
+            guard let ptr = $0.baseAddress else {
+                return nil
+            }
+            return .init(
+                header: ptr.assumingMemoryBound(to: ObjCIvarListHeader.self).pointee,
+                offset: numericCast(offset) - machO.headerStartOffset
+            )
+        }
+        return list
+    }
+}
+
+extension ObjCClassDataProtocol where ObjCIvarList == ObjCIvarList32 {
+    public func ivars(in machO: MachOFile) -> ObjCIvarList? {
+        guard layout.ivars > 0 else { return nil }
+        var offset: UInt64 = numericCast(layout.ivars) + numericCast(machO.headerStartOffset)
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+                return nil
+            }
+            offset = _offset
+        }
+        let data = machO.fileHandle.readData(
+            offset: offset,
+            size: MemoryLayout<ObjCIvarList32.Header>.size
+        )
+        let list: ObjCIvarList32? = data.withUnsafeBytes {
+            guard let ptr = $0.baseAddress else {
+                return nil
+            }
+            return .init(
+                header: ptr.assumingMemoryBound(to: ObjCIvarListHeader.self).pointee,
                 offset: numericCast(offset) - machO.headerStartOffset
             )
         }

@@ -14,6 +14,7 @@ import Foundation
 public struct ObjCClassData64: LayoutWrapper, ObjCClassDataProtocol {
     public typealias Pointer = UInt64
     public typealias ObjCProtocolList = ObjCProtocolList64
+    public typealias ObjCIvarList = ObjCIvarList64
 
     public struct Layout: _ObjCClassDataLayoutProtocol {
         public let flags: UInt32
@@ -34,6 +35,7 @@ public struct ObjCClassData64: LayoutWrapper, ObjCClassDataProtocol {
 public struct ObjCClassData32: LayoutWrapper, ObjCClassDataProtocol {
     public typealias Pointer = UInt32
     public typealias ObjCProtocolList = ObjCProtocolList32
+    public typealias ObjCIvarList = ObjCIvarList64
 
     public struct Layout: _ObjCClassDataLayoutProtocol {
         public let flags: UInt32
