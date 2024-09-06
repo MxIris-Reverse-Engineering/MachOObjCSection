@@ -136,7 +136,7 @@ extension ObjCMethodList {
     public func methods(
         in machO: MachOFile
     ) -> AnyRandomAccessCollection<ObjCMethod>? {
-        let headerStartOffset = machO.headerStartOffset /* + machO.headerStartOffsetInCache*/
+        let headerStartOffset = machO.headerStartOffset
         switch listKind {
         case .pointer where machO.is64Bit:
             let sequence: DataSequence<ObjCMethod.Pointer64> = machO.fileHandle.readDataSequence(

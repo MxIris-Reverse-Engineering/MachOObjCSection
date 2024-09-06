@@ -61,4 +61,12 @@ extension ObjCIvarProtocol where Self: LayoutWrapper {
         }
         return nil
     }
+
+    func isBind(
+        _ keyPath: PartialKeyPath<Layout>,
+        in machO: MachOFile
+    ) -> Bool {
+        let offset = self.offset + layoutOffset(of: keyPath)
+        return machO.isBind(offset)
+    }
 }

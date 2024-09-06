@@ -21,3 +21,11 @@ extension MachOFile {
         return try? DyldCache(url: url)
     }
 }
+
+extension MachOFile {
+    func isBind(
+        _ offset: Int
+    ) -> Bool {
+        resolveBind(at: numericCast(offset)) != nil
+    }
+}
