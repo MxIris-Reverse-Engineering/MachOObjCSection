@@ -7,6 +7,7 @@
 //
 
 import Foundation
+import MachOObjCSectionC
 @_spi(Support) import MachOKit
 
 public protocol ObjCIvarProtocol {
@@ -25,7 +26,18 @@ public protocol ObjCIvarProtocol {
 }
 
 extension ObjCIvarProtocol {
+    // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L1312
+    public var alignment: UInt32 {
+        if layout.alignment == ~UInt32.zero {
+            return 1 << WORD_SHIFT
+        }
+        return 1 << layout.alignment
+    }
+}
+
+extension ObjCIvarProtocol {
     public func offset(in machO: MachOImage) -> UInt32? {
+        guard layout.offset > 0 else { return nil }
         let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.offset)
         )

@@ -13,6 +13,7 @@ public protocol _ObjCIvarLayoutProtocol {
     var offset: Pointer { get }  // uint32_t*
     var name: Pointer { get }    // const char *
     var type: Pointer { get }    // const char *
+    /// alignment is sometimes -1; use ObjCIvar.alignment instead
     var alignment: UInt32 { get }
     var size: UInt32 { get }
 }
