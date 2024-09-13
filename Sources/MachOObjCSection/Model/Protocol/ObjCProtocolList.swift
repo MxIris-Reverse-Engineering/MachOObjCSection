@@ -15,10 +15,12 @@ public struct ObjCProtocolList64: ObjCProtocolListProtocol {
 
     public let offset: Int
     public let header: Header
+    public let isListOfLists: Bool
 
     init(ptr: UnsafeRawPointer, offset: Int) {
         self.offset = offset
         self.header = ptr.assumingMemoryBound(to: Header.self).pointee
+        self.isListOfLists = offset & 1 == 1
     }
 }
 
@@ -26,6 +28,9 @@ extension ObjCProtocolList64 {
     public func protocols(
         in machO: MachOImage
     ) -> [ObjCProtocol]? {
+        // TODO: Support listOfLists
+        guard !isListOfLists else { return nil }
+
         let ptr = machO.ptr.advanced(by: offset)
         let sequnece = MemorySequence(
             basePointer: ptr

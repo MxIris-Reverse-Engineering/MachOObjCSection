@@ -20,6 +20,7 @@ public struct ObjCMethodList {
     public let offset: Int
     public let header: Header
     public let isListOfLists: Bool
+    public let is64Bit: Bool
 
     init(
         ptr: UnsafeRawPointer,
@@ -28,11 +29,8 @@ public struct ObjCMethodList {
     ) {
         self.offset = offset
         self.header = ptr.assumingMemoryBound(to: Header.self).pointee
-        if is64Bit {
-            self.isListOfLists = (ptr.assumingMemoryBound(to: UInt64.self).pointee & 1) != 0
-        } else {
-            self.isListOfLists = (ptr.assumingMemoryBound(to: UInt32.self).pointee & 1) != 0
-        }
+        self.isListOfLists = offset & 1 == 1
+        self.is64Bit = is64Bit
     }
 }
 
@@ -84,6 +82,9 @@ extension ObjCMethodList {
     public func methods(
         in machO: MachOImage
     ) -> AnyRandomAccessCollection<ObjCMethod> {
+        // TODO: Support listOfLists
+        guard !isListOfLists else { return AnyRandomAccessCollection([]) }
+
         let ptr = machO.ptr.advanced(by: offset)
         let start = ptr.advanced(by: MemoryLayout<Header>.size)
         switch listKind {
