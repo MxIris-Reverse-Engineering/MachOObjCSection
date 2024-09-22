@@ -50,6 +50,9 @@ extension ObjCProtocolList64 {
     public func protocols(
         in machO: MachOFile
     ) -> [ObjCProtocol]? {
+        // TODO: Support listOfLists
+        guard !isListOfLists else { return nil }
+
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         let start = headerStartOffset + offset
         let data = machO.fileHandle.readData(
@@ -81,10 +84,12 @@ public struct ObjCProtocolList32: ObjCProtocolListProtocol {
 
     public let offset: Int
     public let header: Header
+    public let isListOfLists: Bool
 
     init(ptr: UnsafeRawPointer, offset: Int) {
         self.offset = offset
         self.header = ptr.assumingMemoryBound(to: Header.self).pointee
+        self.isListOfLists = offset & 1 == 1
     }
 }
 
@@ -92,6 +97,9 @@ extension ObjCProtocolList32 {
     public func protocols(
         in machO: MachOImage
     ) -> [ObjCProtocol]? {
+        // TODO: Support listOfLists
+        guard !isListOfLists else { return nil }
+
         let ptr = machO.ptr.advanced(by: offset)
         let sequnece = MemorySequence(
             basePointer: ptr
@@ -111,6 +119,9 @@ extension ObjCProtocolList32 {
     public func protocols(
         in machO: MachOFile
     ) -> [ObjCProtocol]? {
+        // TODO: Support listOfLists
+        guard !isListOfLists else { return nil }
+
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         let start = headerStartOffset + offset
         let data = machO.fileHandle.readData(
