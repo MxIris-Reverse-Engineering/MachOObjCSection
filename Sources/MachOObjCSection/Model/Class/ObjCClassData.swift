@@ -30,6 +30,7 @@ public struct ObjCClassData64: LayoutWrapper, ObjCClassDataProtocol {
     }
 
     public var layout: Layout
+    public var offset: Int
 }
 
 public struct ObjCClassData32: LayoutWrapper, ObjCClassDataProtocol {
@@ -51,4 +52,5 @@ public struct ObjCClassData32: LayoutWrapper, ObjCClassDataProtocol {
     }
 
     public var layout: Layout
+    public var offset: Int
 }

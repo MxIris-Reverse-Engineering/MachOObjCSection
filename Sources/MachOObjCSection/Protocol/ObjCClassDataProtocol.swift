@@ -15,6 +15,7 @@ public protocol ObjCClassDataProtocol {
     associatedtype ObjCIvarList: ObjCIvarListProtocol
 
     var layout: Layout { get }
+    var offset: Int { get }
 
     var isRootClass: Bool { get }
 
@@ -28,11 +29,38 @@ public protocol ObjCClassDataProtocol {
 }
 
 extension ObjCClassDataProtocol {
+    // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L36
+
+    public var isMetaClass: Bool {
+        let RO_META: UInt32 = (1 << 0)
+        return (layout.flags & RO_META) != 0
+    }
+
     public var isRootClass: Bool {
         let RO_ROOT: UInt32 = (1 << 1)
         return (layout.flags & RO_ROOT) != 0
     }
 
+    // Values for class_rw_t->flags
+    // These are not emitted by the compiler and are never used in class_ro_t.
+    // Their presence should be considered in future ABI versions.
+    // class_t->data is class_rw_t, not class_ro_t
+    public var isRealized: Bool {
+        let RW_REALIZED: UInt32 = (1 << 31)
+        return (layout.flags & RW_REALIZED) != 0
+    }
+
+    public var isFuture: Bool {
+        let RO_FUTURE: UInt32 = (1 << 30)
+        return (layout.flags & RO_FUTURE) != 0
+    }
+
+    public var hasRWPointer: Bool {
+        isRealized
+    }
+}
+
+extension ObjCClassDataProtocol {
     public func ivarLayout(in machO: MachOFile) -> [UInt8]? {
         _ivarLayout(in: machO, at: numericCast(layout.ivarLayout))
     }

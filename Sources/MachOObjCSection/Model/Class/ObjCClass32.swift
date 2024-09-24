@@ -8,6 +8,7 @@
 
 import Foundation
 @_spi(Support) import MachOKit
+import MachOObjCSectionC
 
 public struct ObjCClass32: LayoutWrapper, ObjCClassProtocol {
     public typealias Pointer = UInt32
@@ -46,6 +47,31 @@ extension ObjCClass32 {
         )
     }
 
+    public func classData(in machO: MachOFile) -> ClassData? {
+        var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32) + numericCast(machO.headerStartOffset)
+
+//        if let resolved = resolveRebase(\.dataVMAddrAndFastFlags, in: machO) {
+//            offset = resolved + numericCast(machO.headerStartOffset)
+//        }
+//        if isBind(\.dataVMAddrAndFastFlags, in: machO) { return nil }
+
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+                return nil
+            }
+            offset = _offset
+        }
+
+        let layout: ClassData.Layout = machO.fileHandle.read(offset: offset)
+        let classData = ClassData(layout: layout, offset: Int(offset))
+
+        // TODO: Support `class_rw_t`
+        if classData.hasRWPointer { return nil }
+
+        return classData
+    }
+
+
     private func _readClass(
         at offset: UInt64,
         keyPath: PartialKeyPath<Layout>,
@@ -56,6 +82,7 @@ extension ObjCClass32 {
         if let resolved = resolveRebase(keyPath, in: machO) {
             offset = resolved + numericCast(machO.headerStartOffset)
         }
+        if isBind(keyPath, in: machO) { return nil }
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
                 return nil
@@ -64,5 +91,46 @@ extension ObjCClass32 {
         }
         let layout: ObjCClass32.Layout = machO.fileHandle.read(offset: offset)
         return ObjCClass32(layout: layout, offset: Int(offset))
+    }
+}
+
+extension ObjCClass32 {
+    public func metaClass(in machO: MachOImage) -> Self? {
+        guard layout.isa > 0 else { return nil }
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.isa)) else {
+            return nil
+        }
+        let layout = ptr.assumingMemoryBound(to: Layout.self).pointee
+        let offset: Int = numericCast(layout.isa) - Int(bitPattern: machO.ptr)
+        return .init(layout: layout, offset: offset)
+    }
+
+    public func superClass(in machO: MachOImage) -> Self? {
+        guard layout.superclass > 0 else { return nil }
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.superclass)) else {
+            return nil
+        }
+        let layout = ptr.assumingMemoryBound(to: Layout.self).pointee
+        let offset: Int = numericCast(layout.isa) - Int(bitPattern: machO.ptr)
+        return .init(layout: layout, offset: offset)
+    }
+
+    public func classData(in machO: MachOImage) -> ClassData? {
+        let address: UInt = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32)
+        guard let ptr = UnsafeRawPointer(bitPattern: address) else {
+            return nil
+        }
+        let layout = ptr
+            .assumingMemoryBound(to: ClassData.Layout.self)
+            .pointee
+        let classData = ClassData(
+            layout: layout,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+
+        // TODO: Support `class_rw_t`
+        if classData.hasRWPointer { return nil }
+
+        return classData
     }
 }

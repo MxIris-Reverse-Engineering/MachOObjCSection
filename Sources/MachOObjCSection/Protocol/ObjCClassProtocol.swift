@@ -19,20 +19,10 @@ public protocol ObjCClassProtocol {
     func metaClass(in machO: MachOFile) -> Self?
     func superClass(in machO: MachOFile) -> Self?
     func classData(in machO: MachOFile) -> ClassData?
-}
 
-extension ObjCClassProtocol where Self: LayoutWrapper {
-    public func classData(in machO: MachOFile) -> ClassData? {
-        var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & 0x00007ffffffffff8 + numericCast(machO.headerStartOffset)
-        offset &= 0x7ffffffff
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
-                return nil
-            }
-            offset = _offset
-        }
-        return machO.fileHandle.read(offset: offset)
-    }
+    func metaClass(in machO: MachOImage) -> Self?
+    func superClass(in machO: MachOImage) -> Self?
+    func classData(in machO: MachOImage) -> ClassData?
 }
 
 extension ObjCClassProtocol {
@@ -57,12 +47,20 @@ extension ObjCClassProtocol where Self: LayoutWrapper {
         in machO: MachOFile
     ) -> UInt64? {
         let offset = self.offset + layoutOffset(of: keyPath)
-        if let resolved = machO.resolveRebase(at: UInt64(offset)) {
+        if let resolved = machO.resolveOptionalRebase(at: UInt64(offset)) {
             if let cache = machO.cache {
                 return resolved - cache.header.sharedRegionStart
             }
             return resolved
         }
         return nil
+    }
+
+    func isBind(
+        _ keyPath: PartialKeyPath<Layout>,
+        in machO: MachOFile
+    ) -> Bool {
+        let offset = self.offset + layoutOffset(of: keyPath)
+        return machO.isBind(offset)
     }
 }
