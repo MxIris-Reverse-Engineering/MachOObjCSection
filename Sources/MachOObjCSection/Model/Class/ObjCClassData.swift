@@ -54,3 +54,76 @@ public struct ObjCClassData32: LayoutWrapper, ObjCClassDataProtocol {
     public var layout: Layout
     public var offset: Int
 }
+
+extension ObjCClassData64 {
+    public func methods(in machO: MachOFile) -> ObjCMethodList? {
+        guard layout.baseMethods > 0 else { return nil }
+        var offset: UInt64 = numericCast(layout.baseMethods) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+
+        if let resolved = resolveRebase(\.baseMethods, in: machO) {
+            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        }
+        if isBind(\.baseMethods, in: machO) { return nil }
+        offset &= 0x7ffffffff
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+                return nil
+            }
+            offset = _offset
+        }
+
+        let data = machO.fileHandle.readData(
+            offset: offset,
+            size: MemoryLayout<ObjCMethodList.Header>.size
+        )
+        let list: ObjCMethodList? = data.withUnsafeBytes {
+            guard let ptr = $0.baseAddress else { return nil }
+            return .init(
+                ptr: ptr,
+                offset: numericCast(offset) - machO.headerStartOffset,
+                is64Bit: machO.is64Bit
+            )
+        }
+        if list?.isValidEntrySize(is64Bit: machO.is64Bit) == false {
+            // FIXME: Check
+            return nil
+        }
+        return list
+    }
+}
+
+extension ObjCClassData32 {
+    public func methods(in machO: MachOFile) -> ObjCMethodList? {
+        guard layout.baseMethods > 0 else { return nil }
+        var offset: UInt64 = numericCast(layout.baseMethods) + numericCast(machO.headerStartOffset)
+
+        if let resolved = resolveRebase(\.baseMethods, in: machO) {
+            offset = resolved + numericCast(machO.headerStartOffset)
+        }
+        if isBind(\.baseMethods, in: machO) { return nil }
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+                return nil
+            }
+            offset = _offset
+        }
+
+        let data = machO.fileHandle.readData(
+            offset: offset,
+            size: MemoryLayout<ObjCMethodList.Header>.size
+        )
+        let list: ObjCMethodList? = data.withUnsafeBytes {
+            guard let ptr = $0.baseAddress else { return nil }
+            return .init(
+                ptr: ptr,
+                offset: numericCast(offset) - machO.headerStartOffset,
+                is64Bit: machO.is64Bit
+            )
+        }
+        if list?.isValidEntrySize(is64Bit: machO.is64Bit) == false {
+            // FIXME: Check
+            return nil
+        }
+        return list
+    }
+}

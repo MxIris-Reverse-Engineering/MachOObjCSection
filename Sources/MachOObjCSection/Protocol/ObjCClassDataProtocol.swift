@@ -26,6 +26,14 @@ public protocol ObjCClassDataProtocol {
     func properties(in machO: MachOFile) -> ObjCPropertyList?
     func protocols(in machO: MachOFile) -> ObjCProtocolList?
     func ivars(in machO: MachOFile) -> ObjCIvarList?
+
+    func ivarLayout(in machO: MachOImage) -> [UInt8]?
+    func weakIvarLayout(in machO: MachOImage) -> [UInt8]?
+    func name(in machO: MachOImage) -> String?
+    func methods(in machO: MachOImage) -> ObjCMethodList?
+    func properties(in machO: MachOImage) -> ObjCPropertyList?
+    func protocols(in machO: MachOImage) -> ObjCProtocolList?
+    func ivars(in machO: MachOImage) -> ObjCIvarList?
 }
 
 extension ObjCClassDataProtocol {
@@ -80,32 +88,6 @@ extension ObjCClassDataProtocol {
         return machO.fileHandle.readString(offset: numericCast(offset))
     }
 
-    public func methods(in machO: MachOFile) -> ObjCMethodList? {
-        guard layout.baseMethods > 0 else { return nil }
-        var offset: UInt64 = numericCast(layout.baseMethods) & 0x7ffffffff + numericCast(machO.headerStartOffset)
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
-                return nil
-            }
-            offset = _offset
-        }
-        let data = machO.fileHandle.readData(
-            offset: offset,
-            size: MemoryLayout<ObjCMethodList.Header>.size
-        )
-        let list: ObjCMethodList? = data.withUnsafeBytes {
-            guard let ptr = $0.baseAddress else {
-                return nil
-            }
-            return .init(
-                ptr: ptr,
-                offset: numericCast(offset) - machO.headerStartOffset,
-                is64Bit: machO.is64Bit
-            )
-        }
-        return list
-    }
-
     public func properties(in machO: MachOFile) -> ObjCPropertyList? {
         guard layout.baseProperties > 0 else { return nil }
         var offset: UInt64 = numericCast(layout.baseProperties) & 0x7ffffffff + numericCast(machO.headerStartOffset)
@@ -129,6 +111,70 @@ extension ObjCClassDataProtocol {
                 is64Bit: machO.is64Bit
             )
         }
+        return list
+    }
+}
+
+extension ObjCClassDataProtocol {
+    public func ivarLayout(in machO: MachOImage) -> [UInt8]? {
+        _ivarLayout(in: machO, at: numericCast(layout.ivarLayout))
+    }
+
+    public func weakIvarLayout(in machO: MachOImage) -> [UInt8]? {
+        _ivarLayout(in: machO, at: numericCast(layout.weakIvarLayout))
+    }
+
+    public func name(in machO: MachOImage) -> String? {
+        guard layout.name > 0 else { return nil }
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.name)) else {
+            return nil
+        }
+        return .init(
+            cString: ptr.assumingMemoryBound(to: CChar.self),
+            encoding: .utf8
+        )
+    }
+
+    public func methods(in machO: MachOImage) -> ObjCMethodList? {
+        guard layout.baseMethods > 0 else { return nil }
+        guard let ptr = UnsafeRawPointer(
+            bitPattern: UInt(layout.baseMethods)
+        ) else {
+            return nil
+        }
+
+        let list = ObjCMethodList(
+            ptr: ptr,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr),
+            is64Bit: machO.is64Bit
+        )
+
+        if list.isValidEntrySize(is64Bit: machO.is64Bit) == false {
+            // FIXME: Check
+            return nil
+        }
+
+        return list
+    }
+
+    public func properties(in machO: MachOImage) -> ObjCPropertyList? {
+        guard layout.baseProperties > 0 else { return nil }
+        guard let ptr = UnsafeRawPointer(
+            bitPattern: UInt(layout.baseProperties)
+        ) else {
+            return nil
+        }
+        let list = ObjCPropertyList(
+            ptr: ptr,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr),
+            is64Bit: machO.is64Bit
+        )
+
+        if list.isValidEntrySize(is64Bit: machO.is64Bit) == false {
+            // FIXME: Check
+            return nil
+        }
+
         return list
     }
 }
@@ -158,6 +204,21 @@ extension ObjCClassDataProtocol where ObjCProtocolList == ObjCProtocolList64 {
         }
         return list
     }
+
+    public func protocols(in machO: MachOImage) -> ObjCProtocolList? {
+        guard layout.baseProtocols > 0 else { return nil }
+        guard let ptr = UnsafeRawPointer(
+            bitPattern: UInt(layout.baseProtocols)
+        ) else {
+            return nil
+        }
+        let list = ObjCProtocolList(
+            ptr: ptr,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+
+        return list
+    }
 }
 
 extension ObjCClassDataProtocol where ObjCProtocolList == ObjCProtocolList32 {
@@ -185,6 +246,21 @@ extension ObjCClassDataProtocol where ObjCProtocolList == ObjCProtocolList32 {
         }
         return list
     }
+
+    public func protocols(in machO: MachOImage) -> ObjCProtocolList? {
+        guard layout.baseProtocols > 0 else { return nil }
+        guard let ptr = UnsafeRawPointer(
+            bitPattern: UInt(layout.baseProtocols)
+        ) else {
+            return nil
+        }
+        let list = ObjCProtocolList(
+            ptr: ptr,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+
+        return list
+    }
 }
 
 extension ObjCClassDataProtocol where ObjCIvarList == ObjCIvarList64 {
@@ -206,10 +282,31 @@ extension ObjCClassDataProtocol where ObjCIvarList == ObjCIvarList64 {
                 return nil
             }
             return .init(
-                header: ptr.assumingMemoryBound(to: ObjCIvarListHeader.self).pointee,
+                header: ptr
+                    .assumingMemoryBound(to: ObjCIvarListHeader.self)
+                    .pointee,
                 offset: numericCast(offset) - machO.headerStartOffset
             )
         }
+        return list
+    }
+
+    public func ivars(in machO: MachOImage) -> ObjCIvarList? {
+        guard layout.ivars > 0 else { return nil }
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.ivars)) else {
+            return nil
+        }
+        let list = ObjCIvarList(
+            header: ptr
+                .assumingMemoryBound(to: ObjCIvarList.Header.self)
+                .pointee,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+        if list.isValidEntrySize(is64Bit: machO.is64Bit) == false {
+            // FIXME: Check
+            return nil
+        }
+
         return list
     }
 }
@@ -239,6 +336,25 @@ extension ObjCClassDataProtocol where ObjCIvarList == ObjCIvarList32 {
         }
         return list
     }
+
+    public func ivars(in machO: MachOImage) -> ObjCIvarList? {
+        guard layout.ivars > 0 else { return nil }
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.ivars)) else {
+            return nil
+        }
+        let list = ObjCIvarList(
+            header: ptr
+                .assumingMemoryBound(to: ObjCIvarList.Header.self)
+                .pointee,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+        if list.isValidEntrySize(is64Bit: machO.is64Bit) == false {
+            // FIXME: Check
+            return nil
+        }
+
+        return list
+    }
 }
 
 extension ObjCClassDataProtocol {
@@ -258,5 +374,43 @@ extension ObjCClassDataProtocol {
             return nil
         }
         return Array(data)
+    }
+
+    private func _ivarLayout(
+        in machO: MachOImage,
+        at offset: Int
+    ) -> [UInt8]? {
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(offset)) else {
+            return nil
+        }
+        guard let string = String(cString: ptr.assumingMemoryBound(to: CChar.self), encoding: .utf8),
+              let data = string.data(using: .utf8) else {
+            return nil
+        }
+        return Array(data)
+    }
+}
+
+extension ObjCClassDataProtocol where Self: LayoutWrapper {
+    func resolveRebase(
+        _ keyPath: PartialKeyPath<Layout>,
+        in machO: MachOFile
+    ) -> UInt64? {
+        let offset = self.offset + layoutOffset(of: keyPath)
+        if let resolved = machO.resolveOptionalRebase(at: UInt64(offset)) {
+            if let cache = machO.cache {
+                return resolved - cache.header.sharedRegionStart
+            }
+            return resolved
+        }
+        return nil
+    }
+
+    func isBind(
+        _ keyPath: PartialKeyPath<Layout>,
+        in machO: MachOFile
+    ) -> Bool {
+        let offset = self.offset + layoutOffset(of: keyPath)
+        return machO.isBind(offset)
     }
 }
