@@ -58,12 +58,6 @@ extension ObjCClass64 {
         var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & FAST_DATA_MASK + numericCast(machO.headerStartOffset)
         offset &= 0x7ffffffff
 
-//        if let resolved = resolveRebase(\.dataVMAddrAndFastFlags, in: machO) {
-//            offset = resolved & 0x00007ffffffffff8 + numericCast(machO.headerStartOffset)
-//        }
-//        offset &= 0x7ffffffff
-//        if isBind(\.dataVMAddrAndFastFlags, in: machO) { return nil }
-
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
                 return nil
@@ -136,10 +130,6 @@ extension ObjCClass64 {
 
         let address: UInt = numericCast(layout.dataVMAddrAndFastFlags) & FAST_DATA_MASK
 
-//        if numericCast(layout.dataVMAddrAndFastFlags) != address {
-//            let adjust = numericCast(layout.dataVMAddrAndFastFlags) - address
-//            address = numericCast(layout.dataVMAddrAndFastFlags) - adjust
-//        }
         guard let ptr = UnsafeRawPointer(bitPattern: address) else {
             return nil
         }

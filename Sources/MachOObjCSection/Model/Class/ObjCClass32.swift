@@ -50,11 +50,6 @@ extension ObjCClass32 {
     public func classData(in machO: MachOFile) -> ClassData? {
         var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32) + numericCast(machO.headerStartOffset)
 
-//        if let resolved = resolveRebase(\.dataVMAddrAndFastFlags, in: machO) {
-//            offset = resolved + numericCast(machO.headerStartOffset)
-//        }
-//        if isBind(\.dataVMAddrAndFastFlags, in: machO) { return nil }
-
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
                 return nil
