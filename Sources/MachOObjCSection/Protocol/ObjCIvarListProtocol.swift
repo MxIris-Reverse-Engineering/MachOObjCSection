@@ -25,3 +25,9 @@ extension ObjCIvarListProtocol {
         numericCast(header.count)
     }
 }
+
+extension ObjCIvarListProtocol {
+    func isValidEntrySize(is64Bit: Bool) -> Bool {
+        MemoryLayout<ObjCIvar.Layout>.size == entrySize
+    }
+}
