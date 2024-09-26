@@ -60,7 +60,7 @@ extension ObjCIvarList64 {
             .map {
                 .init(
                     layout: $1,
-                    offset: offset + ObjCIvar.layoutSize * $0
+                    offset: offset - headerStartOffset + ObjCIvar.layoutSize * $0
                 )
             }
     }

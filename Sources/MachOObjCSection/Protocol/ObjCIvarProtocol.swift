@@ -65,7 +65,7 @@ extension ObjCIvarProtocol where Self: LayoutWrapper {
         in machO: MachOFile
     ) -> UInt64? {
         let offset = self.offset + layoutOffset(of: keyPath)
-        if let resolved = machO.resolveRebase(at: UInt64(offset)) {
+        if let resolved = machO.resolveOptionalRebase(at: UInt64(offset)) {
             if let cache = machO.cache {
                 return resolved - cache.header.sharedRegionStart
             }

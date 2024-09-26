@@ -48,7 +48,7 @@ extension ObjCIvar64 {
         if let resolved = resolveRebase(\.name, in: machO) {
             offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
         }
-        if isBind(\.offset, in: machO) { return nil }
+        if isBind(\.name, in: machO) { return nil }
         offset &= 0x7ffffffff
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
@@ -69,7 +69,7 @@ extension ObjCIvar64 {
         if let resolved = resolveRebase(\.type, in: machO) {
             offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
         }
-        if isBind(\.offset, in: machO) { return nil }
+        if isBind(\.type, in: machO) { return nil }
         offset &= 0x7ffffffff
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {

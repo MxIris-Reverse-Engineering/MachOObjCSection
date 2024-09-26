@@ -36,7 +36,7 @@ public struct ObjCClassData64: LayoutWrapper, ObjCClassDataProtocol {
 public struct ObjCClassData32: LayoutWrapper, ObjCClassDataProtocol {
     public typealias Pointer = UInt32
     public typealias ObjCProtocolList = ObjCProtocolList32
-    public typealias ObjCIvarList = ObjCIvarList64
+    public typealias ObjCIvarList = ObjCIvarList32
 
     public struct Layout: _ObjCClassDataLayoutProtocol {
         public let flags: UInt32
