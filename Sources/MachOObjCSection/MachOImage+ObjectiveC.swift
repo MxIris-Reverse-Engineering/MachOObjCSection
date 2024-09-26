@@ -216,3 +216,56 @@ extension MachOImage.ObjectiveC {
             }
     }
 }
+
+extension MachOImage.ObjectiveC {
+    /// __DATA.__objc_classlist or __DATA_CONST.__objc_classlist
+    public var classes64: [ObjCClass64]? {
+        guard machO.is64Bit else { return nil }
+        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
+        let loadCommands = machO.loadCommands
+
+        let segment: any SegmentCommandProtocol
+        let __objc_classlist: any SectionProtocol
+
+        if let data = loadCommands.data64,
+           let section = data.sections(cmdsStart: machO.cmdsStartPtr).first(
+            where: {
+                $0.sectionName == "__objc_classlist"
+            }
+           ) {
+            segment = data
+            __objc_classlist = section
+        } else if let dataConst = loadCommands.dataConst64,
+                  let section = dataConst.sections(cmdsStart: machO.cmdsStartPtr).first(
+                    where: {
+                        $0.sectionName == "__objc_classlist"
+                    }
+                  ) {
+            segment = dataConst
+            __objc_classlist = section
+        } else {
+            return nil
+        }
+
+        guard let start = __objc_classlist.startPtr(
+            in: segment,
+            vmaddrSlide: vmaddrSlide
+        ) else { return nil }
+
+        let offsets: MemorySequence<UInt64> = .init(
+            basePointer: start.assumingMemoryBound(to: UInt64.self),
+            numberOfElements: __objc_classlist.size / 8
+        )
+        return offsets
+            .compactMap {
+                let offset = $0 - numericCast(UInt(bitPattern: machO.ptr))
+                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                    return nil
+                }
+                let layout = ptr
+                    .assumingMemoryBound(to: ObjCClass64.Layout.self)
+                    .pointee
+                return .init(layout: layout, offset: numericCast(offset))
+            }
+    }
+}
