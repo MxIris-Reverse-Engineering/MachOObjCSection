@@ -8,6 +8,7 @@
 
 import Foundation
 @_spi(Support) import MachOKit
+import MachOObjCSectionC
 
 public protocol ObjCClassProtocol {
     associatedtype Layout: _ObjCClassLayoutProtocol
@@ -28,12 +29,12 @@ public protocol ObjCClassProtocol {
 extension ObjCClassProtocol {
     /// class is a Swift class from the pre-stable Swift ABI
     public var isSwiftLegacy: Bool {
-        layout.dataVMAddrAndFastFlags & 0x1 != 0
+        layout.dataVMAddrAndFastFlags & numericCast(FAST_IS_SWIFT_LEGACY) != 0
     }
 
     /// class is a Swift class from the stable Swift ABI
     public var isSwiftStable: Bool {
-        layout.dataVMAddrAndFastFlags & 0x2 != 0
+        layout.dataVMAddrAndFastFlags & numericCast(FAST_IS_SWIFT_STABLE) != 0
     }
 
     public var isSwift: Bool {

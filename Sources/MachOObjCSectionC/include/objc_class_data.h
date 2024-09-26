@@ -14,6 +14,15 @@
 #define FAST_DATA_MASK_64          0x0f007ffffffffff8UL
 #define FAST_DATA_MASK_32          0xfffffffcUL
 
+#define FAST_FLAGS_MASK_64         0x0000000000000007UL
+#define FAST_FLAGS_MASK_32         0x00000003UL
+
+// ref: https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L124
+// ref: https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L180C1-L183C39
+// class is a Swift class from the pre-stable Swift ABI
+#define FAST_IS_SWIFT_LEGACY  (1UL<<0)
+// class is a Swift class from the stable Swift ABI
+#define FAST_IS_SWIFT_STABLE  (1UL<<1)
 
 // ref: https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L38C1-L70C38
 // Values for class_ro_t->flags
