@@ -14,6 +14,31 @@ public protocol ObjCProtocolProtocol {
     associatedtype ObjCProtocolList: ObjCProtocolListProtocol where ObjCProtocolList.ObjCProtocol == Self
 
     var layout: Layout { get }
+
+    var size: UInt32 { get }
+    var flags: UInt32 { get }
+
+    func mangledName(in machO: MachOImage) -> String
+    func protocols(in machO: MachOImage) -> ObjCProtocolList?
+    func instanceMethods(in machO: MachOImage) -> ObjCMethodList?
+    func classMethods(in machO: MachOImage) -> ObjCMethodList?
+    func optionalInstanceMethods(in machO: MachOImage) -> ObjCMethodList?
+    func optionalClassMethods(in machO: MachOImage) -> ObjCMethodList?
+    func instanceProperties(in machO: MachOImage) -> ObjCPropertyList?
+    func extendedMethodTypes(in machO: MachOImage) -> String?
+    func demangledName(in machO: MachOImage) -> String?
+    func classProperties(in machO: MachOImage) -> ObjCPropertyList?
+
+    func mangledName(in machO: MachOFile) -> String
+    func protocols(in machO: MachOFile) -> ObjCProtocolList?
+    func instanceMethods(in machO: MachOFile) -> ObjCMethodList?
+    func classMethods(in machO: MachOFile) -> ObjCMethodList?
+    func optionalInstanceMethods(in machO: MachOFile) -> ObjCMethodList?
+    func optionalClassMethods(in machO: MachOFile) -> ObjCMethodList?
+    func instanceProperties(in machO: MachOFile) -> ObjCPropertyList?
+    func extendedMethodTypes(in machO: MachOFile) -> String?
+    func demangledName(in machO: MachOFile) -> String?
+    func classProperties(in machO: MachOFile) -> ObjCPropertyList?
 }
 
 extension ObjCProtocolProtocol {
