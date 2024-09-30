@@ -19,10 +19,12 @@ public protocol ObjCClassProtocol {
 
     func metaClass(in machO: MachOFile) -> Self?
     func superClass(in machO: MachOFile) -> Self?
+    func superClassName(in machO: MachOFile) -> String?
     func classData(in machO: MachOFile) -> ClassData?
 
     func metaClass(in machO: MachOImage) -> Self?
     func superClass(in machO: MachOImage) -> Self?
+    func superClassName(in machO: MachOImage) -> String?
     func classData(in machO: MachOImage) -> ClassData?
 }
 
@@ -53,6 +55,18 @@ extension ObjCClassProtocol where Self: LayoutWrapper {
                 return resolved - cache.header.sharedRegionStart
             }
             return resolved
+        }
+        return nil
+    }
+
+    func resolveBind(
+        _ keyPath: PartialKeyPath<Layout>,
+        in machO: MachOFile
+    ) -> String? {
+        let offset = self.offset + layoutOffset(of: keyPath)
+        guard let fixup = machO.dyldChainedFixups else { return nil }
+        if let resolved = machO.resolveBind(at: UInt64(offset)) {
+            return fixup.symbolName(for: resolved.0.info.nameOffset)
         }
         return nil
     }

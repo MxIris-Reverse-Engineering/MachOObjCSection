@@ -47,6 +47,14 @@ extension ObjCClass32 {
         )
     }
 
+    public func superClassName(in machO: MachOFile) -> String? {
+        _readClassName(
+            at: numericCast(layout.superclass),
+            keyPath: \.superclass,
+            in: machO
+        )
+    }
+
     public func classData(in machO: MachOFile) -> ClassData? {
         var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32) + numericCast(machO.headerStartOffset)
 
@@ -87,6 +95,29 @@ extension ObjCClass32 {
         let layout: ObjCClass32.Layout = machO.fileHandle.read(offset: offset)
         return ObjCClass32(layout: layout, offset: Int(offset))
     }
+
+    private func _readClassName(
+        at offset: UInt64,
+        keyPath: PartialKeyPath<Layout>,
+        in machO: MachOFile
+    ) -> String? {
+        guard offset > 0 else { return nil }
+
+        if let cls = _readClass(
+            at: offset,
+            keyPath: keyPath,
+            in: machO
+        ), let data = cls.classData(in: machO) {
+            return data.name(in: machO)
+        }
+
+        if let bindSymbolName = resolveBind(keyPath, in: machO) {
+            return bindSymbolName
+                .replacingOccurrences(of: "_OBJC_CLASS_$_", with: "")
+        }
+
+        return nil
+    }
 }
 
 extension ObjCClass32 {
@@ -108,6 +139,14 @@ extension ObjCClass32 {
         let layout = ptr.assumingMemoryBound(to: Layout.self).pointee
         let offset: Int = numericCast(layout.isa) - Int(bitPattern: machO.ptr)
         return .init(layout: layout, offset: offset)
+    }
+
+    public func superClassName(in machO: MachOImage) -> String? {
+        guard let superCls = superClass(in: machO),
+              let data = superCls.classData(in: machO) else {
+            return nil
+        }
+        return data.name(in: machO)
     }
 
     public func classData(in machO: MachOImage) -> ClassData? {
