@@ -8,6 +8,15 @@
         "revision" : "46326847466a7ad3a26400d5c30ab9aeb20e62fe",
         "version" : "0.20.0"
       }
+    },
+    {
+      "identity" : "swift-objc-dump",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/p-x9/swift-objc-dump.git",
+      "state" : {
+        "revision" : "b914944098d654d70c585ebd3dc633e855e61a63",
+        "version" : "0.1.0"
+      }
     }
   ],
   "version" : 2
