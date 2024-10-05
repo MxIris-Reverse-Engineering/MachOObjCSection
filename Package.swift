@@ -11,7 +11,7 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/p-x9/MachOKit.git", exact: "0.20.0"),
+        .package(url: "https://github.com/p-x9/MachOKit.git", exact: "0.21.1"),
         .package(url: "https://github.com/p-x9/swift-objc-dump.git", exact: "0.1.0")
     ],
     targets: [
