@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/p-x9/MachOKit.git",
       "state" : {
-        "revision" : "e5a7755b18d06a8e2bffa17a3a56d8fd31013a17",
-        "version" : "0.21.1"
+        "revision" : "c607a37d33e35231ff420eae6aa7c8c88cd1bbbb",
+        "version" : "0.23.0"
       }
     },
     {
@@ -23,8 +23,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/p-x9/swift-objc-dump.git",
       "state" : {
-        "revision" : "b914944098d654d70c585ebd3dc633e855e61a63",
-        "version" : "0.1.0"
+        "revision" : "45171130326dad32bbc68d6d53c487d04ef3faf7",
+        "version" : "0.3.0"
       }
     }
   ],
