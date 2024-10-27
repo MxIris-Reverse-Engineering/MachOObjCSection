@@ -67,6 +67,19 @@ extension ObjCClassDataProtocol {
 }
 
 extension ObjCClassDataProtocol {
+    /// https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.mm#L6746
+    public func version(in machO: MachOFile) -> Int32 {
+        // FIXME: Support rw
+        isMetaClass ? 7 : 0
+    }
+
+    public func version(in machO: MachOImage) -> Int32 {
+        // FIXME: Support rw
+        isMetaClass ? 7 : 0
+    }
+}
+
+extension ObjCClassDataProtocol {
     public func ivarLayout(in machO: MachOFile) -> [UInt8]? {
         _ivarLayout(in: machO, at: numericCast(layout.ivarLayout))
     }
