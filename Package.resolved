@@ -23,8 +23,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/p-x9/swift-objc-dump.git",
       "state" : {
-        "revision" : "45171130326dad32bbc68d6d53c487d04ef3faf7",
-        "version" : "0.3.0"
+        "revision" : "6096c16cad5a47ff1152c9abbb1f62e11824753f",
+        "version" : "0.4.0"
       }
     }
   ],
