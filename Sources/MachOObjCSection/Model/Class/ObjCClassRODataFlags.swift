@@ -1,5 +1,5 @@
 //
-//  ObjCClassDataFlags.swift
+//  ObjCClassRODataFlags.swift
 //
 //
 //  Created by p-x9 on 2024/09/25
@@ -10,7 +10,7 @@ import Foundation
 import MachOKit
 import MachOObjCSectionC
 
-public struct ObjCClassDataFlags: BitFlags {
+public struct ObjCClassRODataFlags: BitFlags {
     public typealias RawValue = UInt32
 
     public var rawValue: RawValue
@@ -20,62 +20,62 @@ public struct ObjCClassDataFlags: BitFlags {
     }
 }
 
-extension ObjCClassDataFlags {
+extension ObjCClassRODataFlags {
     /// RO_META
-    public static let meta = ObjCClassDataFlags(
+    public static let meta = ObjCClassRODataFlags(
         rawValue: Bit.meta.rawValue
     )
     /// RO_ROOT
-    public static let root = ObjCClassDataFlags(
+    public static let root = ObjCClassRODataFlags(
         rawValue: Bit.root.rawValue
     )
     /// RO_HAS_CXX_STRUCTORS
-    public static let has_cxx_structors = ObjCClassDataFlags(
+    public static let has_cxx_structors = ObjCClassRODataFlags(
         rawValue: Bit.has_cxx_structors.rawValue
     )
     /// RO_HIDDEN
-    public static let hidden = ObjCClassDataFlags(
+    public static let hidden = ObjCClassRODataFlags(
         rawValue: Bit.hidden.rawValue
     )
     /// RO_EXCEPTION
-    public static let exception = ObjCClassDataFlags(
+    public static let exception = ObjCClassRODataFlags(
         rawValue: Bit.exception.rawValue
     )
     /// RO_HAS_SWIFT_INITIALIZER
-    public static let has_swift_initializer = ObjCClassDataFlags(
+    public static let has_swift_initializer = ObjCClassRODataFlags(
         rawValue: Bit.has_swift_initializer.rawValue
     )
     /// RO_IS_ARC
-    public static let is_arc = ObjCClassDataFlags(
+    public static let is_arc = ObjCClassRODataFlags(
         rawValue: Bit.is_arc.rawValue
     )
     /// RO_HAS_CXX_DTOR_ONLY
-    public static let has_cxx_dtor_only = ObjCClassDataFlags(
+    public static let has_cxx_dtor_only = ObjCClassRODataFlags(
         rawValue: Bit.has_cxx_dtor_only.rawValue
     )
     /// RO_HAS_WEAK_WITHOUT_ARC
-    public static let has_weak_without_arc = ObjCClassDataFlags(
+    public static let has_weak_without_arc = ObjCClassRODataFlags(
         rawValue: Bit.has_weak_without_arc.rawValue
     )
     /// RO_FORBIDS_ASSOCIATED_OBJECTS
-    public static let forbids_associated_objects = ObjCClassDataFlags(
+    public static let forbids_associated_objects = ObjCClassRODataFlags(
         rawValue: Bit.forbids_associated_objects.rawValue
     )
     /// RO_FROM_BUNDLE
-    public static let from_bundle = ObjCClassDataFlags(
+    public static let from_bundle = ObjCClassRODataFlags(
         rawValue: Bit.from_bundle.rawValue
     )
     /// RO_FUTURE
-    public static let future = ObjCClassDataFlags(
+    public static let future = ObjCClassRODataFlags(
         rawValue: Bit.future.rawValue
     )
     /// RO_REALIZED
-    public static let realized = ObjCClassDataFlags(
+    public static let realized = ObjCClassRODataFlags(
         rawValue: Bit.realized.rawValue
     )
 }
 
-extension ObjCClassDataFlags {
+extension ObjCClassRODataFlags {
     public enum Bit: CaseIterable {
         /// RO_META
         case meta
@@ -106,7 +106,7 @@ extension ObjCClassDataFlags {
     }
 }
 
-extension ObjCClassDataFlags.Bit: RawRepresentable {
+extension ObjCClassRODataFlags.Bit: RawRepresentable {
     public typealias RawValue = UInt32
 
     public init?(rawValue: RawValue) {
@@ -147,7 +147,7 @@ extension ObjCClassDataFlags.Bit: RawRepresentable {
     }
 }
 
-extension ObjCClassDataFlags.Bit: CustomStringConvertible {
+extension ObjCClassRODataFlags.Bit: CustomStringConvertible {
     public var description: String {
         switch self {
         case .meta: "RO_META"

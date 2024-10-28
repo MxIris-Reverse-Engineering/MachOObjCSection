@@ -9,8 +9,8 @@
 import Foundation
 @_spi(Support) import MachOKit
 
-public protocol ObjCClassDataProtocol {
-    associatedtype Layout: _ObjCClassDataLayoutProtocol
+public protocol ObjCClassRODataProtocol {
+    associatedtype Layout: _ObjCClassRODataLayoutProtocol
     associatedtype ObjCProtocolList: ObjCProtocolListProtocol
     associatedtype ObjCIvarList: ObjCIvarListProtocol
 
@@ -36,13 +36,13 @@ public protocol ObjCClassDataProtocol {
     func ivars(in machO: MachOImage) -> ObjCIvarList?
 }
 
-extension ObjCClassDataProtocol {
-    public var flags: ObjCClassDataFlags {
+extension ObjCClassRODataProtocol {
+    public var flags: ObjCClassRODataFlags {
         .init(rawValue: layout.flags)
     }
 }
 
-extension ObjCClassDataProtocol {
+extension ObjCClassRODataProtocol {
     // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L36
 
     public var isMetaClass: Bool {
@@ -66,7 +66,7 @@ extension ObjCClassDataProtocol {
     }
 }
 
-extension ObjCClassDataProtocol {
+extension ObjCClassRODataProtocol {
     /// https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.mm#L6746
     public func version(in machO: MachOFile) -> Int32 {
         // FIXME: Support rw
@@ -79,9 +79,10 @@ extension ObjCClassDataProtocol {
     }
 }
 
-extension ObjCClassDataProtocol {
+extension ObjCClassRODataProtocol {
     public func ivarLayout(in machO: MachOFile) -> [UInt8]? {
-        _ivarLayout(in: machO, at: numericCast(layout.ivarLayout))
+        if flags.contains(.meta) { return nil }
+        return _ivarLayout(in: machO, at: numericCast(layout.ivarLayout))
     }
 
     public func weakIvarLayout(in machO: MachOFile) -> [UInt8]? {
@@ -126,7 +127,7 @@ extension ObjCClassDataProtocol {
     }
 }
 
-extension ObjCClassDataProtocol {
+extension ObjCClassRODataProtocol {
     public func ivarLayout(in machO: MachOImage) -> [UInt8]? {
         _ivarLayout(in: machO, at: numericCast(layout.ivarLayout))
     }
@@ -190,7 +191,7 @@ extension ObjCClassDataProtocol {
     }
 }
 
-extension ObjCClassDataProtocol where ObjCProtocolList == ObjCProtocolList64 {
+extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList64 {
     public func protocols(in machO: MachOFile) -> ObjCProtocolList? {
         guard layout.baseProtocols > 0 else { return nil }
         var offset: UInt64 = numericCast(layout.baseProtocols) & 0x7ffffffff + numericCast(machO.headerStartOffset)
@@ -232,7 +233,7 @@ extension ObjCClassDataProtocol where ObjCProtocolList == ObjCProtocolList64 {
     }
 }
 
-extension ObjCClassDataProtocol where ObjCProtocolList == ObjCProtocolList32 {
+extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList32 {
     public func protocols(in machO: MachOFile) -> ObjCProtocolList? {
         guard layout.baseProtocols > 0 else { return nil }
         var offset: UInt64 = numericCast(layout.baseProtocols) + numericCast(machO.headerStartOffset)
@@ -274,7 +275,7 @@ extension ObjCClassDataProtocol where ObjCProtocolList == ObjCProtocolList32 {
     }
 }
 
-extension ObjCClassDataProtocol where ObjCIvarList == ObjCIvarList64 {
+extension ObjCClassRODataProtocol where ObjCIvarList == ObjCIvarList64 {
     public func ivars(in machO: MachOFile) -> ObjCIvarList? {
         guard layout.ivars > 0 else { return nil }
         var offset: UInt64 = numericCast(layout.ivars) & 0x7ffffffff + numericCast(machO.headerStartOffset)
@@ -322,7 +323,7 @@ extension ObjCClassDataProtocol where ObjCIvarList == ObjCIvarList64 {
     }
 }
 
-extension ObjCClassDataProtocol where ObjCIvarList == ObjCIvarList32 {
+extension ObjCClassRODataProtocol where ObjCIvarList == ObjCIvarList32 {
     public func ivars(in machO: MachOFile) -> ObjCIvarList? {
         guard layout.ivars > 0 else { return nil }
         var offset: UInt64 = numericCast(layout.ivars) + numericCast(machO.headerStartOffset)
@@ -368,7 +369,7 @@ extension ObjCClassDataProtocol where ObjCIvarList == ObjCIvarList32 {
     }
 }
 
-extension ObjCClassDataProtocol {
+extension ObjCClassRODataProtocol {
     private func _ivarLayout(
         in machO: MachOFile,
         at offset: Int
@@ -402,7 +403,7 @@ extension ObjCClassDataProtocol {
     }
 }
 
-extension ObjCClassDataProtocol where Self: LayoutWrapper {
+extension ObjCClassRODataProtocol where Self: LayoutWrapper {
     func resolveRebase(
         _ keyPath: PartialKeyPath<Layout>,
         in machO: MachOFile

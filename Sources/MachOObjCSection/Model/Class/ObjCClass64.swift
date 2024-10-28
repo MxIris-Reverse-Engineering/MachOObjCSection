@@ -12,7 +12,7 @@ import MachOObjCSectionC
 
 public struct ObjCClass64: LayoutWrapper, ObjCClassProtocol {
     public typealias Pointer = UInt64
-    public typealias ClassData = ObjCClassData64
+    public typealias ClassROData = ObjCClassROData64
 
     public struct Layout: _ObjCClassLayoutProtocol {
         public let isa: Pointer // UnsafeRawPointer?
@@ -55,7 +55,7 @@ extension ObjCClass64 {
         )
     }
 
-    public func classData(in machO: MachOFile) -> ClassData? {
+    public func classData(in machO: MachOFile) -> ClassROData? {
         let FAST_DATA_MASK: UInt64
         if machO.isPhysicalIPhone && !machO.isSimulatorIPhone {
             FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64_IPHONE)
@@ -72,11 +72,8 @@ extension ObjCClass64 {
             }
             offset = _offset
         }
-        let layout: ClassData.Layout = machO.fileHandle.read(offset: offset)
-        let classData = ClassData(layout: layout, offset: Int(offset))
-
-        // TODO: Support `class_rw_t`
-        if classData.hasRWPointer { return nil }
+        let layout: ClassROData.Layout = machO.fileHandle.read(offset: offset)
+        let classData = ClassROData(layout: layout, offset: Int(offset))
 
         return classData
     }
@@ -159,7 +156,14 @@ extension ObjCClass64 {
         return data.name(in: machO)
     }
 
-    public func classData(in machO: MachOImage) -> ClassData? {
+    // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L2534
+    public var hasRWPointer: Bool {
+        return numericCast(layout.dataVMAddrAndFastFlags) & FAST_IS_RW_POINTER_64 != 0
+    }
+
+    public func classData(in machO: MachOImage) -> ClassROData? {
+        if hasRWPointer { return nil }
+
         let FAST_DATA_MASK: UInt
         if machO.isPhysicalIPhone && !machO.isSimulatorIPhone {
             FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64_IPHONE)
@@ -174,16 +178,12 @@ extension ObjCClass64 {
         }
 
         let layout = ptr
-            .assumingMemoryBound(to: ClassData.Layout.self)
+            .assumingMemoryBound(to: ClassROData.Layout.self)
             .pointee
-        let classData = ClassData(
+        let classData = ClassROData(
             layout: layout,
             offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
         )
-
-        // TODO: Support `class_rw_t`
-        // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L2534
-        if classData.hasRWPointer { return nil }
 
         return classData
     }

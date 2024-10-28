@@ -12,7 +12,7 @@ import MachOObjCSectionC
 
 public struct ObjCClass32: LayoutWrapper, ObjCClassProtocol {
     public typealias Pointer = UInt32
-    public typealias ClassData = ObjCClassData32
+    public typealias ClassROData = ObjCClassROData32
 
     public struct Layout: _ObjCClassLayoutProtocol {
         public let isa: Pointer // UnsafeRawPointer?
@@ -55,7 +55,7 @@ extension ObjCClass32 {
         )
     }
 
-    public func classData(in machO: MachOFile) -> ClassData? {
+    public func classData(in machO: MachOFile) -> ClassROData? {
         var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32) + numericCast(machO.headerStartOffset)
 
         if let cache = machO.cache {
@@ -65,8 +65,8 @@ extension ObjCClass32 {
             offset = _offset
         }
 
-        let layout: ClassData.Layout = machO.fileHandle.read(offset: offset)
-        let classData = ClassData(layout: layout, offset: Int(offset))
+        let layout: ClassROData.Layout = machO.fileHandle.read(offset: offset)
+        let classData = ClassROData(layout: layout, offset: Int(offset))
 
         // TODO: Support `class_rw_t`
         if classData.hasRWPointer { return nil }
@@ -149,15 +149,15 @@ extension ObjCClass32 {
         return data.name(in: machO)
     }
 
-    public func classData(in machO: MachOImage) -> ClassData? {
+    public func classData(in machO: MachOImage) -> ClassROData? {
         let address: UInt = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32)
         guard let ptr = UnsafeRawPointer(bitPattern: address) else {
             return nil
         }
         let layout = ptr
-            .assumingMemoryBound(to: ClassData.Layout.self)
+            .assumingMemoryBound(to: ClassROData.Layout.self)
             .pointee
-        let classData = ClassData(
+        let classData = ClassROData(
             layout: layout,
             offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
         )

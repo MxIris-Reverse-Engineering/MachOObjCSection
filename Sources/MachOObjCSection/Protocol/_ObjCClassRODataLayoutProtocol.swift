@@ -1,5 +1,5 @@
 //
-//  _ObjCClassDataLayoutProtocol.swift.swift
+//  _ObjCClassRODataLayoutProtocol.swift.swift
 //
 //
 //  Created by p-x9 on 2024/08/06
@@ -8,7 +8,7 @@
 
 import Foundation
 
-public protocol _ObjCClassDataLayoutProtocol {
+public protocol _ObjCClassRODataLayoutProtocol {
     associatedtype Pointer: FixedWidthInteger
 
     var flags: UInt32 { get }
