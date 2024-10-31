@@ -20,12 +20,12 @@ public protocol ObjCClassProtocol {
     func metaClass(in machO: MachOFile) -> Self?
     func superClass(in machO: MachOFile) -> Self?
     func superClassName(in machO: MachOFile) -> String?
-    func classData(in machO: MachOFile) -> ClassROData?
+    func classROData(in machO: MachOFile) -> ClassROData?
 
     func metaClass(in machO: MachOImage) -> Self?
     func superClass(in machO: MachOImage) -> Self?
     func superClassName(in machO: MachOImage) -> String?
-    func classData(in machO: MachOImage) -> ClassROData?
+    func classROData(in machO: MachOImage) -> ClassROData?
 }
 
 extension ObjCClassProtocol {

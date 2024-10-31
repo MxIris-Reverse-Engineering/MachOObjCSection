@@ -55,7 +55,7 @@ extension ObjCClass32 {
         )
     }
 
-    public func classData(in machO: MachOFile) -> ClassROData? {
+    public func classROData(in machO: MachOFile) -> ClassROData? {
         var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32) + numericCast(machO.headerStartOffset)
 
         if let cache = machO.cache {
@@ -107,7 +107,7 @@ extension ObjCClass32 {
             at: offset,
             keyPath: keyPath,
             in: machO
-        ), let data = cls.classData(in: machO) {
+        ), let data = cls.classROData(in: machO) {
             return data.name(in: machO)
         }
 
@@ -143,13 +143,13 @@ extension ObjCClass32 {
 
     public func superClassName(in machO: MachOImage) -> String? {
         guard let superCls = superClass(in: machO),
-              let data = superCls.classData(in: machO) else {
+              let data = superCls.classROData(in: machO) else {
             return nil
         }
         return data.name(in: machO)
     }
 
-    public func classData(in machO: MachOImage) -> ClassROData? {
+    public func classROData(in machO: MachOImage) -> ClassROData? {
         let address: UInt = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32)
         guard let ptr = UnsafeRawPointer(bitPattern: address) else {
             return nil

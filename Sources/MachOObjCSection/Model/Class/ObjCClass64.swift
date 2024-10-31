@@ -55,7 +55,7 @@ extension ObjCClass64 {
         )
     }
 
-    public func classData(in machO: MachOFile) -> ClassROData? {
+    public func classROData(in machO: MachOFile) -> ClassROData? {
         let FAST_DATA_MASK: UInt64
         if machO.isPhysicalIPhone && !machO.isSimulatorIPhone {
             FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64_IPHONE)
@@ -114,7 +114,7 @@ extension ObjCClass64 {
             at: offset,
             keyPath: keyPath,
             in: machO
-        ), let data = cls.classData(in: machO) {
+        ), let data = cls.classROData(in: machO) {
             return data.name(in: machO)
         }
 
@@ -150,7 +150,7 @@ extension ObjCClass64 {
 
     public func superClassName(in machO: MachOImage) -> String? {
         guard let superCls = superClass(in: machO),
-              let data = superCls.classData(in: machO) else {
+              let data = superCls.classROData(in: machO) else {
             return nil
         }
         return data.name(in: machO)
@@ -161,7 +161,7 @@ extension ObjCClass64 {
         return numericCast(layout.dataVMAddrAndFastFlags) & FAST_IS_RW_POINTER_64 != 0
     }
 
-    public func classData(in machO: MachOImage) -> ClassROData? {
+    public func classROData(in machO: MachOImage) -> ClassROData? {
         if hasRWPointer { return nil }
 
         let FAST_DATA_MASK: UInt
