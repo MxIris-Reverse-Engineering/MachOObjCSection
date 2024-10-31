@@ -58,4 +58,46 @@
 // class is realized - must never be set by compiler
 #define RO_REALIZED           (1<<31)
 
+// Values for class_rw_t->flags
+// These are not emitted by the compiler and are never used in class_ro_t.
+// Their presence should be considered in future ABI versions.
+// class_t->data is class_rw_t, not class_ro_t
+#define RW_REALIZED           (1<<31)
+// class is unresolved future class
+#define RW_FUTURE             (1<<30)
+// class is initialized
+#define RW_INITIALIZED        (1<<29)
+// class is initializing
+#define RW_INITIALIZING       (1<<28)
+// class_rw_t->ro is heap copy of class_ro_t
+#define RW_COPIED_RO          (1<<27)
+// class allocated but not yet registered
+#define RW_CONSTRUCTING       (1<<26)
+// class allocated and registered
+#define RW_CONSTRUCTED        (1<<25)
+// available for use; was RW_FINALIZE_ON_MAIN_THREAD
+// #define RW_24 (1<<24)
+// class +load has been called
+#define RW_LOADED             (1<<23)
+//#if !SUPPORT_NONPOINTER_ISA
+// class instances may have associative references
+#define RW_INSTANCES_HAVE_ASSOCIATED_OBJECTS (1<<22)
+//#endif
+// class has instance-specific GC layout
+#define RW_HAS_INSTANCE_SPECIFIC_LAYOUT (1 << 21)
+// class does not allow associated objects on its instances
+#define RW_FORBIDS_ASSOCIATED_OBJECTS       (1<<20)
+// class has started realizing but not yet completed it
+#define RW_REALIZING          (1<<19)
+
+//#if CONFIG_USE_PREOPT_CACHES
+// this class and its descendants can't have preopt caches with inlined sels
+#define RW_NOPREOPT_SELS      (1<<2)
+// this class and its descendants can't have preopt caches
+#define RW_NOPREOPT_CACHE     (1<<1)
+//#endif
+
+// class is a metaclass (copied from ro)
+#define RW_META               RO_META // (1<<0)
+
 #endif /* objc_class_data_h */
