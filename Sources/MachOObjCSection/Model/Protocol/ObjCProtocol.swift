@@ -9,6 +9,8 @@
 import Foundation
 @_spi(Support) import MachOKit
 
+// ref: https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L1619
+
 public struct ObjCProtocol64: LayoutWrapper, ObjCProtocolProtocol {
     public typealias Pointer = UInt64
     public typealias ObjCProtocolList = ObjCProtocolList64
