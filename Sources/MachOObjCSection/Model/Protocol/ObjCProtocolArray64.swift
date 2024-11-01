@@ -40,29 +40,26 @@ extension ObjCProtocolArray64 {
                 )
             )
         case .array:
-            var currentOffset: Int = 0
             let count = start
                 .assumingMemoryBound(to: UInt32.self)
                 .pointee
-            for _ in 0 ..< Int(count) {
-                let address = start
+            let sequnece = MemorySequence(
+                basePointer: start
                     .advanced(
-                        by: machO.is64Bit ? MemoryLayout<UInt64>.size : 0
+                        by: machO.is64Bit ? MemoryLayout<UInt64>.size : MemoryLayout<UInt32>.size
                     ) // `count` + align
-                    .advanced(by: currentOffset)
-                    .assumingMemoryBound(to: UInt.self)
-                    .pointee
-                guard let ptr = UnsafeRawPointer(bitPattern: address) else {
-                    currentOffset += MemoryLayout<UInt>.size
-                    continue
+                    .assumingMemoryBound(to: UInt64.self),
+                numberOfElements: numericCast(count)
+            )
+
+            lists = sequnece
+                .map {
+                    let ptr = UnsafeRawPointer(bitPattern: UInt($0))!
+                    return ObjCProtocolList(
+                        ptr: ptr,
+                        offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+                    )
                 }
-                let list = ObjCProtocolList(
-                    ptr: ptr,
-                    offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
-                )
-                lists.append(list)
-                currentOffset += MemoryLayout<UInt>.size
-            }
         case .relative:
             // TODO: implement
             break
