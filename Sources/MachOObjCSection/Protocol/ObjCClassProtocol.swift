@@ -13,6 +13,7 @@ import MachOObjCSectionC
 public protocol ObjCClassProtocol {
     associatedtype Layout: _ObjCClassLayoutProtocol
     associatedtype ClassROData: LayoutWrapper, ObjCClassRODataProtocol where ClassROData.Layout.Pointer == Layout.Pointer
+    associatedtype ClassRWData: LayoutWrapper, ObjCClassRWDataProtocol where ClassRWData.Layout.Pointer == Layout.Pointer
 
     var layout: Layout { get }
     var offset: Int { get }
@@ -22,10 +23,13 @@ public protocol ObjCClassProtocol {
     func superClassName(in machO: MachOFile) -> String?
     func classROData(in machO: MachOFile) -> ClassROData?
 
+    func hasRWPointer(in machO: MachOImage) -> Bool
+
     func metaClass(in machO: MachOImage) -> Self?
     func superClass(in machO: MachOImage) -> Self?
     func superClassName(in machO: MachOImage) -> String?
     func classROData(in machO: MachOImage) -> ClassROData?
+    func classRWData(in machO: MachOImage) -> ClassRWData?
 }
 
 extension ObjCClassProtocol {

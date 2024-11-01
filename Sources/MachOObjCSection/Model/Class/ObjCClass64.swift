@@ -13,6 +13,7 @@ import MachOObjCSectionC
 public struct ObjCClass64: LayoutWrapper, ObjCClassProtocol {
     public typealias Pointer = UInt64
     public typealias ClassROData = ObjCClassROData64
+    public typealias ClassRWData = ObjCClassRWData64
 
     public struct Layout: _ObjCClassLayoutProtocol {
         public let isa: Pointer // UnsafeRawPointer?
@@ -157,13 +158,52 @@ extension ObjCClass64 {
     }
 
     // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L2534
-    public var hasRWPointer: Bool {
-        return numericCast(layout.dataVMAddrAndFastFlags) & FAST_IS_RW_POINTER_64 != 0
+    public func hasRWPointer(in machO: MachOImage) -> Bool {
+        if FAST_IS_RW_POINTER_64 != 0 {
+            return numericCast(layout.dataVMAddrAndFastFlags) & FAST_IS_RW_POINTER_64 != 0
+        } else {
+            guard let data = _classROData(in: machO) else {
+                return false
+            }
+            return data.isRealized
+        }
     }
 
     public func classROData(in machO: MachOImage) -> ClassROData? {
-        if hasRWPointer { return nil }
+        if hasRWPointer(in: machO) { return nil }
+        return _classROData(in: machO)
+    }
 
+    public func classRWData(in machO: MachOImage) -> ClassRWData? {
+        if !hasRWPointer(in: machO) { return nil }
+
+        let FAST_DATA_MASK: UInt
+        if machO.isPhysicalIPhone && !machO.isSimulatorIPhone {
+            FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64_IPHONE)
+        } else {
+            FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64)
+        }
+
+        let address: UInt = numericCast(layout.dataVMAddrAndFastFlags) & FAST_DATA_MASK
+
+        guard let ptr = UnsafeRawPointer(bitPattern: address) else {
+            return nil
+        }
+
+        let layout = ptr
+            .assumingMemoryBound(to: ClassRWData.Layout.self)
+            .pointee
+        let classData = ClassRWData(
+            layout: layout,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+
+        return classData
+    }
+}
+
+extension ObjCClass64 {
+    private func _classROData(in machO: MachOImage) -> ClassROData? {
         let FAST_DATA_MASK: UInt
         if machO.isPhysicalIPhone && !machO.isSimulatorIPhone {
             FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64_IPHONE)

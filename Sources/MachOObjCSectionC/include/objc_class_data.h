@@ -17,6 +17,11 @@
 #define FAST_FLAGS_MASK_64         0x0000000000000007UL
 #define FAST_FLAGS_MASK_32         0x00000003UL
 
+// ref: https://github.com/apple-oss-distributions/objc4/blob/89543e2c0f67d38ca5211cea33f42c51500287d5/runtime/objc-runtime-new.h#L158
+#define FAST_IS_RW_POINTER_64      0x8000000000000000UL
+// no fast RW pointer flag on 32-bit
+#define FAST_IS_RW_POINTER_32    0
+
 // ref: https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L124
 // ref: https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L180C1-L183C39
 // class is a Swift class from the pre-stable Swift ABI

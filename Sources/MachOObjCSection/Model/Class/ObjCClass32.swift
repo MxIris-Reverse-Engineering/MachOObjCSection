@@ -13,6 +13,7 @@ import MachOObjCSectionC
 public struct ObjCClass32: LayoutWrapper, ObjCClassProtocol {
     public typealias Pointer = UInt32
     public typealias ClassROData = ObjCClassROData32
+    public typealias ClassRWData = ObjCClassRWData32
 
     public struct Layout: _ObjCClassLayoutProtocol {
         public let isa: Pointer // UnsafeRawPointer?
@@ -149,7 +150,53 @@ extension ObjCClass32 {
         return data.name(in: machO)
     }
 
+    // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L2534
+    public func hasRWPointer(in machO: MachOImage) -> Bool {
+        if FAST_IS_RW_POINTER_32 != 0 {
+            return numericCast(layout.dataVMAddrAndFastFlags) & FAST_IS_RW_POINTER_32 != 0
+        } else {
+            guard let data = _classROData(in: machO) else {
+                return false
+            }
+            return data.isRealized
+        }
+    }
+
     public func classROData(in machO: MachOImage) -> ClassROData? {
+        if hasRWPointer(in: machO) { return nil }
+        return _classROData(in: machO)
+    }
+
+    public func classRWData(in machO: MachOImage) -> ClassRWData? {
+        if !hasRWPointer(in: machO) { return nil }
+
+        let FAST_DATA_MASK: UInt
+        if machO.isPhysicalIPhone && !machO.isSimulatorIPhone {
+            FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64_IPHONE)
+        } else {
+            FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64)
+        }
+
+        let address: UInt = numericCast(layout.dataVMAddrAndFastFlags) & FAST_DATA_MASK
+
+        guard let ptr = UnsafeRawPointer(bitPattern: address) else {
+            return nil
+        }
+
+        let layout = ptr
+            .assumingMemoryBound(to: ClassRWData.Layout.self)
+            .pointee
+        let classData = ClassRWData(
+            layout: layout,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+
+        return classData
+    }
+}
+
+extension ObjCClass32 {
+    private func _classROData(in machO: MachOImage) -> ClassROData? {
         let address: UInt = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32)
         guard let ptr = UnsafeRawPointer(bitPattern: address) else {
             return nil
@@ -161,9 +208,6 @@ extension ObjCClass32 {
             layout: layout,
             offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
         )
-
-        // TODO: Support `class_rw_t`
-        if classData.hasRWPointer { return nil }
 
         return classData
     }
