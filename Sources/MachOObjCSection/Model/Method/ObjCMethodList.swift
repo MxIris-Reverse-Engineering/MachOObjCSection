@@ -19,7 +19,6 @@ public struct ObjCMethodList {
     /// Offset from machO header start
     public let offset: Int
     public let header: Header
-    public let isListOfLists: Bool
     public let is64Bit: Bool
 
     init(
@@ -29,8 +28,13 @@ public struct ObjCMethodList {
     ) {
         self.offset = offset
         self.header = ptr.assumingMemoryBound(to: Header.self).pointee
-        self.isListOfLists = offset & 1 == 1
         self.is64Bit = is64Bit
+    }
+}
+
+extension ObjCMethodList {
+    public var isListOfLists: Bool {
+        offset & 1 == 1
     }
 }
 

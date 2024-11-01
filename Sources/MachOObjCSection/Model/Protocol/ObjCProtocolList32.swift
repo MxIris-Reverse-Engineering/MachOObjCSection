@@ -15,12 +15,16 @@ public struct ObjCProtocolList32: ObjCProtocolListProtocol {
 
     public let offset: Int
     public let header: Header
-    public let isListOfLists: Bool
 
     init(ptr: UnsafeRawPointer, offset: Int) {
         self.offset = offset
         self.header = ptr.assumingMemoryBound(to: Header.self).pointee
-        self.isListOfLists = offset & 1 == 1
+    }
+}
+
+extension ObjCProtocolList32 {
+    public var isListOfLists: Bool {
+        offset & 1 == 1
     }
 }
 
