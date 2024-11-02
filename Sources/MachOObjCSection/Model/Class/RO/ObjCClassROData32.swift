@@ -18,7 +18,7 @@ public struct ObjCClassROData32: LayoutWrapper, ObjCClassRODataProtocol {
     public struct Layout: _ObjCClassRODataLayoutProtocol {
         public let flags: UInt32
         public let instanceStart: UInt32
-        public let instanceSize: Pointer // union { uint32_t instanceSize; PtrTy pad; }
+        public let instanceSize: UInt32
         public let ivarLayout: Pointer // union { const uint8_t * ivarLayout; Class nonMetaclass; };
         public let name: Pointer
         public let baseMethods: Pointer

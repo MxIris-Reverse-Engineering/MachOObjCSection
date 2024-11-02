@@ -13,7 +13,7 @@ public protocol _ObjCClassRODataLayoutProtocol {
 
     var flags: UInt32 { get }
     var instanceStart: UInt32 { get }
-    var instanceSize: Pointer { get } // union { uint32_t instanceSize; PtrTy pad; }
+    var instanceSize: UInt32 { get }
     var ivarLayout: Pointer { get } // union { const uint8_t * ivarLayout; Class nonMetaclass; };
     var name: Pointer { get }
     var baseMethods: Pointer { get }
