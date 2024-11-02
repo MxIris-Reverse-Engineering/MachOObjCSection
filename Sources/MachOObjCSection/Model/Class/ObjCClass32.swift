@@ -57,22 +57,7 @@ extension ObjCClass32 {
     }
 
     public func classROData(in machO: MachOFile) -> ClassROData? {
-        var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32) + numericCast(machO.headerStartOffset)
-
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
-                return nil
-            }
-            offset = _offset
-        }
-
-        let layout: ClassROData.Layout = machO.fileHandle.read(offset: offset)
-        let classData = ClassROData(layout: layout, offset: Int(offset))
-
-        // TODO: Support `class_rw_t`
-        if classData.hasRWPointer { return nil }
-
-        return classData
+        _classROData(in: machO)
     }
 
 
@@ -196,6 +181,27 @@ extension ObjCClass32 {
 }
 
 extension ObjCClass32 {
+    /// https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.mm#L6746
+    public func version(in machO: MachOFile) -> Int32 {
+        guard let _data = _classROData(in: machO) else {
+            return 0
+        }
+        return _data.isMetaClass ? 7 : 0
+    }
+
+    public func version(in machO: MachOImage) -> Int32 {
+        if let rw = classRWData(in: machO),
+           let ext = rw.ext(in: machO) {
+            return numericCast(ext.version)
+        }
+        guard let _data = _classROData(in: machO) else {
+            return 0
+        }
+        return _data.isMetaClass ? 7 : 0
+    }
+}
+
+extension ObjCClass32 {
     private func _classROData(in machO: MachOImage) -> ClassROData? {
         let address: UInt = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32)
         guard let ptr = UnsafeRawPointer(bitPattern: address) else {
@@ -208,6 +214,22 @@ extension ObjCClass32 {
             layout: layout,
             offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
         )
+
+        return classData
+    }
+
+    private func _classROData(in machO: MachOFile) -> ClassROData? {
+        var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32) + numericCast(machO.headerStartOffset)
+
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+                return nil
+            }
+            offset = _offset
+        }
+
+        let layout: ClassROData.Layout = machO.fileHandle.read(offset: offset)
+        let classData = ClassROData(layout: layout, offset: Int(offset))
 
         return classData
     }

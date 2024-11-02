@@ -57,28 +57,8 @@ extension ObjCClass64 {
     }
 
     public func classROData(in machO: MachOFile) -> ClassROData? {
-        let FAST_DATA_MASK: UInt64
-        if machO.isPhysicalIPhone && !machO.isSimulatorIPhone {
-            FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64_IPHONE)
-        } else {
-            FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64)
-        }
-
-        var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & FAST_DATA_MASK + numericCast(machO.headerStartOffset)
-        offset &= 0x7ffffffff
-
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
-                return nil
-            }
-            offset = _offset
-        }
-        let layout: ClassROData.Layout = machO.fileHandle.read(offset: offset)
-        let classData = ClassROData(layout: layout, offset: Int(offset))
-
-        return classData
+        _classROData(in: machO)
     }
-
 
     private func _readClass(
         at offset: UInt64,
@@ -203,6 +183,27 @@ extension ObjCClass64 {
 }
 
 extension ObjCClass64 {
+    /// https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.mm#L6746
+    public func version(in machO: MachOFile) -> Int32 {
+        guard let _data = _classROData(in: machO) else {
+            return 0
+        }
+        return _data.isMetaClass ? 7 : 0
+    }
+
+    public func version(in machO: MachOImage) -> Int32 {
+        if let rw = classRWData(in: machO),
+           let ext = rw.ext(in: machO) {
+            return numericCast(ext.version)
+        }
+        guard let _data = _classROData(in: machO) else {
+            return 0
+        }
+        return _data.isMetaClass ? 7 : 0
+    }
+}
+
+extension ObjCClass64 {
     private func _classROData(in machO: MachOImage) -> ClassROData? {
         let FAST_DATA_MASK: UInt
         if machO.isPhysicalIPhone && !machO.isSimulatorIPhone {
@@ -224,6 +225,29 @@ extension ObjCClass64 {
             layout: layout,
             offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
         )
+
+        return classData
+    }
+
+    private func _classROData(in machO: MachOFile) -> ClassROData? {
+        let FAST_DATA_MASK: UInt64
+        if machO.isPhysicalIPhone && !machO.isSimulatorIPhone {
+            FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64_IPHONE)
+        } else {
+            FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64)
+        }
+
+        var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & FAST_DATA_MASK + numericCast(machO.headerStartOffset)
+        offset &= 0x7ffffffff
+
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+                return nil
+            }
+            offset = _offset
+        }
+        let layout: ClassROData.Layout = machO.fileHandle.read(offset: offset)
+        let classData = ClassROData(layout: layout, offset: Int(offset))
 
         return classData
     }

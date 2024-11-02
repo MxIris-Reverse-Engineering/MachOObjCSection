@@ -30,6 +30,9 @@ public protocol ObjCClassProtocol {
     func superClassName(in machO: MachOImage) -> String?
     func classROData(in machO: MachOImage) -> ClassROData?
     func classRWData(in machO: MachOImage) -> ClassRWData?
+
+    func version(in machO: MachOFile) -> Int32
+    func version(in machO: MachOImage) -> Int32
 }
 
 extension ObjCClassProtocol {
