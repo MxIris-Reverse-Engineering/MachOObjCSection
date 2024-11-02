@@ -69,4 +69,39 @@ extension ObjCClassROData64 {
         }
         return list
     }
+
+    public func properties(in machO: MachOFile) -> ObjCPropertyList? {
+        guard layout.baseProperties > 0 else { return nil }
+        guard layout.baseProperties & 1 == 0 else { return nil }
+
+        var offset: UInt64 = numericCast(layout.baseProperties) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+
+        if let resolved = resolveRebase(\.baseProperties, in: machO) {
+            offset = resolved + numericCast(machO.headerStartOffset)
+        }
+        if isBind(\.baseProperties, in: machO) { return nil }
+        offset &= 0x7ffffffff
+
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+                return nil
+            }
+            offset = _offset
+        }
+        let data = machO.fileHandle.readData(
+            offset: offset,
+            size: MemoryLayout<ObjCPropertyList.Header>.size
+        )
+        let list: ObjCPropertyList? = data.withUnsafeBytes {
+            guard let ptr = $0.baseAddress else {
+                return nil
+            }
+            return .init(
+                ptr: ptr,
+                offset: numericCast(offset) - machO.headerStartOffset,
+                is64Bit: machO.is64Bit
+            )
+        }
+        return list
+    }
 }
