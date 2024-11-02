@@ -61,8 +61,11 @@ extension ObjCProtocolArray32 {
                     )
                 }
         case .relative:
-            // TODO: implement
-            break
+            let relativeListList = ObjCProtocolRelativeListList32(
+                ptr: start,
+                offset: Int(bitPattern: start) - Int(bitPattern: machO.ptr)
+            )
+            lists = relativeListList.lists(in: machO)
         case ._dummy, .none:
             break
         }

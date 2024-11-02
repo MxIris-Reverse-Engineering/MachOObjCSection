@@ -67,8 +67,11 @@ extension ObjCMethodArray {
                 currentOffset += MemoryLayout<UInt>.size
             }
         case .relative:
-            // TODO: implement
-            break
+            let relativeListList = ObjCMethodRelativeListList(
+                ptr: start,
+                offset: Int(bitPattern: start) - Int(bitPattern: machO.ptr)
+            )
+            lists = relativeListList.lists(in: machO)
         case ._dummy, .none:
             break
         }
