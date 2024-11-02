@@ -9,6 +9,8 @@
 #ifndef objc_class_data_h
 #define objc_class_data_h
 
+#include <stdint.h>
+
 // ref: https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L137
 #define FAST_DATA_MASK_64_IPHONE   0x0f00007ffffffff8UL
 #define FAST_DATA_MASK_64          0x0f007ffffffffff8UL
@@ -104,5 +106,10 @@
 
 // class is a metaclass (copied from ro)
 #define RW_META               RO_META // (1<<0)
+
+struct relative_list_list_entry_t {
+    uint64_t imageIndex: 16;
+    int64_t listOffset: 48;
+};
 
 #endif /* objc_class_data_h */
