@@ -20,6 +20,44 @@ extension MachOFile {
         guard isLoadedFromDyldCache else { return nil }
         return try? DyldCache(url: url)
     }
+
+    func cache(for address: UInt64) -> DyldCache? {
+        guard let cache else { return nil }
+        if cache.fileOffset(of: address) != nil {
+            return cache
+        }
+        guard let subCaches = cache.mainCache?.subCaches else {
+            return nil
+        }
+        for subCache in subCaches {
+            guard let cache = try? subCache.subcache(for: cache) else {
+                continue
+            }
+            if cache.fileOffset(of: address) != nil {
+                return cache
+            }
+        }
+        return nil
+    }
+
+    func cacheAndFileOffset(for address: UInt64) -> (DyldCache, UInt64)? {
+        guard let cache else { return nil }
+        if let offset = cache.fileOffset(of: address) {
+            return (cache, offset)
+        }
+        guard let subCaches = cache.mainCache?.subCaches else {
+            return nil
+        }
+        for subCache in subCaches {
+            guard let cache = try? subCache.subcache(for: cache) else {
+                continue
+            }
+            if let offset = cache.fileOffset(of: address) {
+                return (cache, offset)
+            }
+        }
+        return nil
+    }
 }
 
 extension MachOFile {
