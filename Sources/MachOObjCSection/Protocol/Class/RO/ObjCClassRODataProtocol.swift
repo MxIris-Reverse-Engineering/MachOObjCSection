@@ -65,10 +65,6 @@ extension ObjCClassRODataProtocol {
     public var isRealized: Bool {
         flags.contains(.realized)
     }
-
-    public var hasRWPointer: Bool {
-        isRealized
-    }
 }
 
 extension ObjCClassRODataProtocol {
@@ -121,7 +117,8 @@ extension ObjCClassRODataProtocol {
 
 extension ObjCClassRODataProtocol {
     public func ivarLayout(in machO: MachOImage) -> [UInt8]? {
-        _ivarLayout(in: machO, at: numericCast(layout.ivarLayout))
+        if flags.contains(.meta) { return nil }
+        return _ivarLayout(in: machO, at: numericCast(layout.ivarLayout))
     }
 
     public func weakIvarLayout(in machO: MachOImage) -> [UInt8]? {
