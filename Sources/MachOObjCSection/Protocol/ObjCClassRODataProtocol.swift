@@ -3,7 +3,7 @@
 //
 //
 //  Created by p-x9 on 2024/08/06
-//  
+//
 //
 
 import Foundation
@@ -13,6 +13,7 @@ public protocol ObjCClassRODataProtocol {
     associatedtype Layout: _ObjCClassRODataLayoutProtocol
     associatedtype ObjCProtocolList: ObjCProtocolListProtocol
     associatedtype ObjCIvarList: ObjCIvarListProtocol
+    associatedtype ObjCProtocolRelativeListList: RelativeListListProtocol where ObjCProtocolRelativeListList.List == ObjCProtocolList
 
     var layout: Layout { get }
     var offset: Int { get }
@@ -34,6 +35,10 @@ public protocol ObjCClassRODataProtocol {
     func properties(in machO: MachOImage) -> ObjCPropertyList?
     func protocols(in machO: MachOImage) -> ObjCProtocolList?
     func ivars(in machO: MachOImage) -> ObjCIvarList?
+
+    func methodRelativeListList(in machO: MachOImage) -> ObjCMethodRelativeListList?
+    func propertyRelativeListList(in machO: MachOImage) -> ObjCPropertyRelativeListList?
+    func protocolRelativeListList(in machO: MachOImage) -> ObjCProtocolRelativeListList?
 }
 
 extension ObjCClassRODataProtocol {
@@ -149,6 +154,8 @@ extension ObjCClassRODataProtocol {
 
     public func methods(in machO: MachOImage) -> ObjCMethodList? {
         guard layout.baseMethods > 0 else { return nil }
+        guard layout.baseMethods & 1 == 0 else { return nil }
+
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.baseMethods)
         ) else {
@@ -171,6 +178,8 @@ extension ObjCClassRODataProtocol {
 
     public func properties(in machO: MachOImage) -> ObjCPropertyList? {
         guard layout.baseProperties > 0 else { return nil }
+        guard layout.baseProperties & 1 == 0 else { return nil }
+
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.baseProperties)
         ) else {
@@ -188,6 +197,44 @@ extension ObjCClassRODataProtocol {
         }
 
         return list
+    }
+}
+
+extension ObjCClassRODataProtocol {
+    public func methodRelativeListList(
+        in machO: MachOImage
+    ) -> ObjCMethodRelativeListList? {
+        guard layout.baseMethods > 0 else { return nil }
+        guard layout.baseMethods & 1 == 1 else { return nil }
+
+        guard let ptr = UnsafeRawPointer(
+            bitPattern: UInt(layout.baseMethods & ~1)
+        ) else {
+            return nil
+        }
+
+        return .init(
+            ptr: ptr,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+    }
+
+    public func propertyRelativeListList(
+        in machO: MachOImage
+    ) -> ObjCPropertyRelativeListList? {
+        guard layout.baseProperties > 0 else { return nil }
+        guard layout.baseProperties & 1 == 1 else { return nil }
+
+        guard let ptr = UnsafeRawPointer(
+            bitPattern: UInt(layout.baseProperties & ~1)
+        ) else {
+            return nil
+        }
+
+        return .init(
+            ptr: ptr,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
     }
 }
 
@@ -219,6 +266,8 @@ extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList64 {
 
     public func protocols(in machO: MachOImage) -> ObjCProtocolList? {
         guard layout.baseProtocols > 0 else { return nil }
+        guard layout.baseProtocols & 1 == 0 else { return nil }
+
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.baseProtocols)
         ) else {
@@ -230,6 +279,24 @@ extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList64 {
         )
 
         return list
+    }
+
+    public func protocolRelativeListList(
+        in machO: MachOImage
+    ) -> ObjCProtocolRelativeListList64? {
+        guard layout.baseProtocols > 0 else { return nil }
+        guard layout.baseProtocols & 1 == 1 else { return nil }
+
+        guard let ptr = UnsafeRawPointer(
+            bitPattern: UInt(layout.baseProtocols & ~1)
+        ) else {
+            return nil
+        }
+
+        return .init(
+            ptr: ptr,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
     }
 }
 
@@ -261,6 +328,7 @@ extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList32 {
 
     public func protocols(in machO: MachOImage) -> ObjCProtocolList? {
         guard layout.baseProtocols > 0 else { return nil }
+        guard layout.baseProtocols & 1 == 0 else { return nil }
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.baseProtocols)
         ) else {
@@ -272,6 +340,24 @@ extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList32 {
         )
 
         return list
+    }
+
+    public func protocolRelativeListList(
+        in machO: MachOImage
+    ) -> ObjCProtocolRelativeListList32? {
+        guard layout.baseProtocols > 0 else { return nil }
+        guard layout.baseProtocols & 1 == 1 else { return nil }
+
+        guard let ptr = UnsafeRawPointer(
+            bitPattern: UInt(layout.baseProtocols & ~1)
+        ) else {
+            return nil
+        }
+
+        return .init(
+            ptr: ptr,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
     }
 }
 

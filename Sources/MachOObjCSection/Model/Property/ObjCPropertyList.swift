@@ -76,8 +76,10 @@ extension ObjCPropertyList {
     public func properties(
         in machO: MachOFile
     ) -> AnyRandomAccessCollection<ObjCProperty> {
-        // TODO: Support listOfLists
-        guard !isListOfLists else { return AnyRandomAccessCollection([]) }
+        guard !isListOfLists else {
+            assertionFailure()
+            return AnyRandomAccessCollection([])
+        }
 
         let headerStartOffset = machO.headerStartOffset
         let start = headerStartOffset + offset

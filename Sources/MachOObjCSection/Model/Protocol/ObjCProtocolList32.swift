@@ -54,8 +54,10 @@ extension ObjCProtocolList32 {
     public func protocols(
         in machO: MachOFile
     ) -> [ObjCProtocol]? {
-        // TODO: Support listOfLists
-        guard !isListOfLists else { return nil }
+        guard !isListOfLists else {
+            assertionFailure()
+            return nil
+        }
 
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         let start = headerStartOffset + offset

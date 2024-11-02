@@ -15,6 +15,7 @@ public struct ObjCClassROData64: LayoutWrapper, ObjCClassRODataProtocol {
     public typealias Pointer = UInt64
     public typealias ObjCProtocolList = ObjCProtocolList64
     public typealias ObjCIvarList = ObjCIvarList64
+    public typealias ObjCProtocolRelativeListList = ObjCProtocolRelativeListList64
 
     public struct Layout: _ObjCClassRODataLayoutProtocol {
         public let flags: UInt32

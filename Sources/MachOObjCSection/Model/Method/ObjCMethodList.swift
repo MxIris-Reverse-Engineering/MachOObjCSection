@@ -141,6 +141,10 @@ extension ObjCMethodList {
     public func methods(
         in machO: MachOFile
     ) -> AnyRandomAccessCollection<ObjCMethod>? {
+        guard !isListOfLists else {
+            assertionFailure()
+            return nil
+        }
         let headerStartOffset = machO.headerStartOffset
         switch listKind {
         case .pointer where machO.is64Bit:
