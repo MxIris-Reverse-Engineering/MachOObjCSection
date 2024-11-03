@@ -53,12 +53,24 @@ extension DyldCache {
         guard let mainCache else { return nil }
         if let ro = mainCache.headerOptimizationRO64,
            ro.contains(index: index) {
-            let header = ro.headerInfos(in: mainCache)[AnyIndex(index)]
+            guard let header = ro.headerInfos(in: mainCache).first(
+                where: {
+                    $0.index == index
+                }
+            ) else {
+                return nil
+            }
             return header._machO(mainCache: mainCache)
         }
         if let ro = mainCache.headerOptimizationRO32,
            ro.contains(index: index) {
-            let header = ro.headerInfos(in: mainCache)[AnyIndex(index)]
+            guard let header = ro.headerInfos(in: mainCache).first(
+                where: {
+                    $0.index == index
+                }
+            ) else {
+                return nil
+            }
             return header._machO(mainCache: mainCache)
         }
         return nil
