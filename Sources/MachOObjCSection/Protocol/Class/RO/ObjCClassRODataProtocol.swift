@@ -80,7 +80,7 @@ extension ObjCClassRODataProtocol {
     public func name(in machO: MachOFile) -> String? {
         var offset: UInt64 = numericCast(layout.name) & 0x7ffffffff + numericCast(machO.headerStartOffset)
         if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
             offset = _offset
@@ -199,9 +199,11 @@ extension ObjCClassRODataProtocol {
 extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList64 {
     public func protocols(in machO: MachOFile) -> ObjCProtocolList? {
         guard layout.baseProtocols > 0 else { return nil }
+        guard layout.baseProtocols & 1 == 0 else { return nil }
+
         var offset: UInt64 = numericCast(layout.baseProtocols) & 0x7ffffffff + numericCast(machO.headerStartOffset)
         if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
             offset = _offset
@@ -261,9 +263,11 @@ extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList64 {
 extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList32 {
     public func protocols(in machO: MachOFile) -> ObjCProtocolList? {
         guard layout.baseProtocols > 0 else { return nil }
+        guard layout.baseProtocols & 1 == 0 else { return nil }
+
         var offset: UInt64 = numericCast(layout.baseProtocols) + numericCast(machO.headerStartOffset)
         if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
             offset = _offset
@@ -287,6 +291,7 @@ extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList32 {
     public func protocols(in machO: MachOImage) -> ObjCProtocolList? {
         guard layout.baseProtocols > 0 else { return nil }
         guard layout.baseProtocols & 1 == 0 else { return nil }
+
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.baseProtocols)
         ) else {
@@ -324,7 +329,7 @@ extension ObjCClassRODataProtocol where ObjCIvarList == ObjCIvarList64 {
         guard layout.ivars > 0 else { return nil }
         var offset: UInt64 = numericCast(layout.ivars) & 0x7ffffffff + numericCast(machO.headerStartOffset)
         if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
             offset = _offset
@@ -372,7 +377,7 @@ extension ObjCClassRODataProtocol where ObjCIvarList == ObjCIvarList32 {
         guard layout.ivars > 0 else { return nil }
         var offset: UInt64 = numericCast(layout.ivars) + numericCast(machO.headerStartOffset)
         if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
             offset = _offset
@@ -420,7 +425,7 @@ extension ObjCClassRODataProtocol {
     ) -> [UInt8]? {
         var offset: UInt64 = numericCast(offset) & 0x7ffffffff + numericCast(machO.headerStartOffset)
         if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
             offset = _offset
