@@ -171,8 +171,20 @@ extension ObjCProtocolProtocol {
 extension ObjCProtocolProtocol {
     public func mangledName(in machO: MachOFile) -> String {
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
-        return machO.fileHandle.readString(
-            offset: numericCast(layout.mangledName & 0x7ffffffff) + numericCast(headerStartOffset)
+
+        var offset: UInt64 = numericCast(layout.mangledName & 0x7ffffffff)
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            offset = _offset
+            fileHandle = _cache.fileHandle
+        }
+
+        return fileHandle.readString(
+            offset: offset + numericCast(headerStartOffset)
         ) ?? ""
     }
 
@@ -216,20 +228,55 @@ extension ObjCProtocolProtocol {
         let _extendedMethodTypes = layout._extendedMethodTypes & 0x7ffffffff
         if machO.is64Bit {
             var offset: UInt64 = UInt64(_extendedMethodTypes)
-            if let cache = machO.cache {
-                offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart)!
+
+            var fileHandle = machO.fileHandle
+
+            if let (_cache, _offset) = machO.cacheAndFileOffset(
+                fromStart: offset
+            ) {
+                offset = _offset
+                fileHandle = _cache.fileHandle
             }
-            offset = machO.fileHandle.read(
+
+            offset = fileHandle.read(
                 offset: numericCast(headerStartOffset) + numericCast(offset)
             ) & 0x7ffffffff
+
+            if let (_cache, _offset) = machO.cacheAndFileOffset(
+                fromStart: offset
+            ) {
+                offset = _offset
+                fileHandle = _cache.fileHandle
+            }
+
             return machO.fileHandle.readString(
                 offset: numericCast(headerStartOffset) + numericCast(offset)
             )
         } else {
-            let offset: UInt32 = machO.fileHandle.read(
-                offset: numericCast(headerStartOffset) + numericCast(_extendedMethodTypes)
+            var offset: UInt64 = UInt64(_extendedMethodTypes)
+
+            var fileHandle = machO.fileHandle
+
+            if let (_cache, _offset) = machO.cacheAndFileOffset(
+                fromStart: offset
+            ) {
+                offset = _offset
+                fileHandle = _cache.fileHandle
+            }
+
+            let _offset: UInt32 = fileHandle.read(
+                offset: numericCast(headerStartOffset) + offset
             )
-            return machO.fileHandle.readString(
+            offset = numericCast(_offset)
+
+            if let (_cache, _offset) = machO.cacheAndFileOffset(
+                fromStart: offset
+            ) {
+                offset = _offset
+                fileHandle = _cache.fileHandle
+            }
+
+            return fileHandle.readString(
                 offset: numericCast(headerStartOffset) + numericCast(offset)
             )
         }
@@ -243,8 +290,18 @@ extension ObjCProtocolProtocol {
         guard layout._demangledName > 0 else { return nil }
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
 
-        let _demangledName = layout._demangledName & 0x7ffffffff
-        return machO.fileHandle.readString(
+        var _demangledName = layout._demangledName & 0x7ffffffff
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: numericCast(_demangledName)
+        ) {
+            _demangledName = numericCast(_offset)
+            fileHandle = _cache.fileHandle
+        }
+
+        return fileHandle.readString(
             offset: numericCast(headerStartOffset) + numericCast(_demangledName)
         )
     }
@@ -264,12 +321,23 @@ extension ObjCProtocolProtocol {
     ) -> ObjCMethodList? {
         guard offset > 0 else { return nil }
         let headerStartOffset = machO.headerStartOffset /*+ machO.headerStartOffsetInCache*/
-        var offset = offset & 0x7ffffffff
-        if let cache = machO.cache {
-            offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) ?? 0
+        let offset = offset & 0x7ffffffff
+        var resolvedOffset = offset
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+//            if _cache.url == machO.url {
+//                offset = resolvedOffset
+//            }
         }
-        let data = machO.fileHandle.readData(
-            offset: numericCast(headerStartOffset) + numericCast(offset),
+
+        let data = fileHandle.readData(
+            offset: numericCast(headerStartOffset) + numericCast(resolvedOffset),
             size: MemoryLayout<ObjCMethodList.Header>.size
         )
         return data.withUnsafeBytes {
@@ -289,11 +357,22 @@ extension ObjCProtocolProtocol {
         guard offset > 0 else { return nil }
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
         var offset = offset & 0x7ffffffff
-        if let cache = machO.cache {
-            offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) ?? 0
+        var resolvedOffset = offset
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+//            if _cache.url == machO.url {
+//                offset = resolvedOffset
+//            }
         }
-        let data = machO.fileHandle.readData(
-            offset: numericCast(headerStartOffset) + numericCast(offset),
+
+        let data = fileHandle.readData(
+            offset: numericCast(headerStartOffset) + numericCast(resolvedOffset),
             size: MemoryLayout<ObjCPropertyList.Header>.size
         )
         return data.withUnsafeBytes {
