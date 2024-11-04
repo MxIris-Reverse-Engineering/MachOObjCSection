@@ -75,7 +75,7 @@ extension ObjCClass64 {
         offset &= 0x7ffffffff
 
         if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
             offset = _offset
@@ -241,7 +241,7 @@ extension ObjCClass64 {
         offset &= 0x7ffffffff
 
         if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
             offset = _offset
