@@ -51,10 +51,12 @@ extension RelativeListListProtocol {
     }
 
     public var count: Int { numericCast(header.count) }
+}
 
+extension RelativeListListProtocol {
     public func entries(in machO: MachOImage) -> [Entry] {
         let ptr = machO.ptr.advanced(by: offset)
-        let sequnece = MemorySequence(
+        let sequence = MemorySequence(
             basePointer: ptr
                 .advanced(by: MemoryLayout<Header>.size)
                 .assumingMemoryBound(to: Entry.Layout.self),
@@ -63,7 +65,7 @@ extension RelativeListListProtocol {
 
         let baseOffset = offset + MemoryLayout<Header>.size
         let entrySize = MemoryLayout<Entry.Layout>.size
-        return sequnece.enumerated()
+        return sequence.enumerated()
             .map { i, layout in
                 Entry(
                     offset: baseOffset + entrySize * i,
