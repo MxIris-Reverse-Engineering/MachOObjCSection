@@ -35,14 +35,17 @@ public struct ObjCClassROData32: LayoutWrapper, ObjCClassRODataProtocol {
 extension ObjCClassROData32 {
     public func methods(in machO: MachOFile) -> ObjCMethodList? {
         guard layout.baseMethods > 0 else { return nil }
+        guard layout.baseMethods & 1 == 0 else { return nil }
+
         var offset: UInt64 = numericCast(layout.baseMethods) + numericCast(machO.headerStartOffset)
 
         if let resolved = resolveRebase(\.baseMethods, in: machO) {
             offset = resolved + numericCast(machO.headerStartOffset)
         }
         if isBind(\.baseMethods, in: machO) { return nil }
+
         if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
             offset = _offset
@@ -79,7 +82,7 @@ extension ObjCClassROData32 {
         if isBind(\.baseProperties, in: machO) { return nil }
 
         if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.header.sharedRegionStart) else {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
             offset = _offset
