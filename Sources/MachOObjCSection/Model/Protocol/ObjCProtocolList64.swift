@@ -60,23 +60,39 @@ extension ObjCProtocolList64 {
         }
 
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
-        let start = headerStartOffset + offset
-        let data = machO.fileHandle.readData(
-            offset: numericCast(start + MemoryLayout<Header>.size),
-            size: MemoryLayout<UInt64>.size * numericCast(header.count)
-        )
-        let sequnece: DataSequence<UInt64> = .init(
-            data: data,
-            numberOfElements: numericCast(header.count)
-        )
+        let offset: UInt64 = numericCast(headerStartOffset + offset)
+
+        var resolvedOffset = offset
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+        }
+
+        let sequnece: DataSequence<UInt64> = fileHandle
+            .readDataSequence(
+                offset: resolvedOffset + numericCast(MemoryLayout<Header>.size),
+                numberOfElements: numericCast(header.count)
+            )
 
         return sequnece
             .map {
                 var offset = $0 & 0x7ffffffff
-                if let cache = machO.cache {
-                    offset = numericCast(cache.fileOffset(of: numericCast(offset) + cache.header.sharedRegionStart) ?? 0)
+
+                var fileHandle = machO.fileHandle
+
+                if let (_cache, _offset) = machO.cacheAndFileOffset(
+                    fromStart: offset
+                ) {
+                    offset = _offset
+                    fileHandle = _cache.fileHandle
                 }
-                return machO.fileHandle.read<ObjCProtocol64>(
+
+                return fileHandle.read<ObjCProtocol64>(
                     offset: numericCast(headerStartOffset) + numericCast(offset),
                     swapHandler: { _ in }
                 )

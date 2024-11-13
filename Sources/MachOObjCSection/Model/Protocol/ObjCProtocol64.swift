@@ -52,20 +52,30 @@ extension ObjCProtocol64 {
     public func protocols(in machO: MachOFile) -> ObjCProtocolList? {
         guard machO.is64Bit else { return nil }
         guard layout.protocols > 0 else { return nil }
+
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
-        var protocols = layout.protocols & 0x7ffffffff
-        if let cache = machO.cache {
-            protocols = numericCast(cache.fileOffset(of: numericCast(protocols) + cache.header.sharedRegionStart) ?? 0)
+
+        let offset = layout.protocols & 0x7ffffffff + numericCast(headerStartOffset)
+        var resolvedOffset = offset
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
         }
-        let data = machO.fileHandle.readData(
-            offset: numericCast(headerStartOffset) + numericCast(protocols),
+
+        let data = fileHandle.readData(
+            offset: resolvedOffset,
             size: MemoryLayout<ObjCProtocolList64.Header>.size
         )
         return data.withUnsafeBytes {
             guard let baseAddress = $0.baseAddress else { return nil }
             return .init(
                 ptr: baseAddress,
-                offset: numericCast(protocols)
+                offset: numericCast(offset) - machO.headerStartOffset
             )
         }
     }

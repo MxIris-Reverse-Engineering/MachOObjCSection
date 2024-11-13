@@ -320,6 +320,7 @@ extension ObjCProtocolProtocol {
         offset: UInt64
     ) -> ObjCMethodList? {
         guard offset > 0 else { return nil }
+
         let headerStartOffset = machO.headerStartOffset /*+ machO.headerStartOffsetInCache*/
         let offset = offset & 0x7ffffffff
         var resolvedOffset = offset
@@ -331,9 +332,6 @@ extension ObjCProtocolProtocol {
         ) {
             resolvedOffset = _offset
             fileHandle = _cache.fileHandle
-//            if _cache.url == machO.url {
-//                offset = resolvedOffset
-//            }
         }
 
         let data = fileHandle.readData(
@@ -355,8 +353,9 @@ extension ObjCProtocolProtocol {
         offset: UInt64
     ) -> ObjCPropertyList? {
         guard offset > 0 else { return nil }
+
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
-        var offset = offset & 0x7ffffffff
+        let offset = offset & 0x7ffffffff
         var resolvedOffset = offset
 
         var fileHandle = machO.fileHandle
@@ -366,9 +365,6 @@ extension ObjCProtocolProtocol {
         ) {
             resolvedOffset = _offset
             fileHandle = _cache.fileHandle
-//            if _cache.url == machO.url {
-//                offset = resolvedOffset
-//            }
         }
 
         let data = fileHandle.readData(
