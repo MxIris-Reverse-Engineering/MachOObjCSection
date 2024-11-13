@@ -45,22 +45,32 @@ extension ObjCIvarList64 {
 
     public func ivars(in machO: MachOFile) -> [ObjCIvar]? {
         let headerStartOffset = machO.headerStartOffset
-        let offset = headerStartOffset + offset + MemoryLayout<Header>.size
+
+        var fileHandle = machO.fileHandle
+
+        let offset: UInt64 = numericCast(
+            headerStartOffset + offset + MemoryLayout<Header>.size
+        )
+        var resolvedOffset = offset
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+        }
+
         let size = MemoryLayout<ObjCIvar.Layout>.size
-        let data = machO.fileHandle.readData(
-            offset: numericCast(offset),
-            size: size * count
-        )
-        let sequence: DataSequence<ObjCIvar.Layout> = .init(
-            data: data,
-            numberOfElements: count
-        )
+        let sequence: DataSequence<ObjCIvar.Layout> = fileHandle
+            .readDataSequence(
+                offset: resolvedOffset,
+                numberOfElements: count
+            )
         return sequence
             .enumerated()
             .map {
                 .init(
                     layout: $1,
-                    offset: offset - headerStartOffset + ObjCIvar.layoutSize * $0
+                    offset: numericCast(offset) - headerStartOffset + size * $0
                 )
             }
     }
