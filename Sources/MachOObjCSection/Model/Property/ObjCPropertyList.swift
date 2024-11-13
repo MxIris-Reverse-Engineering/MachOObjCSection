@@ -55,9 +55,9 @@ extension ObjCPropertyList {
 extension ObjCPropertyList {
     public func properties(
         in machO: MachOImage
-    ) -> AnyRandomAccessCollection<ObjCProperty> {
+    ) -> [ObjCProperty] {
         // TODO: Support listOfLists
-        guard !isListOfLists else { return AnyRandomAccessCollection([]) }
+        guard !isListOfLists else { return [] }
 
         let ptr = machO.ptr.advanced(by: offset)
         let start = ptr.advanced(by: MemoryLayout<Header>.size)
@@ -67,68 +67,105 @@ extension ObjCPropertyList {
             ),
             numberOfElements: count
         )
-        return AnyRandomAccessCollection(
-            sequence
-                .map { ObjCProperty($0) }
-        )
+        return sequence
+            .map { ObjCProperty($0) }
     }
 
     public func properties(
         in machO: MachOFile
-    ) -> AnyRandomAccessCollection<ObjCProperty> {
+    ) -> [ObjCProperty] {
         guard !isListOfLists else {
             assertionFailure()
-            return AnyRandomAccessCollection([])
+            return []
         }
 
         let headerStartOffset = machO.headerStartOffset
-        let start = headerStartOffset + offset
-        let size = if machO.is64Bit {
-            MemoryLayout<ObjCProperty.Property64>.size
-        } else {
-            MemoryLayout<ObjCProperty.Property32>.size
+        var offset: UInt64 = numericCast(headerStartOffset + offset)
+
+        var fileHandle = machO.fileHandle
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            offset = _offset
+            fileHandle = _cache.fileHandle
         }
-        let data = machO.fileHandle.readData(
-            offset: numericCast(start + MemoryLayout<Header>.size),
-            size: size * count
-        )
+
 
         if machO.is64Bit {
-            let sequence: DataSequence<ObjCProperty.Property64> = .init(
-                data: data,
-                numberOfElements: count
-            )
-            return AnyRandomAccessCollection(
-                sequence
-                    .map {
-                        ObjCProperty(
-                            name: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + ($0.name & 0x7ffffffff)
-                            ) ?? "",
-                            attributes: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + ($0.attributes & 0x7ffffffff)
-                            ) ?? ""
-                        )
+            let sequence: DataSequence<ObjCProperty.Property64> = fileHandle
+                .readDataSequence(
+                    offset: offset + numericCast(MemoryLayout<Header>.size),
+                    numberOfElements: count
+                )
+            return sequence
+                .compactMap {
+                    var name = UInt64($0.name) & 0x7ffffffff
+                    var attributes = UInt64($0.attributes) & 0x7ffffffff
+
+                    var nameFileHandle = machO.fileHandle
+                    var attributesFileHandle = machO.fileHandle
+
+                    if let (_cache, _offset) = machO.cacheAndFileOffset(
+                        fromStart: name
+                    ) {
+                        name = _offset
+                        nameFileHandle = _cache.fileHandle
                     }
-            )
+
+                    if let (_cache, _offset) = machO.cacheAndFileOffset(
+                        fromStart: attributes
+                    ) {
+                        attributes = _offset
+                        attributesFileHandle = _cache.fileHandle
+                    }
+
+                    return ObjCProperty(
+                        name: nameFileHandle.readString(
+                            offset: numericCast(machO.headerStartOffset) + name
+                        ) ?? "",
+                        attributes: attributesFileHandle.readString(
+                            offset: numericCast(headerStartOffset) + attributes
+                        ) ?? ""
+                    )
+                }
         } else {
-            let sequence: DataSequence<ObjCProperty.Property64> = .init(
-                data: data,
-                numberOfElements: count
-            )
-            return AnyRandomAccessCollection(
-                sequence
-                    .map {
-                        ObjCProperty(
-                            name: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + $0.name
-                            ) ?? "",
-                            attributes: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + $0.attributes
-                            ) ?? ""
-                        )
+            let sequence: DataSequence<ObjCProperty.Property32> = fileHandle
+                .readDataSequence(
+                    offset: offset + numericCast(MemoryLayout<Header>.size),
+                    numberOfElements: count
+                )
+            return sequence
+                .map {
+                    var name = UInt64($0.name)
+                    var attributes = UInt64($0.attributes)
+
+                    var nameFileHandle = machO.fileHandle
+                    var attributesFileHandle = machO.fileHandle
+
+
+                    if let (_cache, _offset) = machO.cacheAndFileOffset(
+                        fromStart: name
+                    ) {
+                        name = _offset
+                        nameFileHandle = _cache.fileHandle
                     }
-            )
+
+                    if let (_cache, _offset) = machO.cacheAndFileOffset(
+                        fromStart: attributes
+                    ) {
+                        attributes = _offset
+                        attributesFileHandle = _cache.fileHandle
+                    }
+
+                    return ObjCProperty(
+                        name: nameFileHandle.readString(
+                            offset: numericCast(headerStartOffset) + name
+                        ) ?? "",
+                        attributes: attributesFileHandle.readString(
+                            offset: numericCast(headerStartOffset) + attributes
+                        ) ?? ""
+                    )
+                }
         }
     }
 }
