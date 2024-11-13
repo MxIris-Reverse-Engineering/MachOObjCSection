@@ -249,7 +249,7 @@ extension ObjCMethodList {
                             offset: numericCast(headerStartOffset) + numericCast(name)
                         ) ?? "",
                         types: machO.fileHandle.readString(
-                            offset: numericCast(headerStartOffset) + numericCast(types)
+                            offset: numericCast(types)
                         ) ?? "",
                         imp: nil
                     )
@@ -290,7 +290,7 @@ extension ObjCMethodList {
 
                     return ObjCMethod(
                         name: nameFileHandle.readString(
-                            offset: UInt64(name)
+                            offset: numericCast(headerStartOffset) + UInt64(name)
                         ) ?? "",
                         types: typesFileHandle.readString(
                             offset: types
