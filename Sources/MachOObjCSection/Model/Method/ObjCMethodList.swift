@@ -3,7 +3,7 @@
 //
 //
 //  Created by p-x9 on 2024/05/16
-//  
+//
 //
 
 import Foundation
@@ -15,7 +15,7 @@ import Foundation
 
 public struct ObjCMethodList {
     public typealias Header = ObjCMethodListHeader
-    
+
     /// Offset from machO header start
     public let offset: Int
     public let header: Header
@@ -85,9 +85,9 @@ extension ObjCMethodList {
 extension ObjCMethodList {
     public func methods(
         in machO: MachOImage
-    ) -> AnyRandomAccessCollection<ObjCMethod> {
+    ) -> [ObjCMethod] {
         // TODO: Support listOfLists
-        guard !isListOfLists else { return AnyRandomAccessCollection([]) }
+        guard !isListOfLists else { return [] }
 
         let ptr = machO.ptr.advanced(by: offset)
         let start = ptr.advanced(by: MemoryLayout<Header>.size)
@@ -99,10 +99,8 @@ extension ObjCMethodList {
                 ),
                 numberOfElements: count
             )
-            return AnyRandomAccessCollection(
-                sequence
-                    .map { ObjCMethod($0) }
-            )
+            return sequence
+                .map { ObjCMethod($0) }
 
         case .relativeDirect:
             let sequence = MemorySequence(
@@ -112,13 +110,11 @@ extension ObjCMethodList {
                 numberOfElements: count
             )
             let size = MemoryLayout<ObjCMethod.RelativeInDirect>.size
-            return AnyRandomAccessCollection(
-                sequence
-                    .enumerated()
-                    .map {
-                        ObjCMethod($1, at: start.advanced(by: size * $0))
-                    }
-            )
+            return sequence
+                .enumerated()
+                .map {
+                    ObjCMethod($1, at: start.advanced(by: size * $0))
+                }
 
         case .relativeIndirect:
             let sequence = MemorySequence(
@@ -128,123 +124,180 @@ extension ObjCMethodList {
                 numberOfElements: count
             )
             let size = MemoryLayout<ObjCMethod.RelativeInDirect>.size
-            return AnyRandomAccessCollection(
-                sequence
-                    .enumerated()
-                    .map {
-                        ObjCMethod($1, at: start.advanced(by: size * $0))
-                    }
-            )
+            return sequence
+                .enumerated()
+                .map {
+                    ObjCMethod($1, at: start.advanced(by: size * $0))
+                }
         }
     }
 
     public func methods(
         in machO: MachOFile
-    ) -> AnyRandomAccessCollection<ObjCMethod>? {
+    ) -> [ObjCMethod]? {
         guard !isListOfLists else {
             assertionFailure()
             return nil
         }
         let headerStartOffset = machO.headerStartOffset
+
+        var fileHandle = machO.fileHandle
+
+        let offset: UInt64 = numericCast(offset + headerStartOffset) + numericCast(MemoryLayout<Header>.size)
+        var resolvedOffset = offset
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+        }
+
         switch listKind {
         case .pointer where machO.is64Bit:
-            let sequence: DataSequence<ObjCMethod.Pointer64> = machO.fileHandle.readDataSequence(
-                offset: numericCast(headerStartOffset + offset + MemoryLayout<Header>.size),
+            let sequence: DataSequence<ObjCMethod.Pointer64> = fileHandle.readDataSequence(
+                offset: resolvedOffset,
                 numberOfElements: count,
                 swapHandler: nil
             )
-            return AnyRandomAccessCollection(
-                sequence
-                    .map {
-                        let name = UInt($0.name) & 0x7ffffffff
-                        let types = UInt($0.types) & 0x7ffffffff
-                        return ObjCMethod(
-                            name: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + numericCast(name)
-                            ) ?? "",
-                            types: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + numericCast(types)
-                            ) ?? "",
-                            imp: nil
-                        )
+            return sequence
+                .map {
+                    var name = UInt64($0.name) & 0x7ffffffff
+                    var types = UInt64($0.types) & 0x7ffffffff
+
+                    var nameFileHandle = machO.fileHandle
+                    var typesFileHandle = machO.fileHandle
+
+                    if let (_cache, _offset) = machO.cacheAndFileOffset(
+                        fromStart: name
+                    ) {
+                        name = _offset
+                        nameFileHandle = _cache.fileHandle
                     }
-            )
+
+                    if let (_cache, _offset) = machO.cacheAndFileOffset(
+                        fromStart: types
+                    ) {
+                        types = _offset
+                        typesFileHandle = _cache.fileHandle
+                    }
+
+                    return ObjCMethod(
+                        name: nameFileHandle.readString(
+                            offset: numericCast(headerStartOffset) + numericCast(name)
+                        ) ?? "",
+                        types: typesFileHandle.readString(
+                            offset: numericCast(headerStartOffset) + numericCast(types)
+                        ) ?? "",
+                        imp: nil
+                    )
+                }
         case .pointer:
-            let sequence: DataSequence<ObjCMethod.Pointer32> = machO.fileHandle.readDataSequence(
-                offset: numericCast(headerStartOffset + offset + MemoryLayout<Header>.size),
+            let sequence: DataSequence<ObjCMethod.Pointer32> = fileHandle.readDataSequence(
+                offset: resolvedOffset,
                 numberOfElements: count,
                 swapHandler: nil
             )
-            return AnyRandomAccessCollection(
-                sequence
-                    .map {
-                        let name = UInt($0.name)
-                        let types = UInt($0.types)
-                        return ObjCMethod(
-                            name: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + numericCast(name)
-                            ) ?? "",
-                            types: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + numericCast(types)
-                            ) ?? "",
-                            imp: nil
-                        )
+            return sequence
+                .map {
+                    var name = UInt64($0.name)
+                    var types = UInt64($0.types)
+
+                    var nameFileHandle = machO.fileHandle
+                    var typesFileHandle = machO.fileHandle
+
+                    if let (_cache, _offset) = machO.cacheAndFileOffset(
+                        fromStart: name
+                    ) {
+                        name = _offset
+                        nameFileHandle = _cache.fileHandle
                     }
-            )
+
+                    if let (_cache, _offset) = machO.cacheAndFileOffset(
+                        fromStart: types
+                    ) {
+                        types = _offset
+                        typesFileHandle = _cache.fileHandle
+                    }
+
+                    return ObjCMethod(
+                        name: nameFileHandle.readString(
+                            offset: numericCast(headerStartOffset) + numericCast(name)
+                        ) ?? "",
+                        types: typesFileHandle.readString(
+                            offset: numericCast(headerStartOffset) + numericCast(types)
+                        ) ?? "",
+                        imp: nil
+                    )
+                }
+
         case .relativeIndirect:
-            let offset = headerStartOffset + offset + MemoryLayout<Header>.size
-            let sequence: DataSequence<ObjCMethod.RelativeInDirect> = machO.fileHandle.readDataSequence(
-                offset: numericCast(offset),
+            let sequence: DataSequence<ObjCMethod.RelativeInDirect> = fileHandle.readDataSequence(
+                offset: resolvedOffset,
                 numberOfElements: count,
                 swapHandler: nil
             )
             let size = MemoryLayout<ObjCMethod.RelativeInDirect>.size
-            return AnyRandomAccessCollection(
-                sequence.enumerated()
-                    .map {
-                        let offset = offset + $0 * size
-                        let name: UInt = machO.fileHandle.read(
-                            offset: numericCast(offset) + numericCast($1.name.offset)
-                        ) & 0x7ffffffff
-                        let types: Int = numericCast(offset) + numericCast($1.types.offset) + 4
-                        return ObjCMethod(
-                            name: machO.fileHandle.readString(
-                                offset: numericCast(headerStartOffset) + numericCast(name)
-                            ) ?? "",
-                            types: machO.fileHandle.readString(
-                                offset: numericCast(types)
-                            ) ?? "",
-                            imp: nil
-                        )
-                    }
-            )
+            return sequence.enumerated()
+                .map {
+                    let offset = numericCast(offset) + $0 * size
+                    let name: UInt64 = machO.fileHandle.read(
+                        offset: numericCast(offset) + numericCast($1.name.offset)
+                    ) & 0x7ffffffff
+                    let types: Int64 = numericCast(offset) + numericCast($1.types.offset) + 4
+                    return ObjCMethod(
+                        name: machO.fileHandle.readString(
+                            offset: numericCast(headerStartOffset) + numericCast(name)
+                        ) ?? "",
+                        types: machO.fileHandle.readString(
+                            offset: numericCast(headerStartOffset) + numericCast(types)
+                        ) ?? "",
+                        imp: nil
+                    )
+                }
+
         case .relativeDirect:
-            let offset = headerStartOffset + offset + MemoryLayout<Header>.size
-            let sequence: DataSequence<ObjCMethod.RelativeDirect> = machO.fileHandle.readDataSequence(
-                offset: numericCast(offset),
+            let sequence: DataSequence<ObjCMethod.RelativeDirect> = fileHandle.readDataSequence(
+                offset: resolvedOffset,
                 numberOfElements: count,
                 swapHandler: nil
             )
-            let size = MemoryLayout<ObjCMethod.RelativeDirect>.size
-            return AnyRandomAccessCollection(
-                sequence.enumerated()
-                    .map {
-                        let offset = offset + $0 * size
-                        let name: Int64 = numericCast($1.name.offset)
-                        let types: Int64 = numericCast(offset) + numericCast($1.types.offset) + 4
 
-                        let nameOffsetInCache = machO.cache?.objcOptimization?.relativeMethodSelectorBaseAddressOffset ?? 0
-                        return ObjCMethod(
-                            name: machO.fileHandle.readString(
-                                offset: numericCast(name) + numericCast(nameOffsetInCache)
-                            ) ?? "",
-                            types: machO.fileHandle.readString(
-                                offset: numericCast(types)
-                            ) ?? "",
-                            imp: nil
-                        )
+            let size = MemoryLayout<ObjCMethod.RelativeDirect>.size
+            let nameOffsetInCache = machO.cache?.mainCache?.objcOptimization?.relativeMethodSelectorBaseAddressOffset ?? 0
+
+            return sequence.enumerated()
+                .map {
+                    let offset = numericCast(offset) + $0 * size
+                    var name: Int64 = numericCast($1.name.offset)
+                    var types: UInt64 = numericCast(offset) + numericCast($1.types.offset) + 4
+
+                    var nameFileHandle = machO.fileHandle
+                    var typesFileHandle = machO.fileHandle
+
+                    if let (_cache, _offset) = machO.cacheAndFileOffset(
+                        fromStart: nameOffsetInCache + numericCast(name)
+                    ) {
+                        name = Int64(_offset)
+                        nameFileHandle = _cache.fileHandle
                     }
-            )
+
+                    if let (_cache, _offset) = machO.cacheAndFileOffset(
+                        fromStart: types
+                    ) {
+                        types = _offset
+                        typesFileHandle = _cache.fileHandle
+                    }
+
+                    return ObjCMethod(
+                        name: nameFileHandle.readString(
+                            offset: UInt64(name)
+                        ) ?? "",
+                        types: typesFileHandle.readString(
+                            offset: types
+                        ) ?? "",
+                        imp: nil
+                    )
+                }
         }
     }
 }
