@@ -36,6 +36,10 @@ public protocol ObjCClassRODataProtocol {
     func protocols(in machO: MachOImage) -> ObjCProtocolList?
     func ivars(in machO: MachOImage) -> ObjCIvarList?
 
+    func methodRelativeListList(in machO: MachOFile) -> ObjCMethodRelativeListList?
+    func propertyRelativeListList(in machO: MachOFile) -> ObjCPropertyRelativeListList?
+    func protocolRelativeListList(in machO: MachOFile) -> ObjCProtocolRelativeListList?
+
     func methodRelativeListList(in machO: MachOImage) -> ObjCMethodRelativeListList?
     func propertyRelativeListList(in machO: MachOImage) -> ObjCPropertyRelativeListList?
     func protocolRelativeListList(in machO: MachOImage) -> ObjCProtocolRelativeListList?
@@ -245,6 +249,48 @@ extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList64 {
         return list
     }
 
+    public func protocolRelativeListList(in machO: MachOFile) -> ObjCProtocolRelativeListList64? {
+        guard layout.baseProtocols > 0 else { return nil }
+        guard layout.baseProtocols & 1 == 1 else { return nil }
+
+        var offset: UInt64 = numericCast(layout.baseProtocols) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        offset &= ~1
+
+//        if let resolved = resolveRebase(\.baseProtocols, in: machO) {
+//            offset = resolved + numericCast(machO.headerStartOffset)
+//        }
+//        if isBind(\.baseProtocols, in: machO) { return nil }
+//        offset &= 0x7ffffffff
+//        offset &= ~1
+
+        var resolvedOffset = offset
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+        }
+
+        let data = fileHandle.readData(
+            offset: resolvedOffset,
+            size: MemoryLayout<ObjCProtocolRelativeListList64.Header>.size
+        )
+
+        let lists: ObjCProtocolRelativeListList64? = data.withUnsafeBytes {
+            guard let ptr = $0.baseAddress else {
+                return nil
+            }
+            return .init(
+                ptr: ptr,
+                offset: numericCast(offset) - machO.headerStartOffset
+            )
+        }
+        return lists
+    }
+
     public func protocolRelativeListList(
         in machO: MachOImage
     ) -> ObjCProtocolRelativeListList64? {
@@ -309,6 +355,48 @@ extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList32 {
         )
 
         return list
+    }
+
+    public func protocolRelativeListList(in machO: MachOFile) -> ObjCProtocolRelativeListList32? {
+        guard layout.baseProtocols > 0 else { return nil }
+        guard layout.baseProtocols & 1 == 1 else { return nil }
+
+        var offset: UInt64 = numericCast(layout.baseProtocols) + numericCast(machO.headerStartOffset)
+        offset &= ~1
+
+//        if let resolved = resolveRebase(\.baseProtocols, in: machO) {
+//            offset = resolved + numericCast(machO.headerStartOffset)
+//        }
+//        if isBind(\.baseProtocols, in: machO) { return nil }
+//        offset &= 0x7ffffffff
+//        offset &= ~1
+
+        var resolvedOffset = offset
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+        }
+
+        let data = fileHandle.readData(
+            offset: resolvedOffset,
+            size: MemoryLayout<ObjCProtocolRelativeListList32.Header>.size
+        )
+
+        let lists: ObjCProtocolRelativeListList32? = data.withUnsafeBytes {
+            guard let ptr = $0.baseAddress else {
+                return nil
+            }
+            return .init(
+                ptr: ptr,
+                offset: numericCast(offset) - machO.headerStartOffset
+            )
+        }
+        return lists
     }
 
     public func protocolRelativeListList(

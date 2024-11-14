@@ -112,3 +112,89 @@ extension ObjCClassROData64 {
         return list
     }
 }
+
+extension ObjCClassROData64 {
+    public func methodRelativeListList(in machO: MachOFile) -> ObjCMethodRelativeListList? {
+        guard layout.baseMethods > 0 else { return nil }
+        guard layout.baseMethods & 1 == 1 else { return nil }
+
+        var offset: UInt64 = numericCast(layout.baseMethods) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        offset &= ~1
+
+//        if let resolved = resolveRebase(\.baseMethods, in: machO) {
+//            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+//        }
+//        if isBind(\.baseMethods, in: machO) { return nil }
+//        offset &= 0x7ffffffff
+//        offset &= ~1
+
+        var resolvedOffset = offset
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+        }
+
+        let data = fileHandle.readData(
+            offset: resolvedOffset,
+            size: MemoryLayout<ObjCMethodRelativeListList.Header>.size
+        )
+
+        let lists: ObjCMethodRelativeListList? = data.withUnsafeBytes {
+            guard let ptr = $0.baseAddress else {
+                return nil
+            }
+            return .init(
+                ptr: ptr,
+                offset: numericCast(offset) - machO.headerStartOffset
+            )
+        }
+        return lists
+    }
+
+    public func propertyRelativeListList(in machO: MachOFile) -> ObjCPropertyRelativeListList? {
+        guard layout.baseProperties > 0 else { return nil }
+        guard layout.baseProperties & 1 == 1 else { return nil }
+
+        var offset: UInt64 = numericCast(layout.baseProperties) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        offset &= ~1
+
+//        if let resolved = resolveRebase(\.baseProperties, in: machO) {
+//            offset = resolved + numericCast(machO.headerStartOffset)
+//        }
+//        if isBind(\.baseProperties, in: machO) { return nil }
+//        offset &= 0x7ffffffff
+//        offset &= ~1
+
+        var resolvedOffset = offset
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+        }
+
+        let data = fileHandle.readData(
+            offset: resolvedOffset,
+            size: MemoryLayout<ObjCPropertyRelativeListList.Header>.size
+        )
+
+        let lists: ObjCPropertyRelativeListList? = data.withUnsafeBytes {
+            guard let ptr = $0.baseAddress else {
+                return nil
+            }
+            return .init(
+                ptr: ptr,
+                offset: numericCast(offset) - machO.headerStartOffset
+            )
+        }
+        return lists
+    }
+}
