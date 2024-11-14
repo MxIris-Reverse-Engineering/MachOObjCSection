@@ -41,6 +41,9 @@ public protocol RelativeListListProtocol {
 
     func lists(in machO: MachOImage) -> [List]
     func list(in machO: MachOImage, for entry: Entry) -> List?
+
+    func lists(in machO: MachOFile) -> [(MachOFile, List)]
+    func list(in machO: MachOFile, for entry: Entry) -> (MachOFile, List)?
 }
 
 extension RelativeListListProtocol {
@@ -75,6 +78,45 @@ extension RelativeListListProtocol {
     }
 
     public func lists(in machO: MachOImage) -> [List] {
+        entries(in: machO)
+            .compactMap {
+                list(in: machO, for: $0)
+            }
+    }
+}
+
+extension RelativeListListProtocol {
+    public func entries(in machO: MachOFile) -> [Entry] {
+        let offset = offset + machO.headerStartOffset
+
+        var resolvedOffset: UInt64 = numericCast(offset)
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: UInt64(offset)// + cache.mainCacheHeader.sharedRegionStart
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+        }
+
+        let sequence: DataSequence<Entry.Layout> = fileHandle.readDataSequence(
+            offset: resolvedOffset + numericCast(MemoryLayout<Header>.size),
+            numberOfElements: numericCast(header.count)
+        )
+
+        let baseOffset = offset + MemoryLayout<Header>.size - machO.headerStartOffset
+        let entrySize = MemoryLayout<Entry.Layout>.size
+        return sequence.enumerated()
+            .map { i, layout in
+                Entry(
+                    offset: baseOffset + entrySize * i,
+                    layout: layout
+                )
+            }
+    }
+
+    public func lists(in machO: MachOFile) -> [(MachOFile, List)] {
         entries(in: machO)
             .compactMap {
                 list(in: machO, for: $0)

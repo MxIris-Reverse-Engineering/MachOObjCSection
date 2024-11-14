@@ -30,6 +30,36 @@ public struct ObjCProtocolRelativeListList64: RelativeListListProtocol {
             offset: listOffset
         )
     }
+
+    public func list(in machO: MachOFile, for entry: Entry) -> (MachOFile, List)? {
+        let offset: UInt64 = numericCast(entry.offset + entry.listOffset)
+
+        guard let (cache, resolvedOffset) = machO.cacheAndFileOffset(fromStart: offset) else {
+            return nil
+        }
+
+        guard let listMachO = cache.machO(at: entry.imageIndex) else {
+            return nil
+        }
+
+        let data = cache.fileHandle.readData(
+            offset: numericCast(resolvedOffset),
+            size: MemoryLayout<List.Header>.size
+        )
+        let list: List? = data.withUnsafeBytes {
+            guard let ptr = $0.baseAddress else {
+                return nil
+            }
+            return .init(
+                ptr: ptr,
+                offset: numericCast(offset)
+            )
+        }
+
+        guard let list else { return nil }
+
+        return (listMachO, list)
+    }
 }
 
 public struct ObjCProtocolRelativeListList32: RelativeListListProtocol {
@@ -52,5 +82,35 @@ public struct ObjCProtocolRelativeListList32: RelativeListListProtocol {
             ptr: machO.ptr.advanced(by: listOffset),
             offset: listOffset
         )
+    }
+
+    public func list(in machO: MachOFile, for entry: Entry) -> (MachOFile, List)? {
+        let offset: UInt64 = numericCast(entry.offset + entry.listOffset)
+
+        guard let (cache, resolvedOffset) = machO.cacheAndFileOffset(fromStart: offset) else {
+            return nil
+        }
+
+        guard let listMachO = cache.machO(at: entry.imageIndex) else {
+            return nil
+        }
+
+        let data = cache.fileHandle.readData(
+            offset: resolvedOffset,
+            size: MemoryLayout<List.Header>.size
+        )
+        let list: List? = data.withUnsafeBytes {
+            guard let ptr = $0.baseAddress else {
+                return nil
+            }
+            return .init(
+                ptr: ptr,
+                offset: numericCast(offset)
+            )
+        }
+
+        guard let list else { return nil }
+
+        return (listMachO, list)
     }
 }
