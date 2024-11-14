@@ -40,23 +40,24 @@ extension ObjCClassROData64 {
         guard layout.baseMethods > 0 else { return nil }
         guard layout.baseMethods & 1 == 0 else { return nil }
 
-        var offset: UInt64 = numericCast(layout.baseMethods) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        let offset: UInt64 = numericCast(layout.baseMethods) & 0x7ffffffff + numericCast(machO.headerStartOffset)
 
-        if let resolved = resolveRebase(\.baseMethods, in: machO) {
-            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
-        }
-        if isBind(\.baseMethods, in: machO) { return nil }
-        offset &= 0x7ffffffff
+//        if let resolved = resolveRebase(\.baseMethods, in: machO) {
+//            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+//        }
+//        if isBind(\.baseMethods, in: machO) { return nil }
+//        offset &= 0x7ffffffff
 
+        var resolvedOffset = offset
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
-            offset = _offset
+            resolvedOffset = _offset
         }
 
         let data = machO.fileHandle.readData(
-            offset: offset,
+            offset: resolvedOffset,
             size: MemoryLayout<ObjCMethodList.Header>.size
         )
         let list: ObjCMethodList? = data.withUnsafeBytes {
@@ -78,22 +79,24 @@ extension ObjCClassROData64 {
         guard layout.baseProperties > 0 else { return nil }
         guard layout.baseProperties & 1 == 0 else { return nil }
 
-        var offset: UInt64 = numericCast(layout.baseProperties) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        let offset: UInt64 = numericCast(layout.baseProperties) & 0x7ffffffff + numericCast(machO.headerStartOffset)
 
-        if let resolved = resolveRebase(\.baseProperties, in: machO) {
-            offset = resolved + numericCast(machO.headerStartOffset)
-        }
-        if isBind(\.baseProperties, in: machO) { return nil }
-        offset &= 0x7ffffffff
+//        if let resolved = resolveRebase(\.baseProperties, in: machO) {
+//            offset = resolved + numericCast(machO.headerStartOffset)
+//        }
+//        if isBind(\.baseProperties, in: machO) { return nil }
+//        offset &= 0x7ffffffff
 
+        var resolvedOffset = offset
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
-            offset = _offset
+            resolvedOffset = _offset
         }
+
         let data = machO.fileHandle.readData(
-            offset: offset,
+            offset: resolvedOffset,
             size: MemoryLayout<ObjCPropertyList.Header>.size
         )
         let list: ObjCPropertyList? = data.withUnsafeBytes {

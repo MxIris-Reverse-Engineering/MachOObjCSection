@@ -201,17 +201,21 @@ extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList64 {
         guard layout.baseProtocols > 0 else { return nil }
         guard layout.baseProtocols & 1 == 0 else { return nil }
 
-        var offset: UInt64 = numericCast(layout.baseProtocols) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        let offset: UInt64 = numericCast(layout.baseProtocols) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        var resolvedOffset = offset
+
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
-            offset = _offset
+            resolvedOffset = _offset
         }
+
         let data = machO.fileHandle.readData(
-            offset: offset,
+            offset: resolvedOffset,
             size: MemoryLayout<ObjCProtocolList64.Header>.size
         )
+
         let list: ObjCProtocolList64? = data.withUnsafeBytes {
             guard let ptr = $0.baseAddress else {
                 return nil
@@ -265,15 +269,17 @@ extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList32 {
         guard layout.baseProtocols > 0 else { return nil }
         guard layout.baseProtocols & 1 == 0 else { return nil }
 
-        var offset: UInt64 = numericCast(layout.baseProtocols) + numericCast(machO.headerStartOffset)
+        let offset: UInt64 = numericCast(layout.baseProtocols) + numericCast(machO.headerStartOffset)
+        var resolvedOffset = offset
+
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
-            offset = _offset
+            resolvedOffset = _offset
         }
         let data = machO.fileHandle.readData(
-            offset: offset,
+            offset: resolvedOffset,
             size: MemoryLayout<ObjCProtocolList32.Header>.size
         )
         let list: ObjCProtocolList32? = data.withUnsafeBytes {
@@ -327,15 +333,19 @@ extension ObjCClassRODataProtocol where ObjCProtocolList == ObjCProtocolList32 {
 extension ObjCClassRODataProtocol where ObjCIvarList == ObjCIvarList64 {
     public func ivars(in machO: MachOFile) -> ObjCIvarList? {
         guard layout.ivars > 0 else { return nil }
-        var offset: UInt64 = numericCast(layout.ivars) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+
+        let offset: UInt64 = numericCast(layout.ivars) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        var resolvedOffset = offset
+
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
-            offset = _offset
+            resolvedOffset = _offset
         }
+
         let data = machO.fileHandle.readData(
-            offset: offset,
+            offset: resolvedOffset,
             size: MemoryLayout<ObjCIvarList64.Header>.size
         )
         let list: ObjCIvarList64? = data.withUnsafeBytes {
@@ -375,15 +385,18 @@ extension ObjCClassRODataProtocol where ObjCIvarList == ObjCIvarList64 {
 extension ObjCClassRODataProtocol where ObjCIvarList == ObjCIvarList32 {
     public func ivars(in machO: MachOFile) -> ObjCIvarList? {
         guard layout.ivars > 0 else { return nil }
-        var offset: UInt64 = numericCast(layout.ivars) + numericCast(machO.headerStartOffset)
+
+        let offset: UInt64 = numericCast(layout.ivars) + numericCast(machO.headerStartOffset)
+        var resolvedOffset = offset
+
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
-            offset = _offset
+            resolvedOffset = _offset
         }
         let data = machO.fileHandle.readData(
-            offset: offset,
+            offset: resolvedOffset,
             size: MemoryLayout<ObjCIvarList32.Header>.size
         )
         let list: ObjCIvarList32? = data.withUnsafeBytes {
