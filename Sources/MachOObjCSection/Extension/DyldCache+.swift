@@ -66,7 +66,7 @@ extension DyldCache {
         guard let mainCache else { return nil }
         if let ro = mainCache.headerOptimizationRO64,
            ro.contains(index: index) {
-            guard let header = ro.headerInfos(in: mainCache).first(
+            guard let header = ro.headerInfos(in: mainCache)?.first(
                 where: {
                     $0.index == index
                 }
@@ -77,7 +77,7 @@ extension DyldCache {
         }
         if let ro = mainCache.headerOptimizationRO32,
            ro.contains(index: index) {
-            guard let header = ro.headerInfos(in: mainCache).first(
+            guard let header = ro.headerInfos(in: mainCache)?.first(
                 where: {
                     $0.index == index
                 }
