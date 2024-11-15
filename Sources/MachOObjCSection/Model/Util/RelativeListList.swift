@@ -39,8 +39,8 @@ public protocol RelativeListListProtocol {
     var offset: Int { get }
     var header: Header { get }
 
-    func lists(in machO: MachOImage) -> [List]
-    func list(in machO: MachOImage, for entry: Entry) -> List?
+    func lists(in machO: MachOImage) -> [(MachOImage, List)]
+    func list(in machO: MachOImage, for entry: Entry) -> (MachOImage, List)?
 
     func lists(in machO: MachOFile) -> [(MachOFile, List)]
     func list(in machO: MachOFile, for entry: Entry) -> (MachOFile, List)?
@@ -77,7 +77,7 @@ extension RelativeListListProtocol {
             }
     }
 
-    public func lists(in machO: MachOImage) -> [List] {
+    public func lists(in machO: MachOImage) -> [(MachOImage, List)] {
         entries(in: machO)
             .compactMap {
                 list(in: machO, for: $0)

@@ -3,7 +3,7 @@
 //  MachOObjCSection
 //
 //  Created by p-x9 on 2024/11/02
-//  
+//
 //
 
 import Foundation
@@ -23,13 +23,28 @@ public struct ObjCPropertyRelativeListList: RelativeListListProtocol {
         self.header = ptr.assumingMemoryBound(to: Header.self).pointee
     }
 
-    public func list(in machO: MachOImage, for entry: Entry) -> List? {
-        let listOffset = entry.offset + entry.listOffset
-        return .init(
-            ptr: machO.ptr.advanced(by: listOffset),
-            offset: listOffset,
+    public func list(in machO: MachOImage, for entry: Entry) -> (MachOImage, List)? {
+        let offset = entry.offset + entry.listOffset
+        let list = List(
+            ptr: machO.ptr.advanced(by: offset),
+            offset: offset,
             is64Bit: machO.is64Bit
         )
+
+        let cache: DyldCacheLoaded = .current
+        guard let objcOptimization = cache.objcOptimization,
+              let ro = objcOptimization.headerOptimizationRO64(in: cache) else {
+            return nil
+        }
+
+        guard let header = ro.headerInfos(in: cache).first(
+            where: { $0.index == entry.imageIndex }
+        ),
+              let machO = header.machO(in: cache) else {
+            return nil
+        }
+
+        return (machO, list)
     }
 
     public func list(in machO: MachOFile, for entry: Entry) -> (MachOFile, List)? {

@@ -72,6 +72,7 @@ extension ObjCMethodArray {
                 offset: Int(bitPattern: start) - Int(bitPattern: machO.ptr)
             )
             lists = relativeListList.lists(in: machO)
+                .map(\.1)
         case ._dummy, .none:
             break
         }
