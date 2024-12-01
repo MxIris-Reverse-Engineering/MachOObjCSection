@@ -18,7 +18,7 @@ extension MachOImage {
         }
     }
 
-    public var objc: ObjectiveC  {
+    public var objc: ObjectiveC {
         .init(machO: self)
     }
 }

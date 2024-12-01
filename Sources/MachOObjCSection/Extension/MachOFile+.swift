@@ -33,7 +33,7 @@ extension MachOFile {
     func cache(for address: UInt64) -> DyldCache? {
         cacheAndFileOffset(for: address)?.0
     }
-    
+
     /// Convert an address that is not slided into the actual cache it contains and the file offset in it.
     /// - Parameter address: address (unslid)
     /// - Returns: cache and file offset
@@ -63,7 +63,7 @@ extension MachOFile {
         }
         return nil
     }
-    
+
     /// Converts the offset from the start of the main cache to the actual cache
     /// it contains and the file offset within that cache.
     /// - Parameter offset: Offset from the start of the main cache.

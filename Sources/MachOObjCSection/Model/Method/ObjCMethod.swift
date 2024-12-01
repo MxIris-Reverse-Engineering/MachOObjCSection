@@ -15,12 +15,6 @@ public struct ObjCMethod {
     public let name: String
     public let types: String
     public let imp: IMP?
-
-    init(name: String, types: String, imp: IMP?) {
-        self.name = name
-        self.types = types
-        self.imp = imp
-    }
 }
 
 extension ObjCMethod {

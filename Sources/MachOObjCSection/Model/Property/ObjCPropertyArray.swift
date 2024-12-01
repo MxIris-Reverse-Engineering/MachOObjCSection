@@ -12,14 +12,6 @@ import Foundation
 public struct ObjCPropertyArray {
     public let offset: Int
     public let is64Bit: Bool
-
-    init(
-        offset: Int,
-        is64Bit: Bool
-    ) {
-        self.offset = offset
-        self.is64Bit = is64Bit
-    }
 }
 
 extension ObjCPropertyArray {

@@ -90,7 +90,6 @@ extension ObjCPropertyList {
             fileHandle = _cache.fileHandle
         }
 
-
         if machO.is64Bit {
             let sequence: DataSequence<ObjCProperty.Property64> = fileHandle
                 .readDataSequence(
@@ -141,7 +140,6 @@ extension ObjCPropertyList {
 
                     var nameFileHandle = machO.fileHandle
                     var attributesFileHandle = machO.fileHandle
-
 
                     if let (_cache, _offset) = machO.cacheAndFileOffset(
                         fromStart: name

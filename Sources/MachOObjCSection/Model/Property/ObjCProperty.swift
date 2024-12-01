@@ -15,11 +15,6 @@ import Foundation
 public struct ObjCProperty {
     public let name: String
     public let attributes: String
-
-    init(name: String, attributes: String) {
-        self.name = name
-        self.attributes = attributes
-    }
 }
 
 extension ObjCProperty {

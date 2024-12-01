@@ -130,13 +130,13 @@ extension RelativeListListEntry {
 
         func _isLoaded(rw: some ObjCHeaderOptimizationRWProtocol) -> Bool {
             let headerInfos = rw.headerInfos(in: cache)
-            if 0 <= imageIndex , imageIndex < headerInfos.count {
+            if 0 <= imageIndex, imageIndex < headerInfos.count {
                 return headerInfos[AnyIndex(imageIndex)].isLoaded
             }
             return false
         }
 
-        if let objcOptimization = cache.objcOptimization{
+        if let objcOptimization = cache.objcOptimization {
             if machO.is64Bit,
                let rw = objcOptimization.headerOptimizationRW64(in: cache) {
                 return _isLoaded(rw: rw)
@@ -145,7 +145,7 @@ extension RelativeListListEntry {
             }
         }
 
-        if let objcOptimization = cache.oldObjcOptimization{
+        if let objcOptimization = cache.oldObjcOptimization {
             if machO.is64Bit,
                let rw = objcOptimization.headerOptimizationRW64(in: cache) {
                 return _isLoaded(rw: rw)

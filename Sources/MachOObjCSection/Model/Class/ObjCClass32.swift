@@ -60,7 +60,6 @@ extension ObjCClass32 {
         _classROData(in: machO)
     }
 
-
     private func _readClass(
         at offset: UInt64,
         keyPath: PartialKeyPath<Layout>,

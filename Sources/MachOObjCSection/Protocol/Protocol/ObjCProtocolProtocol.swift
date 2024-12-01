@@ -239,7 +239,7 @@ extension ObjCProtocolProtocol {
 
         let _extendedMethodTypes = layout._extendedMethodTypes & 0x7ffffffff
         if machO.is64Bit {
-            var offset: UInt64 = UInt64(_extendedMethodTypes)
+            var offset = UInt64(_extendedMethodTypes)
 
             var fileHandle = machO.fileHandle
 
@@ -265,7 +265,7 @@ extension ObjCProtocolProtocol {
                 offset: numericCast(headerStartOffset) + numericCast(offset)
             )
         } else {
-            var offset: UInt64 = UInt64(_extendedMethodTypes)
+            var offset = UInt64(_extendedMethodTypes)
 
             var fileHandle = machO.fileHandle
 

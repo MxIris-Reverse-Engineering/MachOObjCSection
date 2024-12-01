@@ -8,13 +8,13 @@ let package = Package(
         .macOS(.v10_15),
         .iOS(.v13),
         .watchOS(.v6),
-        .tvOS(.v13),
+        .tvOS(.v13)
     ],
     products: [
         .library(
             name: "MachOObjCSection",
             targets: ["MachOObjCSection"]
-        ),
+        )
     ],
     dependencies: [
         .package(url: "https://github.com/p-x9/MachOKit.git", exact: "0.25.0"),
@@ -35,6 +35,6 @@ let package = Package(
         .testTarget(
             name: "MachOObjCSectionTests",
             dependencies: ["MachOObjCSection"]
-        ),
+        )
     ]
 )
