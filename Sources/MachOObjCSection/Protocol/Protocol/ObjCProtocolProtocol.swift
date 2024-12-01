@@ -49,6 +49,18 @@ extension ObjCProtocolProtocol {
         return .init(cString: ptr!.assumingMemoryBound(to: CChar.self))
     }
 
+    public func protocols(in machO: MachOImage) -> ObjCProtocolList? {
+        guard let ptr = UnsafeRawPointer(
+            bitPattern: UInt(layout.protocols)
+        ) else {
+            return nil
+        }
+        return .init(
+            ptr: ptr,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+    }
+
     public func instanceMethods(in machO: MachOImage) -> ObjCMethodList? {
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.instanceMethods)

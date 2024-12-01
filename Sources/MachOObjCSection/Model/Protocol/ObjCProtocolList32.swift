@@ -24,32 +24,10 @@ public struct ObjCProtocolList32: ObjCProtocolListProtocol {
 }
 
 extension ObjCProtocolList32 {
-    public var isListOfLists: Bool {
-        offset & 1 == 1
-    }
-}
-
-extension ObjCProtocolList32 {
     public func protocols(
         in machO: MachOImage
     ) -> [ObjCProtocol]? {
-        // TODO: Support listOfLists
-        guard !isListOfLists else { return nil }
-
-        let ptr = machO.ptr.advanced(by: offset)
-        let sequnece = MemorySequence(
-            basePointer: ptr
-                .advanced(by: MemoryLayout<Header>.size)
-                .assumingMemoryBound(to: UInt32.self),
-            numberOfElements: numericCast(header.count)
-        )
-
-        return sequnece
-            .map {
-                UnsafeRawPointer(bitPattern: UInt($0))!
-                    .assumingMemoryBound(to: ObjCProtocol32.self)
-                    .pointee
-            }
+        _readProtocols(in: machO, pointerType: UInt32.self)
     }
 
     public func protocols(

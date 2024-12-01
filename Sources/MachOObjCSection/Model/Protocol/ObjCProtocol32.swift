@@ -34,19 +34,6 @@ public struct ObjCProtocol32: LayoutWrapper, ObjCProtocolProtocol {
 }
 
 extension ObjCProtocol32 {
-    public func protocols(in machO: MachOImage) -> ObjCProtocolList? {
-        guard !machO.is64Bit,
-              let ptr = UnsafeRawPointer(
-                bitPattern: UInt(layout.protocols)
-              ) else {
-            return nil
-        }
-        return .init(
-            ptr: ptr,
-            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
-        )
-    }
-
     public func protocols(in machO: MachOFile) -> ObjCProtocolList? {
         guard !machO.is64Bit else { return nil }
         guard layout.protocols > 0 else { return nil }
