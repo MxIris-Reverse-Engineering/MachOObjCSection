@@ -16,6 +16,9 @@ public protocol ObjCIvarProtocol {
     var layout: Layout { get }
     var offset: Int { get }
 
+    @_spi(Core)
+    init(layout: Layout, offset: Int)
+
     func offset(in machO: MachOFile) -> UInt32?
     func name(in machO: MachOFile) -> String?
     func type(in machO: MachOFile) -> String?

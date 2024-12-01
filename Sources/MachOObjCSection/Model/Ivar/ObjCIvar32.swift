@@ -19,8 +19,15 @@ public struct ObjCIvar32: LayoutWrapper, ObjCIvarProtocol {
         public let alignment: UInt32
         public let size: UInt32
     }
+
     public var layout: Layout
     public var offset: Int
+
+    @_spi(Core)
+    public init(layout: Layout, offset: Int) {
+        self.layout = layout
+        self.offset = offset
+    }
 }
 
 extension ObjCIvar32 {

@@ -10,7 +10,6 @@ import Foundation
 @_spi(Support) import MachOKit
 
 public struct ObjCIvarList64: ObjCIvarListProtocol {
-    public typealias Header = ObjCIvarListHeader
     public typealias ObjCIvar = ObjCIvar64
 
     /// Offset from machO header start
@@ -28,22 +27,6 @@ public struct ObjCIvarList64: ObjCIvarListProtocol {
 }
 
 extension ObjCIvarList64 {
-    public func ivars(in machO: MachOImage) -> [ObjCIvar]? {
-        let offset = offset + MemoryLayout<Header>.size
-        let ptr = machO.ptr.advanced(by: offset)
-        let sequnece = MemorySequence(
-            basePointer: ptr
-                .assumingMemoryBound(to: ObjCIvar.Layout.self),
-            numberOfElements: numericCast(header.count)
-        )
-        return sequnece.enumerated().map {
-            ObjCIvar(
-                layout: $1,
-                offset: offset + ObjCIvar.layoutSize * $0
-            )
-        }
-    }
-
     public func ivars(in machO: MachOFile) -> [ObjCIvar]? {
         let headerStartOffset = machO.headerStartOffset
 
