@@ -24,4 +24,3 @@ public protocol ObjCClassRWDataExtProtocol {
     func protocols(in machO: MachOImage) -> ObjCProtocolArray?
     func demangledName(in machO: MachOImage) -> String?
 }
-
