@@ -10,7 +10,7 @@ import Foundation
 @_spi(Support) import MachOKit
 import MachOObjCSectionC
 
-public protocol ObjCClassProtocol {
+public protocol ObjCClassProtocol: _FixupResolvable {
     associatedtype Layout: _ObjCClassLayoutProtocol
     associatedtype ClassROData: LayoutWrapper, ObjCClassRODataProtocol where ClassROData.Layout.Pointer == Layout.Pointer
     associatedtype ClassRWData: LayoutWrapper, ObjCClassRWDataProtocol where ClassRWData.Layout.Pointer == Layout.Pointer
@@ -48,41 +48,5 @@ extension ObjCClassProtocol {
 
     public var isSwift: Bool {
         isSwiftStable || isSwiftLegacy
-    }
-}
-
-extension ObjCClassProtocol where Self: LayoutWrapper {
-    func resolveRebase(
-        _ keyPath: PartialKeyPath<Layout>,
-        in machO: MachOFile
-    ) -> UInt64? {
-        let offset = self.offset + layoutOffset(of: keyPath)
-        if let resolved = machO.resolveOptionalRebase(at: UInt64(offset)) {
-            if let cache = machO.cache {
-                return resolved - cache.header.sharedRegionStart
-            }
-            return resolved
-        }
-        return nil
-    }
-
-    func resolveBind(
-        _ keyPath: PartialKeyPath<Layout>,
-        in machO: MachOFile
-    ) -> String? {
-        let offset = self.offset + layoutOffset(of: keyPath)
-        guard let fixup = machO.dyldChainedFixups else { return nil }
-        if let resolved = machO.resolveBind(at: UInt64(offset)) {
-            return fixup.symbolName(for: resolved.0.info.nameOffset)
-        }
-        return nil
-    }
-
-    func isBind(
-        _ keyPath: PartialKeyPath<Layout>,
-        in machO: MachOFile
-    ) -> Bool {
-        let offset = self.offset + layoutOffset(of: keyPath)
-        return machO.isBind(offset)
     }
 }

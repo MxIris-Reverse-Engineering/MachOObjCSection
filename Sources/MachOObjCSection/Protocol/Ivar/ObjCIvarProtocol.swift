@@ -10,7 +10,7 @@ import Foundation
 import MachOObjCSectionC
 @_spi(Support) import MachOKit
 
-public protocol ObjCIvarProtocol {
+public protocol ObjCIvarProtocol: _FixupResolvable {
     associatedtype Layout: _ObjCIvarLayoutProtocol
 
     var layout: Layout { get }
@@ -59,29 +59,5 @@ extension ObjCIvarProtocol {
             bitPattern: UInt(layout.type)
         )
         return .init(cString: ptr!.assumingMemoryBound(to: CChar.self))
-    }
-}
-
-extension ObjCIvarProtocol where Self: LayoutWrapper {
-    func resolveRebase(
-        _ keyPath: PartialKeyPath<Layout>,
-        in machO: MachOFile
-    ) -> UInt64? {
-        let offset = self.offset + layoutOffset(of: keyPath)
-        if let resolved = machO.resolveOptionalRebase(at: UInt64(offset)) {
-            if let cache = machO.cache {
-                return resolved - cache.header.sharedRegionStart
-            }
-            return resolved
-        }
-        return nil
-    }
-
-    func isBind(
-        _ keyPath: PartialKeyPath<Layout>,
-        in machO: MachOFile
-    ) -> Bool {
-        let offset = self.offset + layoutOffset(of: keyPath)
-        return machO.isBind(offset)
     }
 }
