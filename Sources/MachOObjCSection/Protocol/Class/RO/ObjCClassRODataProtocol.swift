@@ -160,6 +160,42 @@ extension ObjCClassRODataProtocol {
 
         return list
     }
+
+    public func ivars(in machO: MachOImage) -> ObjCIvarList? {
+        guard layout.ivars > 0 else { return nil }
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.ivars)) else {
+            return nil
+        }
+        let list = ObjCIvarList(
+            header: ptr
+                .assumingMemoryBound(to: ObjCIvarListHeader.self)
+                .pointee,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+        if list.isValidEntrySize(is64Bit: machO.is64Bit) == false {
+            // FIXME: Check
+            return nil
+        }
+
+        return list
+    }
+
+    public func protocols(in machO: MachOImage) -> ObjCProtocolList? {
+        guard layout.baseProtocols > 0 else { return nil }
+        guard layout.baseProtocols & 1 == 0 else { return nil }
+
+        guard let ptr = UnsafeRawPointer(
+            bitPattern: UInt(layout.baseProtocols)
+        ) else {
+            return nil
+        }
+        let list = ObjCProtocolList(
+            ptr: ptr,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+
+        return list
+    }
 }
 
 extension ObjCClassRODataProtocol {

@@ -16,7 +16,8 @@ public struct ObjCProtocolList64: ObjCProtocolListProtocol {
     public let offset: Int
     public let header: Header
 
-    init(ptr: UnsafeRawPointer, offset: Int) {
+    @_spi(Core)
+    public init(ptr: UnsafeRawPointer, offset: Int) {
         self.offset = offset
         self.header = ptr.assumingMemoryBound(to: Header.self).pointee
     }

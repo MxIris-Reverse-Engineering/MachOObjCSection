@@ -14,6 +14,9 @@ public protocol ObjCIvarListProtocol {
     var offset: Int { get }
     var header: ObjCIvarListHeader { get }
 
+    @_spi(Core)
+    init(header: ObjCIvarListHeader, offset: Int)
+
     func ivars(in machO: MachOImage) -> [ObjCIvar]?
     func ivars(in machO: MachOFile) -> [ObjCIvar]?
 }

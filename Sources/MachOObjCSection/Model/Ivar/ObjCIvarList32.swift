@@ -17,7 +17,8 @@ public struct ObjCIvarList32: ObjCIvarListProtocol {
     public let offset: Int
     public let header: Header
 
-    init(
+    @_spi(Core)
+    public init(
         header: ObjCIvarListHeader,
         offset: Int
     ) {
