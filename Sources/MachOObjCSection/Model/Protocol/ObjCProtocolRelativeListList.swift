@@ -9,13 +9,14 @@
 import Foundation
 @_spi(Support) import MachOKit
 
-public struct ObjCProtocolRelativeListList64: RelativeListListProtocol {
+public struct ObjCProtocolRelativeListList64: ObjCProtocolRelativeListListProtocol {
     public typealias List = ObjCProtocolList64
 
     public let offset: Int
     public let header: Header
 
-    init(
+    @_spi(Core)
+    public init(
         ptr: UnsafeRawPointer,
         offset: Int
     ) {
@@ -77,13 +78,14 @@ public struct ObjCProtocolRelativeListList64: RelativeListListProtocol {
     }
 }
 
-public struct ObjCProtocolRelativeListList32: RelativeListListProtocol {
+public struct ObjCProtocolRelativeListList32: ObjCProtocolRelativeListListProtocol {
     public typealias List = ObjCProtocolList32
 
     public let offset: Int
     public let header: Header
 
-    init(
+    @_spi(Core)
+    public init(
         ptr: UnsafeRawPointer,
         offset: Int
     ) {

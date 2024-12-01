@@ -13,7 +13,7 @@ public protocol ObjCClassRODataProtocol {
     associatedtype Layout: _ObjCClassRODataLayoutProtocol
     associatedtype ObjCProtocolList: ObjCProtocolListProtocol
     associatedtype ObjCIvarList: ObjCIvarListProtocol
-    associatedtype ObjCProtocolRelativeListList: RelativeListListProtocol where ObjCProtocolRelativeListList.List == ObjCProtocolList
+    associatedtype ObjCProtocolRelativeListList: ObjCProtocolRelativeListListProtocol where ObjCProtocolRelativeListList.List == ObjCProtocolList
 
     var layout: Layout { get }
     var offset: Int { get }
@@ -225,6 +225,24 @@ extension ObjCClassRODataProtocol {
 
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.baseProperties & ~1)
+        ) else {
+            return nil
+        }
+
+        return .init(
+            ptr: ptr,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+    }
+
+    public func protocolRelativeListList(
+        in machO: MachOImage
+    ) -> ObjCProtocolRelativeListList? {
+        guard layout.baseProtocols > 0 else { return nil }
+        guard layout.baseProtocols & 1 == 1 else { return nil }
+
+        guard let ptr = UnsafeRawPointer(
+            bitPattern: UInt(layout.baseProtocols & ~1)
         ) else {
             return nil
         }

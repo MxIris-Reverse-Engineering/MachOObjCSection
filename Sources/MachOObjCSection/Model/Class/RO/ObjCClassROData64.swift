@@ -302,23 +302,3 @@ extension ObjCClassROData64 {
         return lists
     }
 }
-
-extension ObjCClassROData64 {
-    public func protocolRelativeListList(
-        in machO: MachOImage
-    ) -> ObjCProtocolRelativeListList64? {
-        guard layout.baseProtocols > 0 else { return nil }
-        guard layout.baseProtocols & 1 == 1 else { return nil }
-
-        guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.baseProtocols & ~1)
-        ) else {
-            return nil
-        }
-
-        return .init(
-            ptr: ptr,
-            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
-        )
-    }
-}
