@@ -14,7 +14,8 @@ public struct ObjCProtocolArray64: ObjCProtocolArrayProtocol {
 
     public let offset: Int
 
-    init(
+    @_spi(Core)
+    public init(
         offset: Int
     ) {
         self.offset = offset

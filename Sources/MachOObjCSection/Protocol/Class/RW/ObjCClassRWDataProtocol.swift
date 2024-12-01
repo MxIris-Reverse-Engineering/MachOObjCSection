@@ -38,3 +38,41 @@ extension ObjCClassRWDataProtocol {
         layout.ro_or_rw_ext & 1 != 0
     }
 }
+
+extension ObjCClassRWDataProtocol {
+    public func classROData(in machO: MachOImage) -> ObjCClassROData? {
+        guard hasRO else { return nil }
+
+        let address: Int = numericCast(layout.ro_or_rw_ext)
+        guard let ptr = UnsafeRawPointer(bitPattern: address) else {
+            return nil
+        }
+        let layout = ptr
+            .assumingMemoryBound(to: ObjCClassROData.Layout.self)
+            .pointee
+        let classData = ObjCClassROData(
+            layout: layout,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+
+        return classData
+    }
+
+    public func ext(in machO: MachOImage) -> ObjCClassRWDataExt? {
+        guard hasExt else { return nil }
+
+        let address: Int = numericCast(layout.ro_or_rw_ext)
+        guard let ptr = UnsafeRawPointer(bitPattern: address & ~1) else {
+            return nil
+        }
+        let layout = ptr
+            .assumingMemoryBound(to: ObjCClassRWDataExt.Layout.self)
+            .pointee
+        let classData = ObjCClassRWDataExt(
+            layout: layout,
+            offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+        )
+
+        return classData
+    }
+}

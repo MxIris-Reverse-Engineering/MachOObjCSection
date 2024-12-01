@@ -11,5 +11,8 @@ import Foundation
 public protocol ObjCProtocolArrayProtocol {
     associatedtype ObjCProtocolList: ObjCProtocolListProtocol
 
+    @_spi(Core)
+    init(offset: Int)
+
     func lists(in machO: MachOImage) -> [ObjCProtocolList]
 }

@@ -20,6 +20,9 @@ public protocol ObjCClassRODataProtocol {
 
     var isRootClass: Bool { get }
 
+    @_spi(Core)
+    init(layout: Layout, offset: Int)
+
     func ivarLayout(in machO: MachOFile) -> [UInt8]?
     func weakIvarLayout(in machO: MachOFile) -> [UInt8]?
     func name(in machO: MachOFile) -> String?

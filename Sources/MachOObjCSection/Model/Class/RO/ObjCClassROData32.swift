@@ -30,6 +30,12 @@ public struct ObjCClassROData32: LayoutWrapper, ObjCClassRODataProtocol {
 
     public var layout: Layout
     public var offset: Int
+
+    @_spi(Core)
+    public init(layout: Layout, offset: Int) {
+        self.layout = layout
+        self.offset = offset
+    }
 }
 
 extension ObjCClassROData32 {
