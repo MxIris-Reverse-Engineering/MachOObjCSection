@@ -36,11 +36,10 @@ extension ObjCIvar64 {
         let headerStartOffset = machO.headerStartOffset
         var offset: UInt64 = numericCast(layout.offset & 0x7ffffffff) + numericCast(headerStartOffset)
 
-//        if let resolved = resolveRebase(\.offset, in: machO) {
-//            offset = resolved + numericCast(machO.headerStartOffset)
-//        }
+        if let resolved = resolveRebase(\.offset, in: machO) {
+            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        }
 //        if isBind(\.offset, in: machO) { return nil }
-//        offset &= 0x7ffffffff
 
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
@@ -62,11 +61,10 @@ extension ObjCIvar64 {
         let headerStartOffset = machO.headerStartOffset
         var offset: UInt64 = numericCast(layout.name & 0x7ffffffff) + numericCast(headerStartOffset)
 
-//        if let resolved = resolveRebase(\.name, in: machO) {
-//            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
-//        }
+        if let resolved = resolveRebase(\.name, in: machO) {
+            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        }
 //        if isBind(\.name, in: machO) { return nil }
-//        offset &= 0x7ffffffff
 
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
@@ -84,11 +82,10 @@ extension ObjCIvar64 {
         let headerStartOffset = machO.headerStartOffset
         var offset: UInt64 = numericCast(layout.type & 0x7ffffffff) + numericCast(headerStartOffset)
 
-//        if let resolved = resolveRebase(\.type, in: machO) {
-//            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
-//        }
+        if let resolved = resolveRebase(\.type, in: machO) {
+            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        }
 //        if isBind(\.type, in: machO) { return nil }
-//        offset &= 0x7ffffffff
 
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {

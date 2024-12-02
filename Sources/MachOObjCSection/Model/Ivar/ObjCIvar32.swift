@@ -35,9 +35,9 @@ extension ObjCIvar32 {
         let headerStartOffset = machO.headerStartOffset
         var offset: UInt64 = numericCast(layout.offset) + numericCast(headerStartOffset)
 
-//        if let resolved = resolveRebase(\.offset, in: machO) {
-//            offset = resolved + numericCast(machO.headerStartOffset)
-//        }
+        if let resolved = resolveRebase(\.offset, in: machO) {
+            offset = resolved + numericCast(machO.headerStartOffset)
+        }
 //        if isBind(\.offset, in: machO) { return nil }
 
         if let cache = machO.cache {
@@ -60,9 +60,9 @@ extension ObjCIvar32 {
         let headerStartOffset = machO.headerStartOffset
         var offset: UInt64 = numericCast(layout.name) + numericCast(headerStartOffset)
 
-//        if let resolved = resolveRebase(\.name, in: machO) {
-//            offset = resolved + numericCast(machO.headerStartOffset)
-//        }
+        if let resolved = resolveRebase(\.name, in: machO) {
+            offset = resolved + numericCast(machO.headerStartOffset)
+        }
 //        if isBind(\.name, in: machO) { return nil }
 
         if let cache = machO.cache {
@@ -81,9 +81,9 @@ extension ObjCIvar32 {
         let headerStartOffset = machO.headerStartOffset
         var offset: UInt64 = numericCast(layout.type) + numericCast(headerStartOffset)
 
-//        if let resolved = resolveRebase(\.type, in: machO) {
-//            offset = resolved + numericCast(machO.headerStartOffset)
-//        }
+        if let resolved = resolveRebase(\.type, in: machO) {
+            offset = resolved + numericCast(machO.headerStartOffset)
+        }
 //        if isBind(\.type, in: machO) { return nil }
 
         if let cache = machO.cache {
