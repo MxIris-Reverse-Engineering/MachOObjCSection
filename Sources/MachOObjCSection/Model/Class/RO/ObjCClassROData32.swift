@@ -43,11 +43,11 @@ extension ObjCClassROData32 {
         guard layout.baseMethods > 0 else { return nil }
         guard layout.baseMethods & 1 == 0 else { return nil }
 
-        let offset: UInt64 = numericCast(layout.baseMethods) + numericCast(machO.headerStartOffset)
+        var offset: UInt64 = numericCast(layout.baseMethods) + numericCast(machO.headerStartOffset)
 
-//        if let resolved = resolveRebase(\.baseMethods, in: machO) {
-//            offset = resolved + numericCast(machO.headerStartOffset)
-//        }
+        if let resolved = resolveRebase(\.baseMethods, in: machO) {
+            offset = resolved + numericCast(machO.headerStartOffset)
+        }
 //        if isBind(\.baseMethods, in: machO) { return nil }
 
         var resolvedOffset = offset
@@ -81,11 +81,11 @@ extension ObjCClassROData32 {
         guard layout.baseProperties > 0 else { return nil }
         guard layout.baseProperties & 1 == 0 else { return nil }
 
-        let offset: UInt64 = numericCast(layout.baseProperties) + numericCast(machO.headerStartOffset)
+        var offset: UInt64 = numericCast(layout.baseProperties) + numericCast(machO.headerStartOffset)
 
-//        if let resolved = resolveRebase(\.baseProperties, in: machO) {
-//            offset = resolved + numericCast(machO.headerStartOffset)
-//        }
+        if let resolved = resolveRebase(\.baseProperties, in: machO) {
+            offset = resolved + numericCast(machO.headerStartOffset)
+        }
 //        if isBind(\.baseProperties, in: machO) { return nil }
 
         var resolvedOffset = offset
@@ -110,13 +110,23 @@ extension ObjCClassROData32 {
                 is64Bit: machO.is64Bit
             )
         }
+        if list?.isValidEntrySize(is64Bit: machO.is64Bit) == false {
+            // FIXME: Check
+            return nil
+        }
         return list
     }
 
     public func ivars(in machO: MachOFile) -> ObjCIvarList? {
         guard layout.ivars > 0 else { return nil }
 
-        let offset: UInt64 = numericCast(layout.ivars) + numericCast(machO.headerStartOffset)
+        var offset: UInt64 = numericCast(layout.ivars) + numericCast(machO.headerStartOffset)
+
+        if let resolved = resolveRebase(\.ivars, in: machO),
+           resolved != offset {
+            offset = resolved + numericCast(machO.headerStartOffset)
+        }
+
         var resolvedOffset = offset
 
         if let cache = machO.cache {
@@ -134,9 +144,15 @@ extension ObjCClassROData32 {
                 return nil
             }
             return .init(
-                header: ptr.assumingMemoryBound(to: ObjCIvarListHeader.self).pointee,
+                header: ptr
+                    .assumingMemoryBound(to: ObjCIvarListHeader.self)
+                    .pointee,
                 offset: numericCast(offset) - machO.headerStartOffset
             )
+        }
+        if list?.isValidEntrySize(is64Bit: machO.is64Bit) == false {
+            // FIXME: Check
+            return nil
         }
         return list
     }
@@ -145,7 +161,14 @@ extension ObjCClassROData32 {
         guard layout.baseProtocols > 0 else { return nil }
         guard layout.baseProtocols & 1 == 0 else { return nil }
 
-        let offset: UInt64 = numericCast(layout.baseProtocols) + numericCast(machO.headerStartOffset)
+        var offset: UInt64 = numericCast(layout.baseProtocols) + numericCast(machO.headerStartOffset)
+
+        if let resolved = resolveRebase(\.baseProtocols, in: machO),
+           resolved != offset {
+            offset = resolved + numericCast(machO.headerStartOffset)
+        }
+//        if isBind(\.baseProtocols, in: machO) { return nil }
+
         var resolvedOffset = offset
 
         if let cache = machO.cache {
@@ -154,10 +177,12 @@ extension ObjCClassROData32 {
             }
             resolvedOffset = _offset
         }
+
         let data = machO.fileHandle.readData(
             offset: resolvedOffset,
             size: MemoryLayout<ObjCProtocolList32.Header>.size
         )
+
         let list: ObjCProtocolList32? = data.withUnsafeBytes {
             guard let ptr = $0.baseAddress else {
                 return nil
@@ -179,11 +204,11 @@ extension ObjCClassROData32 {
         var offset: UInt64 = numericCast(layout.baseMethods) + numericCast(machO.headerStartOffset)
         offset &= ~1
 
-//        if let resolved = resolveRebase(\.baseMethods, in: machO) {
-//            offset = resolved + numericCast(machO.headerStartOffset)
-//        }
+        if let resolved = resolveRebase(\.baseMethods, in: machO) {
+            offset = resolved + numericCast(machO.headerStartOffset)
+            offset &= ~1
+        }
 //        if isBind(\.baseMethods, in: machO) { return nil }
-//        offset &= ~1
 
         var resolvedOffset = offset
 
@@ -220,11 +245,11 @@ extension ObjCClassROData32 {
         var offset: UInt64 = numericCast(layout.baseProperties) + numericCast(machO.headerStartOffset)
         offset &= ~1
 
-//        if let resolved = resolveRebase(\.baseProperties, in: machO) {
-//            offset = resolved + numericCast(machO.headerStartOffset)
-//        }
+        if let resolved = resolveRebase(\.baseProperties, in: machO) {
+            offset = resolved + numericCast(machO.headerStartOffset)
+            offset &= ~1
+        }
 //        if isBind(\.baseProperties, in: machO) { return nil }
-//        offset &= ~1
 
         var resolvedOffset = offset
 
@@ -261,12 +286,11 @@ extension ObjCClassROData32 {
         var offset: UInt64 = numericCast(layout.baseProtocols) + numericCast(machO.headerStartOffset)
         offset &= ~1
 
-//        if let resolved = resolveRebase(\.baseProtocols, in: machO) {
-//            offset = resolved + numericCast(machO.headerStartOffset)
-//        }
+        if let resolved = resolveRebase(\.baseProtocols, in: machO) {
+            offset = resolved + numericCast(machO.headerStartOffset)
+            offset &= ~1
+        }
 //        if isBind(\.baseProtocols, in: machO) { return nil }
-//        offset &= 0x7ffffffff
-//        offset &= ~1
 
         var resolvedOffset = offset
 
