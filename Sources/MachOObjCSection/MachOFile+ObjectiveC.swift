@@ -143,13 +143,14 @@ extension MachOFile.ObjectiveC {
             .map { $0 & 0x7ffffffff }
             .compactMap {
                 if let cache = machO.cache {
-                    return cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart)
+                    let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0
+                    return ($0, resolved)
                 }
-                return $0
+                return ($0, $0)
             }
-            .map {
-                let proto: ObjCProtocol64 = machO.fileHandle.read(offset: $0 + numericCast(machO.headerStartOffset))
-                return proto
+            .map { (offset: UInt64, resolved: UInt64) in
+                let layout: ObjCProtocol64.Layout = machO.fileHandle.read(offset: resolved + numericCast(machO.headerStartOffset))
+                return .init(layout: layout, offset: numericCast(offset))
             }
     }
 
@@ -188,11 +189,17 @@ extension MachOFile.ObjectiveC {
         )
 
         return offsets
-            .map {
-                let proto: ObjCProtocol32 = machO.fileHandle.read(
-                    offset: numericCast($0) + numericCast(machO.headerStartOffset)
-                )
-                return proto
+            .compactMap {
+                let offset: UInt64 = numericCast($0)
+                if let cache = machO.cache {
+                    let resolved = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) ?? offset
+                    return (offset, resolved)
+                }
+                return (offset, offset)
+            }
+            .map { (offset: UInt64, resolved: UInt64) in
+                let layout: ObjCProtocol32.Layout = machO.fileHandle.read(offset: resolved + numericCast(machO.headerStartOffset))
+                return .init(layout: layout, offset: numericCast(offset))
             }
     }
 }
@@ -237,15 +244,16 @@ extension MachOFile.ObjectiveC {
             .map { $0 & 0x7ffffffff }
             .compactMap {
                 if let cache = machO.cache {
-                    return cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart)
+                    let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0
+                    return ($0, resolved)
                 }
-                return $0
+                return ($0, $0)
             }
-            .map {
+            .map { (offset: UInt64, resolved: UInt64) in
                 let layout: ObjCClass64.Layout = machO.fileHandle.read(
-                    offset: $0 + numericCast(machO.headerStartOffset)
+                    offset: resolved + numericCast(machO.headerStartOffset)
                 )
-                return .init(layout: layout, offset: numericCast($0))
+                return .init(layout: layout, offset: numericCast(offset))
             }
     }
 
@@ -286,16 +294,18 @@ extension MachOFile.ObjectiveC {
 
         return offsets
             .compactMap {
+                let offset: UInt64 = numericCast($0)
                 if let cache = machO.cache {
-                    return cache.fileOffset(of: numericCast($0) + cache.mainCacheHeader.sharedRegionStart)
+                    let resolved = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) ?? offset
+                    return (offset, resolved)
                 }
-                return numericCast($0)
+                return (offset, offset)
             }
-            .map {
+            .map { (offset: UInt64, resolved: UInt64) in
                 let layout: ObjCClass32.Layout = machO.fileHandle.read(
-                    offset: $0 + numericCast(machO.headerStartOffset)
+                    offset: resolved + numericCast(machO.headerStartOffset)
                 )
-                return .init(layout: layout, offset: numericCast($0))
+                return .init(layout: layout, offset: numericCast(offset))
             }
     }
 }
