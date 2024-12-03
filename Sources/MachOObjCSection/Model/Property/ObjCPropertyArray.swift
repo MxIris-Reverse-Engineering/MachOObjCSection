@@ -19,7 +19,7 @@ extension ObjCPropertyArray {
         .init(rawValue: numericCast(offset) & 3)
     }
 
-    func lists(in machO: MachOImage) -> [ObjCPropertyList] {
+    public func lists(in machO: MachOImage) -> [ObjCPropertyList] {
         let start = machO.ptr
             .advanced(by: offset & ~3)
 
@@ -59,16 +59,22 @@ extension ObjCPropertyArray {
                 currentOffset += MemoryLayout<UInt>.size
             }
         case .relative:
-            let relativeListList = ObjCPropertyRelativeListList(
-                ptr: start,
-                offset: Int(bitPattern: start) - Int(bitPattern: machO.ptr)
-            )
-            lists = relativeListList.lists(in: machO)
-                .map(\.1)
+            // Use `relativeListList(in:)`
+            break
         case ._dummy, .none:
             break
         }
 
         return lists
+    }
+
+    public func relativeListList(in machO: MachOImage) -> ObjCPropertyRelativeListList? {
+        guard kind == .relative else { return nil }
+        let start = machO.ptr
+            .advanced(by: offset & ~3)
+        return .init(
+            ptr: start,
+            offset: Int(bitPattern: start) - Int(bitPattern: machO.ptr)
+        )
     }
 }

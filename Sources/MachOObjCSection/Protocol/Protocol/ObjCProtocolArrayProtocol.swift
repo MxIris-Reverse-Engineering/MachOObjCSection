@@ -61,16 +61,22 @@ extension ObjCProtocolArrayProtocol {
                     )
                 }
         case .relative:
-            let relativeListList = ObjCProtocolRelativeListList(
-                ptr: start,
-                offset: Int(bitPattern: start) - Int(bitPattern: machO.ptr)
-            )
-            lists = relativeListList.lists(in: machO)
-                .map(\.1)
+            // Use `relativeListList(in:)`
+            break
         case ._dummy, .none:
             break
         }
 
         return lists
+    }
+
+    public func relativeListList(in machO: MachOImage) -> ObjCProtocolRelativeListList? {
+        guard kind == .relative else { return nil }
+        let start = machO.ptr
+            .advanced(by: offset & ~3)
+        return .init(
+            ptr: start,
+            offset: Int(bitPattern: start) - Int(bitPattern: machO.ptr)
+        )
     }
 }
