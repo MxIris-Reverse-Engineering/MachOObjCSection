@@ -33,6 +33,7 @@ public struct ObjCProtocol64: LayoutWrapper, ObjCProtocolProtocol {
     }
 
     public var layout: Layout
+    public var offset: Int
 }
 
 extension ObjCProtocol64 {

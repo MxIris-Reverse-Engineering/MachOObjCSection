@@ -9,11 +9,12 @@
 import Foundation
 @_spi(Support) import MachOKit
 
-public protocol ObjCProtocolProtocol {
+public protocol ObjCProtocolProtocol: _FixupResolvable {
     associatedtype Layout: _ObjCProtocolLayoutProtocol
     associatedtype ObjCProtocolList: ObjCProtocolListProtocol where ObjCProtocolList.ObjCProtocol == Self
 
     var layout: Layout { get }
+    var offset: Int { get }
 
     var size: UInt32 { get }
     var flags: UInt32 { get }
@@ -39,6 +40,11 @@ public protocol ObjCProtocolProtocol {
     func extendedMethodTypes(in machO: MachOFile) -> String?
     func demangledName(in machO: MachOFile) -> String?
     func classProperties(in machO: MachOFile) -> ObjCPropertyList?
+}
+
+extension ObjCProtocolProtocol {
+    public var size: UInt32 { layout.size }
+    public var flags: UInt32 { layout.flags }
 }
 
 extension ObjCProtocolProtocol {
@@ -125,9 +131,6 @@ extension ObjCProtocolProtocol {
             is64Bit: machO.is64Bit
         )
     }
-
-    public var size: UInt32 { layout.size }
-    public var flags: UInt32 { layout.flags }
 
     public func extendedMethodTypes(in machO: MachOImage) -> String? {
         let offset = machO.is64Bit ? 72 : 40

@@ -31,6 +31,7 @@ public struct ObjCProtocol32: LayoutWrapper, ObjCProtocolProtocol {
     }
 
     public var layout: Layout
+    public var offset: Int
 }
 
 extension ObjCProtocol32 {

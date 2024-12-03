@@ -60,21 +60,23 @@ extension ObjCProtocolList32 {
 
         return sequnece
             .map {
-                var offset = $0
+                let offset = $0 + numericCast(headerStartOffset)
+                var resolvedOffset = offset
 
                 var fileHandle = machO.fileHandle
 
                 if let (_cache, _offset) = machO.cacheAndFileOffset(
                     fromStart: offset
                 ) {
-                    offset = _offset
+                    resolvedOffset = _offset
                     fileHandle = _cache.fileHandle
                 }
 
-                return fileHandle.read<ObjCProtocol32>(
-                    offset: numericCast(headerStartOffset) + numericCast(offset),
+                let layout: ObjCProtocol32.Layout = fileHandle.read(
+                    offset: numericCast(resolvedOffset),
                     swapHandler: { _ in }
                 )
+                return .init(layout: layout, offset: numericCast(offset))
             }
     }
 }
