@@ -32,6 +32,28 @@ public struct ObjCProtocol32: LayoutWrapper, ObjCProtocolProtocol {
 
     public var layout: Layout
     public var offset: Int
+
+    public func layoutOffset(of field: LayoutField) -> Int {
+        let keyPath: PartialKeyPath<Layout>
+
+        switch field {
+        case .isa: keyPath = \.isa
+        case .mangledName: keyPath = \.mangledName
+        case .protocols: keyPath = \.protocols
+        case .instanceMethods: keyPath = \.instanceMethods
+        case .classMethods: keyPath = \.classMethods
+        case .optionalInstanceMethods: keyPath = \.optionalInstanceMethods
+        case .optionalClassMethods: keyPath = \.optionalClassMethods
+        case .instanceProperties: keyPath = \.instanceProperties
+        case .size: keyPath = \.size
+        case .flags: keyPath = \.flags
+        case ._extendedMethodTypes: keyPath = \._extendedMethodTypes
+        case ._demangledName: keyPath = \._demangledName
+        case ._classProperties: keyPath = \._classProperties
+        }
+
+        return layoutOffset(of: keyPath)
+    }
 }
 
 extension ObjCProtocol32 {
@@ -41,7 +63,14 @@ extension ObjCProtocol32 {
 
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
 
-        let offset: UInt64 = numericCast(layout.protocols) + numericCast(headerStartOffset)
+        var offset: UInt64 = numericCast(layout.protocols) + numericCast(headerStartOffset)
+
+        if let resolved = resolveRebase(.protocols, in: machO),
+            resolved != offset {
+            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        }
+//        if isBind(\.protocols, in: machO) { return nil }
+
         var resolvedOffset = offset
 
         var fileHandle = machO.fileHandle

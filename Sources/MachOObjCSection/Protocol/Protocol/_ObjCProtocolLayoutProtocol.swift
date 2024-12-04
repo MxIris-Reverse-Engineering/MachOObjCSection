@@ -26,3 +26,19 @@ public protocol _ObjCProtocolLayoutProtocol {
     var _demangledName: Pointer { get } // UnsafePointer<CChar>?
     var _classProperties: Pointer { get } // UnsafeRawPointer?
 }
+
+public enum ObjCProtocolLayoutField {
+    case isa
+    case mangledName
+    case protocols
+    case instanceMethods
+    case classMethods
+    case optionalInstanceMethods
+    case optionalClassMethods
+    case instanceProperties
+    case size
+    case flags
+    case _extendedMethodTypes
+    case _demangledName
+    case _classProperties
+}

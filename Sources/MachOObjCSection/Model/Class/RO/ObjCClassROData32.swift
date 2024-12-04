@@ -36,6 +36,25 @@ public struct ObjCClassROData32: LayoutWrapper, ObjCClassRODataProtocol {
         self.layout = layout
         self.offset = offset
     }
+
+    public func layoutOffset(of field: LayoutField) -> Int {
+        let keyPath: PartialKeyPath<Layout>
+
+        switch field {
+        case .flags: keyPath = \.flags
+        case .instanceStart: keyPath = \.instanceStart
+        case .instanceSize: keyPath = \.instanceSize
+        case .ivarLayout: keyPath = \.ivarLayout
+        case .name: keyPath = \.name
+        case .baseMethods: keyPath = \.baseMethods
+        case .baseProtocols: keyPath = \.baseProtocols
+        case .ivars: keyPath = \.ivars
+        case .weakIvarLayout: keyPath = \.weakIvarLayout
+        case .baseProperties: keyPath = \.baseProperties
+        }
+
+        return layoutOffset(of: keyPath)
+    }
 }
 
 extension ObjCClassROData32 {
@@ -45,7 +64,7 @@ extension ObjCClassROData32 {
 
         var offset: UInt64 = numericCast(layout.baseMethods) + numericCast(machO.headerStartOffset)
 
-        if let resolved = resolveRebase(\.baseMethods, in: machO) {
+        if let resolved = resolveRebase(.baseMethods, in: machO) {
             offset = resolved + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.baseMethods, in: machO) { return nil }
@@ -83,7 +102,7 @@ extension ObjCClassROData32 {
 
         var offset: UInt64 = numericCast(layout.baseProperties) + numericCast(machO.headerStartOffset)
 
-        if let resolved = resolveRebase(\.baseProperties, in: machO) {
+        if let resolved = resolveRebase(.baseProperties, in: machO) {
             offset = resolved + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.baseProperties, in: machO) { return nil }
@@ -122,7 +141,7 @@ extension ObjCClassROData32 {
 
         var offset: UInt64 = numericCast(layout.ivars) + numericCast(machO.headerStartOffset)
 
-        if let resolved = resolveRebase(\.ivars, in: machO),
+        if let resolved = resolveRebase(.ivars, in: machO),
            resolved != offset {
             offset = resolved + numericCast(machO.headerStartOffset)
         }
@@ -163,7 +182,7 @@ extension ObjCClassROData32 {
 
         var offset: UInt64 = numericCast(layout.baseProtocols) + numericCast(machO.headerStartOffset)
 
-        if let resolved = resolveRebase(\.baseProtocols, in: machO),
+        if let resolved = resolveRebase(.baseProtocols, in: machO),
            resolved != offset {
             offset = resolved + numericCast(machO.headerStartOffset)
         }
@@ -204,7 +223,7 @@ extension ObjCClassROData32 {
         var offset: UInt64 = numericCast(layout.baseMethods) + numericCast(machO.headerStartOffset)
         offset &= ~1
 
-        if let resolved = resolveRebase(\.baseMethods, in: machO) {
+        if let resolved = resolveRebase(.baseMethods, in: machO) {
             offset = resolved + numericCast(machO.headerStartOffset)
             offset &= ~1
         }
@@ -245,7 +264,7 @@ extension ObjCClassROData32 {
         var offset: UInt64 = numericCast(layout.baseProperties) + numericCast(machO.headerStartOffset)
         offset &= ~1
 
-        if let resolved = resolveRebase(\.baseProperties, in: machO) {
+        if let resolved = resolveRebase(.baseProperties, in: machO) {
             offset = resolved + numericCast(machO.headerStartOffset)
             offset &= ~1
         }
@@ -286,7 +305,7 @@ extension ObjCClassROData32 {
         var offset: UInt64 = numericCast(layout.baseProtocols) + numericCast(machO.headerStartOffset)
         offset &= ~1
 
-        if let resolved = resolveRebase(\.baseProtocols, in: machO) {
+        if let resolved = resolveRebase(.baseProtocols, in: machO) {
             offset = resolved + numericCast(machO.headerStartOffset)
             offset &= ~1
         }

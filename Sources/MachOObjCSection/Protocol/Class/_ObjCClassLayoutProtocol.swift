@@ -22,3 +22,12 @@ public protocol _ObjCClassLayoutProtocol {
     // fast bits set
     var swiftClassFlags: UInt32 { get }
 }
+
+public enum ObjCClassLayoutField {
+    case isa
+    case superclass
+    case methodCacheBuckets
+    case methodCacheProperties
+    case dataVMAddrAndFastFlags
+    case swiftClassFlags
+}

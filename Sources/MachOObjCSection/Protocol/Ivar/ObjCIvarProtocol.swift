@@ -10,7 +10,7 @@ import Foundation
 import MachOObjCSectionC
 @_spi(Support) import MachOKit
 
-public protocol ObjCIvarProtocol: _FixupResolvable {
+public protocol ObjCIvarProtocol: _FixupResolvable where LayoutField == ObjCIvarLayoutField {
     associatedtype Layout: _ObjCIvarLayoutProtocol
 
     var layout: Layout { get }

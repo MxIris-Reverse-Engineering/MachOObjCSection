@@ -29,6 +29,20 @@ public struct ObjCIvar64: LayoutWrapper, ObjCIvarProtocol {
         self.layout = layout
         self.offset = offset
     }
+
+    public func layoutOffset(of field: LayoutField) -> Int {
+        let keyPath: PartialKeyPath<Layout>
+
+        switch field {
+        case .offset: keyPath = \.offset
+        case .name: keyPath = \.name
+        case .type: keyPath = \.type
+        case .alignment: keyPath = \.alignment
+        case .size: keyPath = \.size
+        }
+
+        return layoutOffset(of: keyPath)
+    }
 }
 
 extension ObjCIvar64 {
@@ -36,7 +50,7 @@ extension ObjCIvar64 {
         let headerStartOffset = machO.headerStartOffset
         var offset: UInt64 = numericCast(layout.offset & 0x7ffffffff) + numericCast(headerStartOffset)
 
-        if let resolved = resolveRebase(\.offset, in: machO) {
+        if let resolved = resolveRebase(.offset, in: machO) {
             offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.offset, in: machO) { return nil }
@@ -61,7 +75,7 @@ extension ObjCIvar64 {
         let headerStartOffset = machO.headerStartOffset
         var offset: UInt64 = numericCast(layout.name & 0x7ffffffff) + numericCast(headerStartOffset)
 
-        if let resolved = resolveRebase(\.name, in: machO) {
+        if let resolved = resolveRebase(.name, in: machO) {
             offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.name, in: machO) { return nil }
@@ -82,7 +96,7 @@ extension ObjCIvar64 {
         let headerStartOffset = machO.headerStartOffset
         var offset: UInt64 = numericCast(layout.type & 0x7ffffffff) + numericCast(headerStartOffset)
 
-        if let resolved = resolveRebase(\.type, in: machO) {
+        if let resolved = resolveRebase(.type, in: machO) {
             offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.type, in: machO) { return nil }

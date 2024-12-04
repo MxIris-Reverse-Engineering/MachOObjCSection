@@ -17,3 +17,11 @@ public protocol _ObjCIvarLayoutProtocol {
     var alignment: UInt32 { get }
     var size: UInt32 { get }
 }
+
+public enum ObjCIvarLayoutField {
+    case offset
+    case name
+    case type
+    case alignment
+    case size
+}

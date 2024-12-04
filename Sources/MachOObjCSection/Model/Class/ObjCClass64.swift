@@ -29,13 +29,28 @@ public struct ObjCClass64: LayoutWrapper, ObjCClassProtocol {
 
     public var layout: Layout
     public var offset: Int
+
+    public func layoutOffset(of field: LayoutField) -> Int {
+        let keyPath: PartialKeyPath<Layout>
+
+        switch field {
+        case .isa: keyPath = \.isa
+        case .superclass: keyPath = \.superclass
+        case .methodCacheBuckets: keyPath = \.methodCacheBuckets
+        case .methodCacheProperties: keyPath = \.methodCacheProperties
+        case .dataVMAddrAndFastFlags: keyPath = \.dataVMAddrAndFastFlags
+        case .swiftClassFlags: keyPath = \.swiftClassFlags
+        }
+
+        return layoutOffset(of: keyPath)
+    }
 }
 
 extension ObjCClass64 {
     public func metaClass(in machO: MachOFile) -> Self? {
         _readClass(
             at: numericCast(layout.isa),
-            keyPath: \.isa,
+            field: .isa,
             in: machO
         )
     }
@@ -43,7 +58,7 @@ extension ObjCClass64 {
     public func superClass(in machO: MachOFile) -> Self? {
         _readClass(
             at: numericCast(layout.superclass),
-            keyPath: \.superclass,
+            field: .superclass,
             in: machO
         )
     }
@@ -51,7 +66,7 @@ extension ObjCClass64 {
     public func superClassName(in machO: MachOFile) -> String? {
         _readClassName(
             at: numericCast(layout.superclass),
-            keyPath: \.superclass,
+            field: .superclass,
             in: machO
         )
     }
@@ -62,44 +77,45 @@ extension ObjCClass64 {
 
     private func _readClass(
         at offset: UInt64,
-        keyPath: PartialKeyPath<Layout>,
+        field: LayoutField,
         in machO: MachOFile
     ) -> Self? {
         guard offset > 0 else { return nil }
         var offset: UInt64 = numericCast(offset) & 0x7ffffffff + numericCast(machO.headerStartOffset)
 
-        if let resolved = resolveRebase(keyPath, in: machO) {
+        if let resolved = resolveRebase(field, in: machO) {
             offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
         }
-        if isBind(keyPath, in: machO) { return nil }
-        offset &= 0x7ffffffff
+        if isBind(field, in: machO) { return nil }
 
+        var resolvedOffset = offset
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
-            offset = _offset
+            resolvedOffset = _offset
         }
-        let layout: ObjCClass64.Layout = machO.fileHandle.read(offset: offset)
-        return ObjCClass64(layout: layout, offset: Int(offset))
+
+        let layout: ObjCClass64.Layout = machO.fileHandle.read(offset: resolvedOffset)
+        return ObjCClass64(layout: layout, offset: numericCast(offset))
     }
 
     private func _readClassName(
         at offset: UInt64,
-        keyPath: PartialKeyPath<Layout>,
+        field: LayoutField,
         in machO: MachOFile
     ) -> String? {
         guard offset > 0 else { return nil }
 
         if let cls = _readClass(
             at: offset,
-            keyPath: keyPath,
+            field: field,
             in: machO
         ), let data = cls.classROData(in: machO) {
             return data.name(in: machO)
         }
 
-        if let bindSymbolName = resolveBind(keyPath, in: machO) {
+        if let bindSymbolName = resolveBind(field, in: machO) {
             return bindSymbolName
                 .replacingOccurrences(of: "_OBJC_CLASS_$_", with: "")
         }

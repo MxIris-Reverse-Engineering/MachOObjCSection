@@ -10,9 +10,43 @@ import Foundation
 @_spi(Support) import MachOKit
 
 public protocol _FixupResolvable {
+    associatedtype LayoutField
+
     var offset: Int { get }
+
+    func layoutOffset(of field: LayoutField) -> Int
 }
 
+extension _FixupResolvable {
+    @_spi(Core)
+    public func resolveRebase(
+        _ field: LayoutField,
+        in machO: MachOFile
+    ) -> UInt64? {
+        let offset = self.offset + layoutOffset(of: field)
+        return resolveRebase(fileOffset: offset, in: machO)
+    }
+
+    @_spi(Core)
+    public func resolveBind(
+        _ field: LayoutField,
+        in machO: MachOFile
+    ) -> String? {
+        let offset = self.offset + layoutOffset(of: field)
+        return resolveBind(fileOffset: offset, in: machO)
+    }
+
+    @_spi(Core)
+    public func isBind(
+        _ field: LayoutField,
+        in machO: MachOFile
+    ) -> Bool {
+        let offset = self.offset + layoutOffset(of: field)
+        return isBind(fileOffset: offset, in: machO)
+    }
+}
+
+#if false
 extension _FixupResolvable where Self: LayoutWrapper {
     @_spi(Core)
     public func resolveRebase(
@@ -41,6 +75,7 @@ extension _FixupResolvable where Self: LayoutWrapper {
         return isBind(fileOffset: offset, in: machO)
     }
 }
+#endif
 
 extension _FixupResolvable {
     @_spi(Core)

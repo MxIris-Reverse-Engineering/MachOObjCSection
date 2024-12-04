@@ -22,3 +22,16 @@ public protocol _ObjCClassRODataLayoutProtocol {
     var weakIvarLayout: Pointer { get }
     var baseProperties: Pointer { get }
 }
+
+public enum ObjCClassRODataLayoutField {
+    case flags
+    case instanceStart
+    case instanceSize
+    case ivarLayout
+    case name
+    case baseMethods
+    case baseProtocols
+    case ivars
+    case weakIvarLayout
+    case baseProperties
+}
