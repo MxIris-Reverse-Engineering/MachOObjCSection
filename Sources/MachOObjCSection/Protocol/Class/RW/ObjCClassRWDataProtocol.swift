@@ -17,6 +17,9 @@ public protocol ObjCClassRWDataProtocol {
     var layout: Layout { get }
     var offset: Int { get }
 
+    @_spi(Core)
+    init(layout: Layout, offset: Int)
+
     func classROData(in machO: MachOImage) -> ObjCClassROData?
     func ext(in machO: MachOImage) -> ObjCClassRWDataExt?
 }

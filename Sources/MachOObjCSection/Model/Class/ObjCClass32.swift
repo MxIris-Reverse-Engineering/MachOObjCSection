@@ -30,6 +30,12 @@ public struct ObjCClass32: LayoutWrapper, ObjCClassProtocol {
     public var layout: Layout
     public var offset: Int
 
+    @_spi(Core)
+    public init(layout: Layout, offset: Int) {
+        self.layout = layout
+        self.offset = offset
+    }
+
     public func layoutOffset(of field: LayoutField) -> Int {
         let keyPath: PartialKeyPath<Layout>
 
@@ -47,110 +53,12 @@ public struct ObjCClass32: LayoutWrapper, ObjCClassProtocol {
 }
 
 extension ObjCClass32 {
-    public func metaClass(in machO: MachOFile) -> Self? {
-        _readClass(
-            at: numericCast(layout.isa),
-            field: .isa,
-            in: machO
-        )
-    }
-
-    public func superClass(in machO: MachOFile) -> Self? {
-        _readClass(
-            at: numericCast(layout.superclass),
-            field: .superclass,
-            in: machO
-        )
-    }
-
-    public func superClassName(in machO: MachOFile) -> String? {
-        _readClassName(
-            at: numericCast(layout.superclass),
-            field: .superclass,
-            in: machO
-        )
-    }
-
     public func classROData(in machO: MachOFile) -> ClassROData? {
         _classROData(in: machO)
-    }
-
-    private func _readClass(
-        at offset: UInt64,
-        field: LayoutField,
-        in machO: MachOFile
-    ) -> Self? {
-        guard offset > 0 else { return nil }
-        var offset: UInt64 = numericCast(offset) + numericCast(machO.headerStartOffset)
-        if let resolved = resolveRebase(field, in: machO) {
-            offset = resolved + numericCast(machO.headerStartOffset)
-        }
-        if isBind(field, in: machO) { return nil }
-
-        var resolvedOffset = offset
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
-            resolvedOffset = _offset
-        }
-        let layout: ObjCClass32.Layout = machO.fileHandle.read(offset: resolvedOffset)
-        return ObjCClass32(layout: layout, offset: numericCast(offset))
-    }
-
-    private func _readClassName(
-        at offset: UInt64,
-        field: LayoutField,
-        in machO: MachOFile
-    ) -> String? {
-        guard offset > 0 else { return nil }
-
-        if let cls = _readClass(
-            at: offset,
-            field: field,
-            in: machO
-        ), let data = cls.classROData(in: machO) {
-            return data.name(in: machO)
-        }
-
-        if let bindSymbolName = resolveBind(field, in: machO) {
-            return bindSymbolName
-                .replacingOccurrences(of: "_OBJC_CLASS_$_", with: "")
-        }
-
-        return nil
     }
 }
 
 extension ObjCClass32 {
-    public func metaClass(in machO: MachOImage) -> Self? {
-        guard layout.isa > 0 else { return nil }
-        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.isa)) else {
-            return nil
-        }
-        let layout = ptr.assumingMemoryBound(to: Layout.self).pointee
-        let offset: Int = numericCast(layout.isa) - Int(bitPattern: machO.ptr)
-        return .init(layout: layout, offset: offset)
-    }
-
-    public func superClass(in machO: MachOImage) -> Self? {
-        guard layout.superclass > 0 else { return nil }
-        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.superclass)) else {
-            return nil
-        }
-        let layout = ptr.assumingMemoryBound(to: Layout.self).pointee
-        let offset: Int = numericCast(layout.isa) - Int(bitPattern: machO.ptr)
-        return .init(layout: layout, offset: offset)
-    }
-
-    public func superClassName(in machO: MachOImage) -> String? {
-        guard let superCls = superClass(in: machO),
-              let data = superCls.classROData(in: machO) else {
-            return nil
-        }
-        return data.name(in: machO)
-    }
-
     // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L2534
     public func hasRWPointer(in machO: MachOImage) -> Bool {
         if FAST_IS_RW_POINTER_32 != 0 {
