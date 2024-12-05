@@ -106,7 +106,10 @@ extension ObjCMethod {
                     .address(from: pointer.advanced(by: 4))
                     .assumingMemoryBound(to: CChar.self)
             ),
-            imp: nil
+            imp: .init(
+                relativeDirect.imp
+                .address(from: pointer.advanced(by: 8))
+            )
         )
     }
 }
@@ -131,8 +134,10 @@ extension ObjCMethod {
                     .address(from: pointer.advanced(by: 4))
                     .assumingMemoryBound(to: CChar.self)
             ),
-            imp: relativeIndirect.imp
-                .pointee(from: pointer.advanced(by: 8))
+            imp: .init(
+                relativeIndirect.imp
+                .address(from: pointer.advanced(by: 8))
+            )
         )
     }
 }
