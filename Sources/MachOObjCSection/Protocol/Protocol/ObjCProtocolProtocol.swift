@@ -203,6 +203,43 @@ extension ObjCProtocolProtocol {
         ) ?? ""
     }
 
+    public func protocols(in machO: MachOFile) -> ObjCProtocolList? {
+        guard layout.protocols > 0 else { return nil }
+
+        let headerStartOffset = machO.headerStartOffset
+
+        var offset: UInt64 = numericCast(layout.protocols) & 0x7ffffffff + numericCast(headerStartOffset)
+
+        if let resolved = resolveRebase(.protocols, in: machO),
+            resolved != offset {
+            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        }
+//        if isBind(\.protocols, in: machO) { return nil }
+
+        var resolvedOffset = offset
+
+        var fileHandle = machO.fileHandle
+
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+        }
+
+        let data = fileHandle.readData(
+            offset: resolvedOffset,
+            size: MemoryLayout<ObjCProtocolList64.Header>.size
+        )
+        return data.withUnsafeBytes {
+            guard let baseAddress = $0.baseAddress else { return nil }
+            return .init(
+                ptr: baseAddress,
+                offset: numericCast(offset) - machO.headerStartOffset
+            )
+        }
+    }
+
     public func instanceMethods(in machO: MachOFile) -> ObjCMethodList? {
         _readObjCMethodList(in: machO, offset: numericCast(layout.instanceMethods))
     }
