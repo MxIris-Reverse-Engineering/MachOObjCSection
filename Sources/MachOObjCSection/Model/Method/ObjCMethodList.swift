@@ -91,6 +91,7 @@ extension ObjCMethodList {
 
         let ptr = machO.ptr.advanced(by: offset)
         let start = ptr.advanced(by: MemoryLayout<Header>.size)
+
         switch listKind {
         case .pointer:
             let sequence = MemorySequence(
@@ -163,6 +164,7 @@ extension ObjCMethodList {
                 .map {
                     var name = UInt64($0.name) & 0x7ffffffff
                     var types = UInt64($0.types) & 0x7ffffffff
+                    let imp = UInt64($0.imp) & 0x7ffffffff
 
                     var nameFileHandle = machO.fileHandle
                     var typesFileHandle = machO.fileHandle
@@ -188,7 +190,7 @@ extension ObjCMethodList {
                         types: typesFileHandle.readString(
                             offset: numericCast(headerStartOffset) + numericCast(types)
                         ) ?? "",
-                        imp: nil
+                        imp: imp
                     )
                 }
         case .pointer:
@@ -201,6 +203,7 @@ extension ObjCMethodList {
                 .map {
                     var name = UInt64($0.name)
                     var types = UInt64($0.types)
+                    let imp = UInt64($0.imp)
 
                     var nameFileHandle = machO.fileHandle
                     var typesFileHandle = machO.fileHandle
@@ -226,7 +229,7 @@ extension ObjCMethodList {
                         types: typesFileHandle.readString(
                             offset: numericCast(headerStartOffset) + numericCast(types)
                         ) ?? "",
-                        imp: nil
+                        imp: imp
                     )
                 }
 
@@ -244,6 +247,8 @@ extension ObjCMethodList {
                         offset: numericCast(offset) + numericCast($1.name.offset)
                     ) & 0x7ffffffff
                     let types: Int64 = numericCast(offset) + numericCast($1.types.offset) + 4
+                    let imp: UInt64 = numericCast(offset + numericCast($1.imp.offset)) + 8
+
                     return ObjCMethod(
                         name: machO.fileHandle.readString(
                             offset: numericCast(headerStartOffset) + numericCast(name)
@@ -251,7 +256,7 @@ extension ObjCMethodList {
                         types: machO.fileHandle.readString(
                             offset: numericCast(types)
                         ) ?? "",
-                        imp: nil
+                        imp: imp
                     )
                 }
 
@@ -269,7 +274,8 @@ extension ObjCMethodList {
                 .map {
                     let offset = numericCast(offset) + $0 * size
                     var name: Int64 = numericCast($1.name.offset)
-                    var types: UInt64 = numericCast(offset) + numericCast($1.types.offset) + 4
+                    var types: UInt64 = numericCast(offset + numericCast($1.types.offset)) + 4
+                    let imp: UInt64 = numericCast(offset + numericCast($1.imp.offset)) + 8
 
                     var nameFileHandle = machO.fileHandle
                     var typesFileHandle = machO.fileHandle
@@ -295,7 +301,7 @@ extension ObjCMethodList {
                         types: typesFileHandle.readString(
                             offset: types
                         ) ?? "",
-                        imp: nil
+                        imp: imp
                     )
                 }
         }

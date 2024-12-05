@@ -14,7 +14,14 @@ import MachOKit
 public struct ObjCMethod {
     public let name: String
     public let types: String
-    public let imp: IMP?
+    /// address or offset of method implementation
+    ///
+    /// If it is obtained from mach-o image, it represents an address.
+    ///
+    /// If it is obtained from a mach-o  file, it represents the offset from the start position of the mach-o header.
+    ///
+    /// If it is obtained from a dyld cache file, it is the offset from the start address of the main cache.
+    public let imp: UInt64
 }
 
 extension ObjCMethod {
@@ -36,7 +43,7 @@ extension ObjCMethod {
         self.init(
             name: .init(cString: pointer.name),
             types: .init(cString: pointer.types),
-            imp: pointer.imp
+            imp: numericCast(UInt(bitPattern: pointer.imp))
         )
     }
 }
@@ -47,19 +54,19 @@ extension ObjCMethod {
         public let types: UInt32 // UnsafePointer<CChar>
         public let imp: UInt32 // IMP
     }
-
-    init(_ pointer: Pointer32) {
-        let name = UnsafeRawPointer(bitPattern: UInt(pointer.name))?
-            .assumingMemoryBound(to: CChar.self)
-        let types = UnsafeRawPointer(bitPattern: UInt(pointer.types))?
-            .assumingMemoryBound(to: CChar.self)
-        let imp = OpaquePointer(bitPattern: UInt(pointer.imp))
-        self.init(
-            name: .init(cString: name!),
-            types: .init(cString: types!),
-            imp: imp
-        )
-    }
+//
+//    init(_ pointer: Pointer32) {
+//        let name = UnsafeRawPointer(bitPattern: UInt(pointer.name))?
+//            .assumingMemoryBound(to: CChar.self)
+//        let types = UnsafeRawPointer(bitPattern: UInt(pointer.types))?
+//            .assumingMemoryBound(to: CChar.self)
+//        let imp = OpaquePointer(bitPattern: UInt(pointer.imp))
+//        self.init(
+//            name: .init(cString: name!),
+//            types: .init(cString: types!),
+//            imp: numericCast(pointer.imp)
+//        )
+//    }
 }
 
 extension ObjCMethod {
@@ -68,19 +75,19 @@ extension ObjCMethod {
         public let types: UInt64 // UnsafePointer<CChar>
         public let imp: UInt64 // IMP
     }
-
-    init(_ pointer: Pointer64) {
-        let name = UnsafeRawPointer(bitPattern: UInt(pointer.name))?
-            .assumingMemoryBound(to: CChar.self)
-        let types = UnsafeRawPointer(bitPattern: UInt(pointer.types))?
-            .assumingMemoryBound(to: CChar.self)
-        let imp = OpaquePointer(bitPattern: UInt(pointer.imp))
-        self.init(
-            name: .init(cString: name!),
-            types: .init(cString: types!),
-            imp: imp
-        )
-    }
+//
+//    init(_ pointer: Pointer64) {
+//        let name = UnsafeRawPointer(bitPattern: UInt(pointer.name))?
+//            .assumingMemoryBound(to: CChar.self)
+//        let types = UnsafeRawPointer(bitPattern: UInt(pointer.types))?
+//            .assumingMemoryBound(to: CChar.self)
+//        let imp = OpaquePointer(bitPattern: UInt(pointer.imp))
+//        self.init(
+//            name: .init(cString: name!),
+//            types: .init(cString: types!),
+//            imp: numericCast(pointer.imp)
+//        )
+//    }
 }
 
 extension ObjCMethod {
@@ -106,9 +113,11 @@ extension ObjCMethod {
                     .address(from: pointer.advanced(by: 4))
                     .assumingMemoryBound(to: CChar.self)
             ),
-            imp: .init(
-                relativeDirect.imp
-                .address(from: pointer.advanced(by: 8))
+            imp: numericCast(
+                UInt(
+                    bitPattern: relativeDirect.imp
+                        .address(from: pointer.advanced(by: 8))
+                )
             )
         )
     }
@@ -134,9 +143,11 @@ extension ObjCMethod {
                     .address(from: pointer.advanced(by: 4))
                     .assumingMemoryBound(to: CChar.self)
             ),
-            imp: .init(
-                relativeIndirect.imp
-                .address(from: pointer.advanced(by: 8))
+            imp: numericCast(
+                UInt(
+                    bitPattern: relativeIndirect.imp
+                        .address(from: pointer.advanced(by: 8))
+                )
             )
         )
     }
