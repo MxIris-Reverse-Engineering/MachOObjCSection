@@ -39,6 +39,75 @@ extension ObjCIvarProtocol {
 }
 
 extension ObjCIvarProtocol {
+    public func offset(in machO: MachOFile) -> UInt32? {
+        let headerStartOffset = machO.headerStartOffset
+        var offset: UInt64 = numericCast(layout.offset & 0x7ffffffff) + numericCast(headerStartOffset)
+
+        if let resolved = resolveRebase(.offset, in: machO) {
+            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        }
+//        if isBind(\.offset, in: machO) { return nil }
+
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
+                return nil
+            }
+            offset = _offset
+        }
+
+        return machO.fileHandle
+            .readData(
+                offset: offset,
+                size: MemoryLayout<UInt32>.size
+            ).withUnsafeBytes {
+                $0.load(as: UInt32.self)
+            }
+    }
+
+    public func name(in machO: MachOFile) -> String? {
+        let headerStartOffset = machO.headerStartOffset
+        var offset: UInt64 = numericCast(layout.name & 0x7ffffffff) + numericCast(headerStartOffset)
+
+        if let resolved = resolveRebase(.name, in: machO) {
+            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        }
+//        if isBind(\.name, in: machO) { return nil }
+
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
+                return nil
+            }
+            offset = _offset
+        }
+
+        return machO.fileHandle.readString(
+            offset: offset
+        )
+    }
+
+    public func type(in machO: MachOFile) -> String? {
+        let headerStartOffset = machO.headerStartOffset
+        var offset: UInt64 = numericCast(layout.type & 0x7ffffffff) + numericCast(headerStartOffset)
+
+        if let resolved = resolveRebase(.type, in: machO) {
+            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        }
+//        if isBind(\.type, in: machO) { return nil }
+
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
+                return nil
+            }
+            offset = _offset
+        }
+
+        return machO.fileHandle.readString(
+            offset: offset
+        )
+    }
+}
+
+extension ObjCIvarProtocol {
     public func offset(in machO: MachOImage) -> UInt32? {
         guard layout.offset > 0 else { return nil }
         let ptr = UnsafeRawPointer(
