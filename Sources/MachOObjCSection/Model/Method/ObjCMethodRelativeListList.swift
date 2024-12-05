@@ -25,11 +25,7 @@ public struct ObjCMethodRelativeListList: RelativeListListProtocol {
 
     public func list(in machO: MachOImage, for entry: Entry) -> (MachOImage, List)? {
         let offset = entry.offset + entry.listOffset
-        let list = List(
-            ptr: machO.ptr.advanced(by: offset),
-            offset: offset,
-            is64Bit: machO.is64Bit
-        )
+        let ptr = machO.ptr.advanced(by: offset)
 
         let cache: DyldCacheLoaded = .current
         guard let objcOptimization = cache.objcOptimization,
@@ -43,6 +39,12 @@ public struct ObjCMethodRelativeListList: RelativeListListProtocol {
               let machO = header.machO(in: cache) else {
             return nil
         }
+
+        let list = List(
+            ptr: ptr,
+            offset: .init(bitPattern: ptr) - .init(bitPattern: machO.ptr),
+            is64Bit: machO.is64Bit
+        )
 
         return (machO, list)
     }

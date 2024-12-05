@@ -26,10 +26,7 @@ public struct ObjCProtocolRelativeListList64: ObjCProtocolRelativeListListProtoc
 
     public func list(in machO: MachOImage, for entry: Entry) -> (MachOImage, List)? {
         let offset = entry.offset + entry.listOffset
-        let list = List(
-            ptr: machO.ptr.advanced(by: offset),
-            offset: offset
-        )
+        let ptr = machO.ptr.advanced(by: offset)
 
         let cache: DyldCacheLoaded = .current
         guard let objcOptimization = cache.objcOptimization,
@@ -43,6 +40,11 @@ public struct ObjCProtocolRelativeListList64: ObjCProtocolRelativeListListProtoc
               let machO = header.machO(in: cache) else {
             return nil
         }
+
+        let list = List(
+            ptr: ptr,
+            offset: .init(bitPattern: ptr) - .init(bitPattern: machO.ptr)
+        )
 
         return (machO, list)
     }
@@ -95,10 +97,7 @@ public struct ObjCProtocolRelativeListList32: ObjCProtocolRelativeListListProtoc
 
     public func list(in machO: MachOImage, for entry: Entry) -> (MachOImage, List)? {
         let offset = entry.offset + entry.listOffset
-        let list = List(
-            ptr: machO.ptr.advanced(by: offset),
-            offset: offset
-        )
+        let ptr = machO.ptr.advanced(by: offset)
 
         let cache: DyldCacheLoaded = .current
         guard let objcOptimization = cache.objcOptimization,
@@ -112,6 +111,11 @@ public struct ObjCProtocolRelativeListList32: ObjCProtocolRelativeListListProtoc
               let machO = header.machO(in: cache) else {
             return nil
         }
+
+        let list = List(
+            ptr: ptr,
+            offset: .init(bitPattern: ptr) - .init(bitPattern: machO.ptr)
+        )
 
         return (machO, list)
     }
