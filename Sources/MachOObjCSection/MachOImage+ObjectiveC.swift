@@ -24,7 +24,7 @@ extension MachOImage {
 }
 
 extension MachOImage.ObjectiveC {
-    /// __DATA.__objc_imageinfo or __DATA_CONST.__objc_imageinfo
+    /// `__DATA.__objc_imageinfo` or `__DATA_CONST.__objc_imageinfo`
     public var imageInfo: ObjCImageInfo? {
         let loadCommands = machO.loadCommands
 
@@ -34,35 +34,19 @@ extension MachOImage.ObjectiveC {
         let __objc_imageinfo: any SectionProtocol
 
         if let data = loadCommands.data64,
-           let section = data.sections(cmdsStart: machO.cmdsStartPtr).first(
-            where: {
-                $0.sectionName == "__objc_imageinfo"
-            }
-           ) {
+           let section = data.__objc_imageinfo(in: machO) {
             segment = data
             __objc_imageinfo = section
         } else if let dataConst = loadCommands.dataConst64,
-                  let section = dataConst.sections(cmdsStart: machO.cmdsStartPtr).first(
-                    where: {
-                        $0.sectionName == "__objc_imageinfo"
-                    }
-                  ) {
+                  let section = dataConst.__objc_imageinfo(in: machO) {
             segment = dataConst
             __objc_imageinfo = section
         } else if let data = loadCommands.data,
-                  let section = data.sections(cmdsStart: machO.cmdsStartPtr).first(
-                    where: {
-                        $0.sectionName == "__objc_imageinfo"
-                    }
-                  ) {
+                  let section = data.__objc_imageinfo(in: machO) {
             segment = data
             __objc_imageinfo = section
         } else if let dataConst = loadCommands.dataConst,
-                  let section = dataConst.sections(cmdsStart: machO.cmdsStartPtr).first(
-                    where: {
-                        $0.sectionName == "__objc_imageinfo"
-                    }
-                  ) {
+                  let section = dataConst.__objc_imageinfo(in: machO) {
             segment = dataConst
             __objc_imageinfo = section
         } else {
@@ -81,7 +65,7 @@ extension MachOImage.ObjectiveC {
 }
 
 extension MachOImage.ObjectiveC {
-    /// __TEXT.__objc_methlist
+    /// `__TEXT.__objc_methlist`
     public var methods: MachOImage.ObjCMethodLists? {
         let loadCommands = machO.loadCommands
 
@@ -90,19 +74,11 @@ extension MachOImage.ObjectiveC {
         let text: any SegmentCommandProtocol
         let __objc_methlist: any SectionProtocol
         if let _text = loadCommands.text64,
-           let section = _text.sections(cmdsStart: machO.cmdsStartPtr).first(
-            where: {
-                $0.sectionName == "__objc_methlist"
-            }
-           ) {
+           let section = _text.__objc_methlist(in: machO) {
             text = _text
             __objc_methlist = section
         } else if let _text = loadCommands.text,
-                  let section = _text.sections(cmdsStart: machO.cmdsStartPtr).first(
-                    where: {
-                        $0.sectionName == "__objc_methlist"
-                    }
-                  ) {
+                  let section = _text.__objc_methlist(in: machO) {
             text = _text
             __objc_methlist = section
         } else {
@@ -125,7 +101,7 @@ extension MachOImage.ObjectiveC {
 }
 
 extension MachOImage.ObjectiveC {
-    /// __DATA.__objc_protolist or __DATA_CONST.__objc_protolist
+    /// `__DATA.__objc_protolist` or `__DATA_CONST.__objc_protolist`
     public var protocols64: [ObjCProtocol64]? {
         guard machO.is64Bit else { return nil }
         guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
@@ -135,19 +111,11 @@ extension MachOImage.ObjectiveC {
         let __objc_protolist: any SectionProtocol
 
         if let data = loadCommands.data64,
-           let section = data.sections(cmdsStart: machO.cmdsStartPtr).first(
-            where: {
-                $0.sectionName == "__objc_protolist"
-            }
-           ) {
+           let section = data.__objc_protolist(in: machO) {
             segment = data
             __objc_protolist = section
         } else if let dataConst = loadCommands.dataConst64,
-                  let section = dataConst.sections(cmdsStart: machO.cmdsStartPtr).first(
-                    where: {
-                        $0.sectionName == "__objc_protolist"
-                    }
-                  ) {
+                  let section = dataConst.__objc_protolist(in: machO) {
             segment = dataConst
             __objc_protolist = section
         } else {
@@ -171,6 +139,7 @@ extension MachOImage.ObjectiveC {
             }
     }
 
+    /// `__DATA.__objc_protolist` or `__DATA_CONST.__objc_protolist`
     public var protocols32: [ObjCProtocol32]? {
         guard !machO.is64Bit else { return nil }
         guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
@@ -180,19 +149,11 @@ extension MachOImage.ObjectiveC {
         let __objc_protolist: any SectionProtocol
 
         if let data = loadCommands.data,
-           let section = data.sections(cmdsStart: machO.cmdsStartPtr).first(
-            where: {
-                $0.sectionName == "__objc_protolist"
-            }
-           ) {
+           let section = data.__objc_protolist(in: machO) {
             segment = data
             __objc_protolist = section
         } else if let dataConst = loadCommands.dataConst,
-                  let section = dataConst.sections(cmdsStart: machO.cmdsStartPtr).first(
-                    where: {
-                        $0.sectionName == "__objc_protolist"
-                    }
-                  ) {
+                  let section = dataConst.__objc_protolist(in: machO) {
             segment = dataConst
             __objc_protolist = section
         } else {
@@ -218,7 +179,7 @@ extension MachOImage.ObjectiveC {
 }
 
 extension MachOImage.ObjectiveC {
-    /// __DATA.__objc_classlist or __DATA_CONST.__objc_classlist
+    /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
     public var classes64: [ObjCClass64]? {
         guard machO.is64Bit else { return nil }
         guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
@@ -228,19 +189,11 @@ extension MachOImage.ObjectiveC {
         let __objc_classlist: any SectionProtocol
 
         if let data = loadCommands.data64,
-           let section = data.sections(cmdsStart: machO.cmdsStartPtr).first(
-            where: {
-                $0.sectionName == "__objc_classlist"
-            }
-           ) {
+           let section = data.__objc_classlist(in: machO) {
             segment = data
             __objc_classlist = section
         } else if let dataConst = loadCommands.dataConst64,
-                  let section = dataConst.sections(cmdsStart: machO.cmdsStartPtr).first(
-                    where: {
-                        $0.sectionName == "__objc_classlist"
-                    }
-                  ) {
+                  let section = dataConst.__objc_classlist(in: machO) {
             segment = dataConst
             __objc_classlist = section
         } else {
@@ -266,6 +219,242 @@ extension MachOImage.ObjectiveC {
                     .assumingMemoryBound(to: ObjCClass64.Layout.self)
                     .pointee
                 return .init(layout: layout, offset: numericCast(offset))
+            }
+    }
+
+    /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
+    public var classes32: [ObjCClass32]? {
+        guard !machO.is64Bit else { return nil }
+        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
+        let loadCommands = machO.loadCommands
+
+        let segment: any SegmentCommandProtocol
+        let __objc_classlist: any SectionProtocol
+
+        if let data = loadCommands.data64,
+           let section = data.__objc_classlist(in: machO) {
+            segment = data
+            __objc_classlist = section
+        } else if let dataConst = loadCommands.dataConst64,
+                  let section = dataConst.__objc_classlist(in: machO) {
+            segment = dataConst
+            __objc_classlist = section
+        } else {
+            return nil
+        }
+
+        guard let start = __objc_classlist.startPtr(
+            in: segment,
+            vmaddrSlide: vmaddrSlide
+        ) else { return nil }
+
+        let offsets: MemorySequence<UInt32> = .init(
+            basePointer: start.assumingMemoryBound(to: UInt32.self),
+            numberOfElements: __objc_classlist.size / 4
+        )
+        return offsets
+            .compactMap {
+                let offset = $0 - numericCast(UInt(bitPattern: machO.ptr))
+                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                    return nil
+                }
+                let layout = ptr
+                    .assumingMemoryBound(to: ObjCClass32.Layout.self)
+                    .pointee
+                return .init(layout: layout, offset: numericCast(offset))
+            }
+    }
+}
+
+extension MachOImage.ObjectiveC {
+    /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
+    public var categories64: [ObjCCategory64]? {
+        guard machO.is64Bit else { return nil }
+        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
+        let loadCommands = machO.loadCommands
+
+        let segment: any SegmentCommandProtocol
+        let __objc_catlist: any SectionProtocol
+
+        if let data = loadCommands.data64,
+           let section = data.__objc_catlist(in: machO) {
+            segment = data
+            __objc_catlist = section
+        } else if let dataConst = loadCommands.dataConst64,
+                  let section = dataConst.__objc_catlist(in: machO) {
+            segment = dataConst
+            __objc_catlist = section
+        } else {
+            return nil
+        }
+
+        guard let start = __objc_catlist.startPtr(
+            in: segment,
+            vmaddrSlide: vmaddrSlide
+        ) else { return nil }
+
+        let offsets: MemorySequence<UInt64> = .init(
+            basePointer: start.assumingMemoryBound(to: UInt64.self),
+            numberOfElements: __objc_catlist.size / 8
+        )
+
+        return offsets
+            .compactMap {
+                let offset = $0 - numericCast(UInt(bitPattern: machO.ptr))
+                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                    return nil
+                }
+                let layout = ptr
+                    .assumingMemoryBound(to: ObjCCategory64.Layout.self)
+                    .pointee
+                return .init(
+                    layout: layout,
+                    offset: numericCast(offset),
+                    isCatlist2: false
+                )
+            }
+    }
+
+    /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
+    public var categories32: [ObjCCategory32]? {
+        guard !machO.is64Bit else { return nil }
+        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
+        let loadCommands = machO.loadCommands
+
+        let segment: any SegmentCommandProtocol
+        let __objc_catlist: any SectionProtocol
+
+        if let data = loadCommands.data64,
+           let section = data.__objc_catlist(in: machO) {
+            segment = data
+            __objc_catlist = section
+        } else if let dataConst = loadCommands.dataConst64,
+                  let section = dataConst.__objc_catlist(in: machO) {
+            segment = dataConst
+            __objc_catlist = section
+        } else {
+            return nil
+        }
+
+        guard let start = __objc_catlist.startPtr(
+            in: segment,
+            vmaddrSlide: vmaddrSlide
+        ) else { return nil }
+
+        let offsets: MemorySequence<UInt32> = .init(
+            basePointer: start.assumingMemoryBound(to: UInt32.self),
+            numberOfElements: __objc_catlist.size / 4
+        )
+        return offsets
+            .compactMap {
+                let offset = $0 - numericCast(UInt(bitPattern: machO.ptr))
+                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                    return nil
+                }
+                let layout = ptr
+                    .assumingMemoryBound(to: ObjCCategory32.Layout.self)
+                    .pointee
+                return .init(
+                    layout: layout,
+                    offset: numericCast(offset),
+                    isCatlist2: false
+                )
+            }
+    }
+}
+
+extension MachOImage.ObjectiveC {
+    /// `__DATA.__objc_classlist2` or `__DATA_CONST.__objc_classlist2`
+    public var categories2_64: [ObjCCategory64]? {
+        guard machO.is64Bit else { return nil }
+        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
+        let loadCommands = machO.loadCommands
+
+        let segment: any SegmentCommandProtocol
+        let __objc_catlist: any SectionProtocol
+
+        if let data = loadCommands.data64,
+           let section = data.__objc_catlist2(in: machO) {
+            segment = data
+            __objc_catlist = section
+        } else if let dataConst = loadCommands.dataConst64,
+                  let section = dataConst.__objc_catlist2(in: machO) {
+            segment = dataConst
+            __objc_catlist = section
+        } else {
+            return nil
+        }
+
+        guard let start = __objc_catlist.startPtr(
+            in: segment,
+            vmaddrSlide: vmaddrSlide
+        ) else { return nil }
+
+        let offsets: MemorySequence<UInt64> = .init(
+            basePointer: start.assumingMemoryBound(to: UInt64.self),
+            numberOfElements: __objc_catlist.size / 8
+        )
+        return offsets
+            .compactMap {
+                let offset = $0 - numericCast(UInt(bitPattern: machO.ptr))
+                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                    return nil
+                }
+                let layout = ptr
+                    .assumingMemoryBound(to: ObjCCategory64.Layout.self)
+                    .pointee
+                return .init(
+                    layout: layout,
+                    offset: numericCast(offset),
+                    isCatlist2: true
+                )
+            }
+    }
+
+    /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
+    public var categories2_32: [ObjCCategory32]? {
+        guard !machO.is64Bit else { return nil }
+        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
+        let loadCommands = machO.loadCommands
+
+        let segment: any SegmentCommandProtocol
+        let __objc_catlist: any SectionProtocol
+
+        if let data = loadCommands.data64,
+           let section = data.__objc_catlist2(in: machO) {
+            segment = data
+            __objc_catlist = section
+        } else if let dataConst = loadCommands.dataConst64,
+                  let section = dataConst.__objc_catlist2(in: machO) {
+            segment = dataConst
+            __objc_catlist = section
+        } else {
+            return nil
+        }
+
+        guard let start = __objc_catlist.startPtr(
+            in: segment,
+            vmaddrSlide: vmaddrSlide
+        ) else { return nil }
+
+        let offsets: MemorySequence<UInt32> = .init(
+            basePointer: start.assumingMemoryBound(to: UInt32.self),
+            numberOfElements: __objc_catlist.size / 4
+        )
+        return offsets
+            .compactMap {
+                let offset = $0 - numericCast(UInt(bitPattern: machO.ptr))
+                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                    return nil
+                }
+                let layout = ptr
+                    .assumingMemoryBound(to: ObjCCategory32.Layout.self)
+                    .pointee
+                return .init(
+                    layout: layout,
+                    offset: numericCast(offset),
+                    isCatlist2: true
+                )
             }
     }
 }
