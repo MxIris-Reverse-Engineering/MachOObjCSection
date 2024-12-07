@@ -133,11 +133,23 @@ extension ObjCCategoryProtocol {
     }
 
     public func className(in machO: MachOImage) -> String? {
-        guard let cls = `class`(in: machO),
-              let data = cls.classROData(in: machO) else {
+        guard let cls = `class`(in: machO) else {
             return nil
         }
-        return data.name(in: machO)
+        var data: ObjCClass.ClassROData?
+        if let _data = cls.classROData(in: machO) {
+            data = _data
+        }
+        if let rw = cls.classRWData(in: machO) {
+            if let _data = rw.classROData(in: machO) {
+                data = _data
+            }
+            if let ext = rw.ext(in: machO),
+               let _data = ext.classROData(in: machO) {
+                data = _data
+            }
+        }
+        return data?.name(in: machO)
     }
 
     public func instanceMethods(in machO: MachOImage) -> ObjCMethodList? {

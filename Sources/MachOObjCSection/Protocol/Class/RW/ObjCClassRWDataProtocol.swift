@@ -12,7 +12,7 @@ import Foundation
 public protocol ObjCClassRWDataProtocol {
     associatedtype Layout: _ObjCClassRWDataLayoutProtocol
     associatedtype ObjCClassROData: ObjCClassRODataProtocol
-    associatedtype ObjCClassRWDataExt: ObjCClassRWDataExtProtocol
+    associatedtype ObjCClassRWDataExt: ObjCClassRWDataExtProtocol where ObjCClassRWDataExt.ObjCClassROData == ObjCClassROData
 
     var layout: Layout { get }
     var offset: Int { get }

@@ -102,11 +102,24 @@ extension ObjCClassProtocol {
     }
 
     public func superClassName(in machO: MachOImage) -> String? {
-        guard let superCls = superClass(in: machO),
-              let data = superCls.classROData(in: machO) else {
+        guard let superCls = superClass(in: machO) else {
             return nil
         }
-        return data.name(in: machO)
+
+        var data: ClassROData?
+        if let _data = superCls.classROData(in: machO) {
+            data = _data
+        }
+        if let rw = superCls.classRWData(in: machO) {
+            if let _data = rw.classROData(in: machO) {
+                data = _data
+            }
+            if let ext = rw.ext(in: machO),
+               let _data = ext.classROData(in: machO) {
+                data = _data
+            }
+        }
+        return data?.name(in: machO)
     }
 }
 
