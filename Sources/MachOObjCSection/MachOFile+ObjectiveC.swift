@@ -26,20 +26,11 @@ extension MachOFile {
 extension MachOFile.ObjectiveC {
     /// `__DATA.__objc_imageinfo` or `__DATA_CONST.__objc_imageinfo`
     public var imageInfo: ObjCImageInfo? {
-        let loadCommands = machO.loadCommands
-
         let __objc_imageinfo: any SectionProtocol
-        if let data = loadCommands.data64,
-           let section = data.__objc_imageinfo(in: machO) {
+        if machO.is64Bit,
+           let section = machO.findObjCSection64(for: .__objc_imageinfo) {
             __objc_imageinfo = section
-        } else if let dataConst = loadCommands.dataConst64,
-                  let section = dataConst.__objc_imageinfo(in: machO) {
-            __objc_imageinfo = section
-        } else if let data = loadCommands.data,
-                  let section = data.__objc_imageinfo(in: machO) {
-            __objc_imageinfo = section
-        } else if let dataConst = loadCommands.dataConst,
-                  let section = dataConst.__objc_imageinfo(in: machO) {
+        } else if let section = machO.findObjCSection32(for: .__objc_imageinfo) {
             __objc_imageinfo = section
         } else {
             return nil
@@ -83,19 +74,10 @@ extension MachOFile.ObjectiveC {
     /// `__DATA.__objc_protolist` or `__DATA_CONST.__objc_protolist`
     public var protocols64: [ObjCProtocol64]? {
         guard machO.is64Bit else { return nil }
-        let loadCommands = machO.loadCommands
 
-        let __objc_protolist: any SectionProtocol
-
-        if let data = loadCommands.data64,
-           let section = data.__objc_protolist(in: machO) {
-            __objc_protolist = section
-        } else if let dataConst = loadCommands.dataConst64,
-                  let section = dataConst.__objc_protolist(in: machO) {
-            __objc_protolist = section
-        } else {
-            return nil
-        }
+        guard let __objc_protolist = machO.findObjCSection64(
+            for: .__objc_protolist
+        ) else { return nil }
 
         let data = machO.fileHandle.readData(
             offset: numericCast(__objc_protolist.offset + machO.headerStartOffset),
@@ -125,19 +107,10 @@ extension MachOFile.ObjectiveC {
     /// `__DATA.__objc_protolist` or `__DATA_CONST.__objc_protolist`
     public var protocols32: [ObjCProtocol32]? {
         guard !machO.is64Bit else { return nil }
-        let loadCommands = machO.loadCommands
 
-        let __objc_protolist: any SectionProtocol
-
-        if let data = loadCommands.data,
-           let section = data.__objc_protolist(in: machO) {
-            __objc_protolist = section
-        } else if let dataConst = loadCommands.dataConst,
-                  let section = dataConst.__objc_protolist(in: machO) {
-            __objc_protolist = section
-        } else {
-            return nil
-        }
+        guard let __objc_protolist = machO.findObjCSection32(
+            for: .__objc_protolist
+        ) else { return nil }
 
         let data = machO.fileHandle.readData(
             offset: numericCast(__objc_protolist.offset + machO.headerStartOffset),
@@ -169,19 +142,10 @@ extension MachOFile.ObjectiveC {
     /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
     public var classes64: [ObjCClass64]? {
         guard machO.is64Bit else { return nil }
-        let loadCommands = machO.loadCommands
 
-        let __objc_classlist: any SectionProtocol
-
-        if let data = loadCommands.data64,
-           let section = data.__objc_classlist(in: machO) {
-            __objc_classlist = section
-        } else if let dataConst = loadCommands.dataConst64,
-                  let section = dataConst.__objc_classlist(in: machO) {
-            __objc_classlist = section
-        } else {
-            return nil
-        }
+        guard let __objc_classlist = machO.findObjCSection64(
+            for: .__objc_classlist
+        ) else { return nil }
 
         let data = machO.fileHandle.readData(
             offset: numericCast(__objc_classlist.offset + machO.headerStartOffset),
@@ -213,19 +177,10 @@ extension MachOFile.ObjectiveC {
     /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
     public var classes32: [ObjCClass32]? {
         guard !machO.is64Bit else { return nil }
-        let loadCommands = machO.loadCommands
 
-        let __objc_classlist: any SectionProtocol
-
-        if let data = loadCommands.data,
-           let section = data.__objc_classlist(in: machO) {
-            __objc_classlist = section
-        } else if let dataConst = loadCommands.dataConst,
-                  let section = dataConst.__objc_classlist(in: machO) {
-            __objc_classlist = section
-        } else {
-            return nil
-        }
+        guard let __objc_classlist = machO.findObjCSection32(
+            for: .__objc_classlist
+        ) else { return nil }
 
         let data = machO.fileHandle.readData(
             offset: numericCast(__objc_classlist.offset + machO.headerStartOffset),
@@ -259,19 +214,10 @@ extension MachOFile.ObjectiveC {
     /// `__DATA.__objc_catlist` or `__DATA_CONST.__objc_catlist`
     public var categories64: [ObjCCategory64]? {
         guard machO.is64Bit else { return nil }
-        let loadCommands = machO.loadCommands
 
-        let __objc_catlist: any SectionProtocol
-
-        if let data = loadCommands.data64,
-           let section = data.__objc_catlist(in: machO) {
-            __objc_catlist = section
-        } else if let dataConst = loadCommands.dataConst64,
-                  let section = dataConst.__objc_catlist(in: machO) {
-            __objc_catlist = section
-        } else {
-            return nil
-        }
+        guard let __objc_catlist = machO.findObjCSection64(
+            for: .__objc_catlist
+        ) else { return nil }
 
         let data = machO.fileHandle.readData(
             offset: numericCast(__objc_catlist.offset + machO.headerStartOffset),
@@ -307,19 +253,10 @@ extension MachOFile.ObjectiveC {
     /// `__DATA.__objc_catlist` or `__DATA_CONST.__objc_catlist`
     public var categories32: [ObjCCategory32]? {
         guard !machO.is64Bit else { return nil }
-        let loadCommands = machO.loadCommands
 
-        let __objc_catlist: any SectionProtocol
-
-        if let data = loadCommands.data,
-           let section = data.__objc_catlist(in: machO) {
-            __objc_catlist = section
-        } else if let dataConst = loadCommands.dataConst,
-                  let section = dataConst.__objc_catlist(in: machO) {
-            __objc_catlist = section
-        } else {
-            return nil
-        }
+        guard let __objc_catlist = machO.findObjCSection32(
+            for: .__objc_catlist
+        ) else { return nil }
 
         let data = machO.fileHandle.readData(
             offset: numericCast(__objc_catlist.offset + machO.headerStartOffset),
@@ -357,19 +294,10 @@ extension MachOFile.ObjectiveC {
     /// `__DATA.__objc_catlist2` or `__DATA_CONST.__objc_catlist2`
     public var categories2_64: [ObjCCategory64]? {
         guard machO.is64Bit else { return nil }
-        let loadCommands = machO.loadCommands
 
-        let __objc_catlist: any SectionProtocol
-
-        if let data = loadCommands.data64,
-           let section = data.__objc_catlist2(in: machO) {
-            __objc_catlist = section
-        } else if let dataConst = loadCommands.dataConst64,
-                  let section = dataConst.__objc_catlist2(in: machO) {
-            __objc_catlist = section
-        } else {
-            return nil
-        }
+        guard let __objc_catlist = machO.findObjCSection64(
+            for: .__objc_catlist2
+        ) else { return nil }
 
         let data = machO.fileHandle.readData(
             offset: numericCast(__objc_catlist.offset + machO.headerStartOffset),
@@ -405,19 +333,10 @@ extension MachOFile.ObjectiveC {
     /// `__DATA.__objc_catlist2` or `__DATA_CONST.__objc_catlist2`
     public var categories2_32: [ObjCCategory32]? {
         guard !machO.is64Bit else { return nil }
-        let loadCommands = machO.loadCommands
 
-        let __objc_catlist: any SectionProtocol
-
-        if let data = loadCommands.data,
-           let section = data.__objc_catlist2(in: machO) {
-            __objc_catlist = section
-        } else if let dataConst = loadCommands.dataConst,
-                  let section = dataConst.__objc_catlist2(in: machO) {
-            __objc_catlist = section
-        } else {
-            return nil
-        }
+        guard let __objc_catlist = machO.findObjCSection32(
+            for: .__objc_catlist2
+        ) else { return nil }
 
         let data = machO.fileHandle.readData(
             offset: numericCast(__objc_catlist.offset + machO.headerStartOffset),
