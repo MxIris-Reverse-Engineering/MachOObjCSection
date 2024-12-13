@@ -10,7 +10,7 @@ import Foundation
 @_spi(Support) import MachOKit
 
 extension MachOImage {
-    public struct ObjectiveC {
+    public struct ObjectiveC: ObjCSectionRepresentable {
         private let machO: MachOImage
 
         init(machO: MachOImage) {

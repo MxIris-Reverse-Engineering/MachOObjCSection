@@ -10,7 +10,7 @@ import Foundation
 @_spi(Support) import MachOKit
 
 extension MachOFile {
-    public struct ObjectiveC {
+    public struct ObjectiveC: ObjCSectionRepresentable {
         private let machO: MachOFile
 
         init(machO: MachOFile) {
