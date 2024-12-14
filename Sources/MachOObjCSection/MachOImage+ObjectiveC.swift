@@ -207,7 +207,8 @@ extension MachOImage.ObjectiveC {
 
         guard let categories: [ObjCCategory64] = _readCategories(
             from: __objc_catlist,
-            in: machO
+            in: machO,
+            pointerType: UInt64.self
         ) else { return nil }
 
         return categories
@@ -222,7 +223,8 @@ extension MachOImage.ObjectiveC {
 
         guard let categories: [ObjCCategory32] = _readCategories(
             from: __objc_catlist,
-            in: machO
+            in: machO,
+            pointerType: UInt32.self
         ) else { return nil }
 
         return categories
@@ -240,7 +242,8 @@ extension MachOImage.ObjectiveC {
         guard let categories: [ObjCCategory64] = _readCategories(
             from: __objc_catlist,
             in: machO,
-            isCatlist2: true
+            isCatlist2: true,
+            pointerType: UInt64.self
         ) else { return nil }
 
         return categories
@@ -256,7 +259,8 @@ extension MachOImage.ObjectiveC {
         guard let categories: [ObjCCategory32] = _readCategories(
             from: __objc_catlist,
             in: machO,
-            isCatlist2: true
+            isCatlist2: true,
+            pointerType: UInt32.self
         ) else { return nil }
 
         return categories
@@ -264,10 +268,14 @@ extension MachOImage.ObjectiveC {
 }
 
 extension MachOImage.ObjectiveC {
-    func _readCategories<Categgory: ObjCCategoryProtocol>(
+    func _readCategories<
+        Categgory: ObjCCategoryProtocol,
+        Pointer: FixedWidthInteger
+    >(
         from section: any SectionProtocol,
         in machO: MachOImage,
-        isCatlist2: Bool = false
+        isCatlist2: Bool = false,
+        pointerType: Pointer.Type
     ) -> [Categgory]? {
         guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
 
@@ -275,9 +283,9 @@ extension MachOImage.ObjectiveC {
             bitPattern: section.address + vmaddrSlide
         ) else { return nil }
 
-        let pointerSize: Int = machO.is64Bit ? 8 : 4
-        let offsets: MemorySequence<UInt64> = .init(
-            basePointer: start.assumingMemoryBound(to: UInt64.self),
+        let pointerSize: Int = MemoryLayout<Pointer>.size
+        let offsets: MemorySequence<Pointer> = .init(
+            basePointer: start.assumingMemoryBound(to: Pointer.self),
             numberOfElements: section.size / pointerSize
         )
         return offsets
