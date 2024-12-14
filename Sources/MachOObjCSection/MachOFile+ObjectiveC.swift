@@ -24,7 +24,6 @@ extension MachOFile {
 }
 
 extension MachOFile.ObjectiveC {
-    /// `__DATA.__objc_imageinfo` or `__DATA_CONST.__objc_imageinfo`
     public var imageInfo: ObjCImageInfo? {
         let __objc_imageinfo: any SectionProtocol
         if machO.is64Bit,
@@ -43,7 +42,6 @@ extension MachOFile.ObjectiveC {
 }
 
 extension MachOFile.ObjectiveC {
-    /// `__TEXT.__objc_methlist`
     public var methods: MachOFile.ObjCMethodLists? {
         let loadCommands = machO.loadCommands
 
@@ -71,7 +69,6 @@ extension MachOFile.ObjectiveC {
 }
 
 extension MachOFile.ObjectiveC {
-    /// `__DATA.__objc_protolist` or `__DATA_CONST.__objc_protolist`
     public var protocols64: [ObjCProtocol64]? {
         guard machO.is64Bit else { return nil }
 
@@ -79,32 +76,14 @@ extension MachOFile.ObjectiveC {
             for: .__objc_protolist
         ) else { return nil }
 
-        let data = machO.fileHandle.readData(
-            offset: numericCast(__objc_protolist.offset + machO.headerStartOffset),
-            size: __objc_protolist.size
-        )
+        guard let protocols: [ObjCProtocol64] = _readProtocols(
+            from: __objc_protolist,
+            in: machO
+        ) else { return nil }
 
-        let offsets: DataSequence<UInt64> = .init(
-            data: data,
-            numberOfElements: __objc_protolist.size / 8
-        )
-
-        return offsets
-            .map { $0 & 0x7ffffffff }
-            .compactMap {
-                if let cache = machO.cache {
-                    let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0
-                    return ($0, resolved)
-                }
-                return ($0, $0)
-            }
-            .map { (offset: UInt64, resolved: UInt64) in
-                let layout: ObjCProtocol64.Layout = machO.fileHandle.read(offset: resolved + numericCast(machO.headerStartOffset))
-                return .init(layout: layout, offset: numericCast(offset))
-            }
+        return protocols
     }
 
-    /// `__DATA.__objc_protolist` or `__DATA_CONST.__objc_protolist`
     public var protocols32: [ObjCProtocol32]? {
         guard !machO.is64Bit else { return nil }
 
@@ -112,29 +91,12 @@ extension MachOFile.ObjectiveC {
             for: .__objc_protolist
         ) else { return nil }
 
-        let data = machO.fileHandle.readData(
-            offset: numericCast(__objc_protolist.offset + machO.headerStartOffset),
-            size: __objc_protolist.size
-        )
+        guard let protocols: [ObjCProtocol32] = _readProtocols(
+            from: __objc_protolist,
+            in: machO
+        ) else { return nil }
 
-        let offsets: DataSequence<UInt32> = .init(
-            data: data,
-            numberOfElements: __objc_protolist.size / 4
-        )
-
-        return offsets
-            .compactMap {
-                let offset: UInt64 = numericCast($0)
-                if let cache = machO.cache {
-                    let resolved = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) ?? offset
-                    return (offset, resolved)
-                }
-                return (offset, offset)
-            }
-            .map { (offset: UInt64, resolved: UInt64) in
-                let layout: ObjCProtocol32.Layout = machO.fileHandle.read(offset: resolved + numericCast(machO.headerStartOffset))
-                return .init(layout: layout, offset: numericCast(offset))
-            }
+        return protocols
     }
 }
 
@@ -308,6 +270,39 @@ extension MachOFile.ObjectiveC {
                 let layout: Class.Layout = machO.fileHandle.read(
                     offset: resolved + numericCast(machO.headerStartOffset)
                 )
+                return .init(layout: layout, offset: numericCast(offset))
+            }
+    }
+
+    func _readProtocols<
+        Protocol: ObjCProtocolProtocol
+    >(
+        from section: any SectionProtocol,
+        in machO: MachOFile
+    ) -> [Protocol]? {
+        let data = machO.fileHandle.readData(
+            offset: numericCast(section.offset + machO.headerStartOffset),
+            size: section.size
+        )
+
+        typealias Pointer = Protocol.Layout.Pointer
+        let pointerSize: Int = MemoryLayout<Pointer>.size
+        let offsets: DataSequence<Pointer> = .init(
+            data: data,
+            numberOfElements: section.size / pointerSize
+        )
+
+        return offsets
+            .map { UInt64($0) & 0x7ffffffff }
+            .compactMap {
+                if let cache = machO.cache {
+                    let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0
+                    return ($0, resolved)
+                }
+                return ($0, $0)
+            }
+            .map { (offset: UInt64, resolved: UInt64) in
+                let layout: Protocol.Layout = machO.fileHandle.read(offset: resolved + numericCast(machO.headerStartOffset))
                 return .init(layout: layout, offset: numericCast(offset))
             }
     }

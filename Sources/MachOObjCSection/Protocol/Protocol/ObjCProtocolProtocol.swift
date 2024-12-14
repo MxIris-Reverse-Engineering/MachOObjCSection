@@ -16,6 +16,9 @@ public protocol ObjCProtocolProtocol: _FixupResolvable where LayoutField == ObjC
     var layout: Layout { get }
     var offset: Int { get }
 
+    @_spi(Core)
+    init(layout: Layout, offset: Int)
+
     var size: UInt32 { get }
     var flags: UInt32 { get }
 
