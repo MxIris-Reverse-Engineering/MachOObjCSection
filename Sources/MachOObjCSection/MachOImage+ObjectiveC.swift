@@ -28,7 +28,6 @@ extension MachOImage.ObjectiveC {
     public var imageInfo: ObjCImageInfo? {
         guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
 
-        let segment: any SegmentCommandProtocol
         let __objc_imageinfo: any SectionProtocol
 
         if machO.is64Bit,
@@ -135,64 +134,35 @@ extension MachOImage.ObjectiveC {
 }
 
 extension MachOImage.ObjectiveC {
-    /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
     public var classes64: [ObjCClass64]? {
         guard machO.is64Bit else { return nil }
-        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
 
         guard let __objc_classlist = machO.findObjCSection64(
             for: .__objc_classlist
         ) else { return nil }
 
-        guard let start = UnsafeRawPointer(
-            bitPattern: __objc_classlist.address + vmaddrSlide
+        guard let classes: [ObjCClass64] = _readClasses(
+            from: __objc_classlist,
+            in: machO
         ) else { return nil }
 
-        let offsets: MemorySequence<UInt64> = .init(
-            basePointer: start.assumingMemoryBound(to: UInt64.self),
-            numberOfElements: __objc_classlist.size / 8
-        )
-        return offsets
-            .compactMap {
-                let offset = $0 - numericCast(UInt(bitPattern: machO.ptr))
-                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
-                    return nil
-                }
-                let layout = ptr
-                    .assumingMemoryBound(to: ObjCClass64.Layout.self)
-                    .pointee
-                return .init(layout: layout, offset: numericCast(offset))
-            }
+        return classes
     }
 
     /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
     public var classes32: [ObjCClass32]? {
         guard !machO.is64Bit else { return nil }
-        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
 
         guard let __objc_classlist = machO.findObjCSection32(
             for: .__objc_classlist
         ) else { return nil }
 
-        guard let start = UnsafeRawPointer(
-            bitPattern: __objc_classlist.address + vmaddrSlide
+        guard let classes: [ObjCClass32] = _readClasses(
+            from: __objc_classlist,
+            in: machO
         ) else { return nil }
 
-        let offsets: MemorySequence<UInt32> = .init(
-            basePointer: start.assumingMemoryBound(to: UInt32.self),
-            numberOfElements: __objc_classlist.size / 4
-        )
-        return offsets
-            .compactMap {
-                let offset = $0 - numericCast(UInt(bitPattern: machO.ptr))
-                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
-                    return nil
-                }
-                let layout = ptr
-                    .assumingMemoryBound(to: ObjCClass32.Layout.self)
-                    .pointee
-                return .init(layout: layout, offset: numericCast(offset))
-            }
+        return classes
     }
 }
 
@@ -207,8 +177,7 @@ extension MachOImage.ObjectiveC {
 
         guard let categories: [ObjCCategory64] = _readCategories(
             from: __objc_catlist,
-            in: machO,
-            pointerType: UInt64.self
+            in: machO
         ) else { return nil }
 
         return categories
@@ -223,8 +192,7 @@ extension MachOImage.ObjectiveC {
 
         guard let categories: [ObjCCategory32] = _readCategories(
             from: __objc_catlist,
-            in: machO,
-            pointerType: UInt32.self
+            in: machO
         ) else { return nil }
 
         return categories
@@ -242,8 +210,7 @@ extension MachOImage.ObjectiveC {
         guard let categories: [ObjCCategory64] = _readCategories(
             from: __objc_catlist,
             in: machO,
-            isCatlist2: true,
-            pointerType: UInt64.self
+            isCatlist2: true
         ) else { return nil }
 
         return categories
@@ -259,8 +226,7 @@ extension MachOImage.ObjectiveC {
         guard let categories: [ObjCCategory32] = _readCategories(
             from: __objc_catlist,
             in: machO,
-            isCatlist2: true,
-            pointerType: UInt32.self
+            isCatlist2: true
         ) else { return nil }
 
         return categories
@@ -269,13 +235,11 @@ extension MachOImage.ObjectiveC {
 
 extension MachOImage.ObjectiveC {
     func _readCategories<
-        Categgory: ObjCCategoryProtocol,
-        Pointer: FixedWidthInteger
+        Categgory: ObjCCategoryProtocol
     >(
         from section: any SectionProtocol,
         in machO: MachOImage,
-        isCatlist2: Bool = false,
-        pointerType: Pointer.Type
+        isCatlist2: Bool = false
     ) -> [Categgory]? {
         guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
 
@@ -283,6 +247,7 @@ extension MachOImage.ObjectiveC {
             bitPattern: section.address + vmaddrSlide
         ) else { return nil }
 
+        typealias Pointer = Categgory.Layout.Pointer
         let pointerSize: Int = MemoryLayout<Pointer>.size
         let offsets: MemorySequence<Pointer> = .init(
             basePointer: start.assumingMemoryBound(to: Pointer.self),
@@ -302,6 +267,36 @@ extension MachOImage.ObjectiveC {
                     offset: numericCast(offset),
                     isCatlist2: isCatlist2
                 )
+            }
+    }
+
+    func _readClasses<
+        Class: ObjCClassProtocol
+    >(
+        from section: any SectionProtocol,
+        in machO: MachOImage
+    ) -> [Class]? {
+        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
+        guard let start = UnsafeRawPointer(
+            bitPattern: section.address + vmaddrSlide
+        ) else { return nil }
+
+        typealias Pointer = Class.Layout.Pointer
+        let pointerSize: Int = MemoryLayout<Pointer>.size
+        let offsets: MemorySequence<Pointer> = .init(
+            basePointer: start.assumingMemoryBound(to: Pointer.self),
+            numberOfElements: section.size / pointerSize
+        )
+        return offsets
+            .compactMap {
+                let offset = $0 - numericCast(UInt(bitPattern: machO.ptr))
+                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                    return nil
+                }
+                let layout = ptr
+                    .assumingMemoryBound(to: Class.Layout.self)
+                    .pointee
+                return .init(layout: layout, offset: numericCast(offset))
             }
     }
 }
