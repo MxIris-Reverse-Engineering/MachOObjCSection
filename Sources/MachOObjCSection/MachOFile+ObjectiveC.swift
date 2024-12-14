@@ -139,7 +139,6 @@ extension MachOFile.ObjectiveC {
 }
 
 extension MachOFile.ObjectiveC {
-    /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
     public var classes64: [ObjCClass64]? {
         guard machO.is64Bit else { return nil }
 
@@ -147,34 +146,14 @@ extension MachOFile.ObjectiveC {
             for: .__objc_classlist
         ) else { return nil }
 
-        let data = machO.fileHandle.readData(
-            offset: numericCast(__objc_classlist.offset + machO.headerStartOffset),
-            size: __objc_classlist.size
-        )
+        guard let classes: [ObjCClass64] = _readClasses(
+            from: __objc_classlist,
+            in: machO
+        ) else { return nil }
 
-        let offsets: DataSequence<UInt64> = .init(
-            data: data,
-            numberOfElements: __objc_classlist.size / 8
-        )
-
-        return offsets
-            .map { $0 & 0x7ffffffff }
-            .compactMap {
-                if let cache = machO.cache {
-                    let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0
-                    return ($0, resolved)
-                }
-                return ($0, $0)
-            }
-            .map { (offset: UInt64, resolved: UInt64) in
-                let layout: ObjCClass64.Layout = machO.fileHandle.read(
-                    offset: resolved + numericCast(machO.headerStartOffset)
-                )
-                return .init(layout: layout, offset: numericCast(offset))
-            }
+        return classes
     }
 
-    /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
     public var classes32: [ObjCClass32]? {
         guard !machO.is64Bit else { return nil }
 
@@ -182,31 +161,12 @@ extension MachOFile.ObjectiveC {
             for: .__objc_classlist
         ) else { return nil }
 
-        let data = machO.fileHandle.readData(
-            offset: numericCast(__objc_classlist.offset + machO.headerStartOffset),
-            size: __objc_classlist.size
-        )
+        guard let classes: [ObjCClass32] = _readClasses(
+            from: __objc_classlist,
+            in: machO
+        ) else { return nil }
 
-        let offsets: DataSequence<UInt32> = .init(
-            data: data,
-            numberOfElements: __objc_classlist.size / 4
-        )
-
-        return offsets
-            .compactMap {
-                let offset: UInt64 = numericCast($0)
-                if let cache = machO.cache {
-                    let resolved = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) ?? offset
-                    return (offset, resolved)
-                }
-                return (offset, offset)
-            }
-            .map { (offset: UInt64, resolved: UInt64) in
-                let layout: ObjCClass32.Layout = machO.fileHandle.read(
-                    offset: resolved + numericCast(machO.headerStartOffset)
-                )
-                return .init(layout: layout, offset: numericCast(offset))
-            }
+        return classes
     }
 }
 
@@ -220,8 +180,7 @@ extension MachOFile.ObjectiveC {
 
         guard let categories: [ObjCCategory64] = _readCategories(
             from: __objc_catlist,
-            in: machO,
-            pointerType: UInt64.self
+            in: machO
         ) else { return nil }
 
         return categories
@@ -236,8 +195,7 @@ extension MachOFile.ObjectiveC {
 
         guard let categories: [ObjCCategory32] = _readCategories(
             from: __objc_catlist,
-            in: machO,
-            pointerType: UInt32.self
+            in: machO
         ) else { return nil }
 
         return categories
@@ -255,8 +213,7 @@ extension MachOFile.ObjectiveC {
         guard let categories: [ObjCCategory64] = _readCategories(
             from: __objc_catlist,
             in: machO,
-            isCatlist2: true,
-            pointerType: UInt64.self
+            isCatlist2: true
         ) else { return nil }
 
         return categories
@@ -272,8 +229,7 @@ extension MachOFile.ObjectiveC {
         guard let categories: [ObjCCategory32] = _readCategories(
             from: __objc_catlist,
             in: machO,
-            isCatlist2: true,
-            pointerType: UInt32.self
+            isCatlist2: true
         ) else { return nil }
 
         return categories
@@ -282,19 +238,18 @@ extension MachOFile.ObjectiveC {
 
 extension MachOFile.ObjectiveC {
     func _readCategories<
-        Categgory: ObjCCategoryProtocol,
-        Pointer: FixedWidthInteger
+        Categgory: ObjCCategoryProtocol
     >(
         from section: any SectionProtocol,
         in machO: MachOFile,
-        isCatlist2: Bool = false,
-        pointerType: Pointer.Type
+        isCatlist2: Bool = false
     ) -> [Categgory]? {
         let data = machO.fileHandle.readData(
             offset: numericCast(section.offset + machO.headerStartOffset),
             size: section.size
         )
 
+        typealias Pointer = Categgory.Layout.Pointer
         let pointerSize: Int = MemoryLayout<Pointer>.size
         let offsets: DataSequence<Pointer> = .init(
             data: data,
@@ -319,6 +274,41 @@ extension MachOFile.ObjectiveC {
                     offset: numericCast(offset),
                     isCatlist2: isCatlist2
                 )
+            }
+    }
+
+    func _readClasses<
+        Class: ObjCClassProtocol
+    >(
+        from section: any SectionProtocol,
+        in machO: MachOFile
+    ) -> [Class]? {
+        let data = machO.fileHandle.readData(
+            offset: numericCast(section.offset + machO.headerStartOffset),
+            size: section.size
+        )
+
+        typealias Pointer = Class.Layout.Pointer
+        let pointerSize: Int = MemoryLayout<Pointer>.size
+        let offsets: DataSequence<Pointer> = .init(
+            data: data,
+            numberOfElements: section.size / pointerSize
+        )
+
+        return offsets
+            .map { UInt64($0) & 0x7ffffffff }
+            .compactMap {
+                if let cache = machO.cache {
+                    let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0
+                    return ($0, resolved)
+                }
+                return ($0, $0)
+            }
+            .map { (offset: UInt64, resolved: UInt64) in
+                let layout: Class.Layout = machO.fileHandle.read(
+                    offset: resolved + numericCast(machO.headerStartOffset)
+                )
+                return .init(layout: layout, offset: numericCast(offset))
             }
     }
 }
