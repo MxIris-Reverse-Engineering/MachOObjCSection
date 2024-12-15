@@ -24,7 +24,6 @@ extension MachOImage {
 }
 
 extension MachOImage.ObjectiveC {
-    /// `__DATA.__objc_imageinfo` or `__DATA_CONST.__objc_imageinfo`
     public var imageInfo: ObjCImageInfo? {
         guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
 
@@ -50,7 +49,6 @@ extension MachOImage.ObjectiveC {
 }
 
 extension MachOImage.ObjectiveC {
-    /// `__TEXT.__objc_methlist`
     public var methods: MachOImage.ObjCMethodLists? {
         let loadCommands = machO.loadCommands
 
@@ -99,7 +97,6 @@ extension MachOImage.ObjectiveC {
 
     public var protocols32: [ObjCProtocol32]? {
         guard !machO.is64Bit else { return nil }
-        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
 
         guard let __objc_protolist = machO.findObjCSection32(
             for: .__objc_protolist
@@ -130,7 +127,6 @@ extension MachOImage.ObjectiveC {
         return classes
     }
 
-    /// `__DATA.__objc_classlist` or `__DATA_CONST.__objc_classlist`
     public var classes32: [ObjCClass32]? {
         guard !machO.is64Bit else { return nil }
 
@@ -140,6 +136,36 @@ extension MachOImage.ObjectiveC {
 
         guard let classes: [ObjCClass32] = _readClasses(
             from: __objc_classlist,
+            in: machO
+        ) else { return nil }
+
+        return classes
+    }
+
+    public var nonLazyClasses64: [ObjCClass64]? {
+        guard machO.is64Bit else { return nil }
+
+        guard let __objc_nlclslist = machO.findObjCSection64(
+            for: .__objc_nlclslist
+        ) else { return nil }
+
+        guard let classes: [ObjCClass64] = _readClasses(
+            from: __objc_nlclslist,
+            in: machO
+        ) else { return nil }
+
+        return classes
+    }
+
+    public var nonLazyClasses32: [ObjCClass32]? {
+        guard !machO.is64Bit else { return nil }
+
+        guard let __objc_nlclslist = machO.findObjCSection32(
+            for: .__objc_nlclslist
+        ) else { return nil }
+
+        guard let classes: [ObjCClass32] = _readClasses(
+            from: __objc_nlclslist,
             in: machO
         ) else { return nil }
 

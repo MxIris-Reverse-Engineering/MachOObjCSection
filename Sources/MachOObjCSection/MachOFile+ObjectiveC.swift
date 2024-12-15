@@ -130,6 +130,36 @@ extension MachOFile.ObjectiveC {
 
         return classes
     }
+
+    public var nonLazyClasses64: [ObjCClass64]? {
+        guard machO.is64Bit else { return nil }
+
+        guard let __objc_nlclslist = machO.findObjCSection64(
+            for: .__objc_nlclslist
+        ) else { return nil }
+
+        guard let classes: [ObjCClass64] = _readClasses(
+            from: __objc_nlclslist,
+            in: machO
+        ) else { return nil }
+
+        return classes
+    }
+
+    public var nonLazyClasses32: [ObjCClass32]? {
+        guard !machO.is64Bit else { return nil }
+
+        guard let __objc_nlclslist = machO.findObjCSection32(
+            for: .__objc_nlclslist
+        ) else { return nil }
+
+        guard let classes: [ObjCClass32] = _readClasses(
+            from: __objc_nlclslist,
+            in: machO
+        ) else { return nil }
+
+        return classes
+    }
 }
 
 extension MachOFile.ObjectiveC {

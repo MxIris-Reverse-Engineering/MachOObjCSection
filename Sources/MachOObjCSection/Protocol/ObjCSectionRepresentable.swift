@@ -32,6 +32,17 @@ public protocol ObjCSectionRepresentable {
     /// It exists in a section named `__DATA*.__objc_classlist`
     var classes32: [ObjCClass32]? { get }
 
+    /// List of objective-c non lazy classes exist in this mach-o image
+    /// Only available from 64-bit mach-o images
+    ///
+    /// It exists in a section named `__DATA*.__objc_nlclslist`
+    var nonLazyClasses64: [ObjCClass64]? { get }
+    /// List of objective-c non lazy classes exist in this mach-o image
+    /// Only available from 32-bit mach-o images
+    ///
+    /// It exists in a section named `__DATA*.__objc_nlclslist`
+    var nonLazyClasses32: [ObjCClass32]? { get }
+
     /// List of objective-c protocols exist in this mach-o image
     /// Only available from 64-bit mach-o images
     ///
