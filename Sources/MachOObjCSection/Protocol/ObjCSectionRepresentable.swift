@@ -65,6 +65,17 @@ public protocol ObjCSectionRepresentable {
     /// It exists in a section named `__DATA*.__objc_catlist`
     var categories32: [ObjCCategory32]? { get }
 
+    /// List of objective-c non lazycategories exist in this mach-o image
+    /// Only available from 64-bit mach-o images
+    ///
+    /// It exists in a section named `__DATA*.__objc_nlcatlist`
+    var nonLazyCategories64: [ObjCCategory64]? { get }
+    /// List of objective-c non lazy categories exist in this mach-o image
+    /// Only available from 32-bit mach-o images
+    ///
+    /// It exists in a section named `__DATA*.__objc_nlcatlist`
+    var nonLazyCategories32: [ObjCCategory32]? { get }
+
     /// List of objective-c categories exist in this mach-o image
     /// Only available from 64-bit mach-o images
     ///

@@ -204,6 +204,36 @@ extension MachOImage.ObjectiveC {
 
         return categories
     }
+
+    public var nonLazyCategories64: [ObjCCategory64]? {
+        guard machO.is64Bit else { return nil }
+
+        guard let __objc_nlcatlist = machO.findObjCSection64(
+            for: .__objc_nlcatlist
+        ) else { return nil }
+
+        guard let categories: [ObjCCategory64] = _readCategories(
+            from: __objc_nlcatlist,
+            in: machO
+        ) else { return nil }
+
+        return categories
+    }
+
+    public var nonLazyCategories32: [ObjCCategory32]? {
+        guard !machO.is64Bit else { return nil }
+
+        guard let __objc_nlcatlist = machO.findObjCSection32(
+            for: .__objc_nlcatlist
+        ) else { return nil }
+
+        guard let categories: [ObjCCategory32] = _readCategories(
+            from: __objc_nlcatlist,
+            in: machO
+        ) else { return nil }
+
+        return categories
+    }
 }
 
 extension MachOImage.ObjectiveC {
