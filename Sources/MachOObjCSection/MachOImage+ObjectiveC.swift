@@ -82,32 +82,21 @@ extension MachOImage.ObjectiveC {
 }
 
 extension MachOImage.ObjectiveC {
-    /// `__DATA.__objc_protolist` or `__DATA_CONST.__objc_protolist`
     public var protocols64: [ObjCProtocol64]? {
         guard machO.is64Bit else { return nil }
-        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
 
         guard let __objc_protolist = machO.findObjCSection64(
             for: .__objc_protolist
         ) else { return nil }
 
-        guard let start = UnsafeRawPointer(
-            bitPattern: __objc_protolist.address + vmaddrSlide
+        guard let protocols: [ObjCProtocol64] = _readProtocols(
+            from: __objc_protolist,
+            in: machO
         ) else { return nil }
 
-        let offsets: MemorySequence<UInt64> = .init(
-            basePointer: start.assumingMemoryBound(to: UInt64.self),
-            numberOfElements: __objc_protolist.size / 8
-        )
-
-        return offsets
-            .compactMap { UnsafeRawPointer(bitPattern: UInt($0)) }
-            .map {
-                $0.assumingMemoryBound(to: ObjCProtocol64.self).pointee
-            }
+        return protocols
     }
 
-    /// `__DATA.__objc_protolist` or `__DATA_CONST.__objc_protolist`
     public var protocols32: [ObjCProtocol32]? {
         guard !machO.is64Bit else { return nil }
         guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
@@ -116,20 +105,12 @@ extension MachOImage.ObjectiveC {
             for: .__objc_protolist
         ) else { return nil }
 
-        guard let start = UnsafeRawPointer(
-            bitPattern: __objc_protolist.address + vmaddrSlide
+        guard let protocols: [ObjCProtocol32] = _readProtocols(
+            from: __objc_protolist,
+            in: machO
         ) else { return nil }
 
-        let offsets: MemorySequence<UInt32> = .init(
-            basePointer: start.assumingMemoryBound(to: UInt32.self),
-            numberOfElements: __objc_protolist.size / 4
-        )
-
-        return offsets
-            .compactMap { UnsafeRawPointer(bitPattern: UInt($0)) }
-            .map {
-                $0.assumingMemoryBound(to: ObjCProtocol32.self).pointee
-            }
+        return protocols
     }
 }
 
@@ -297,6 +278,31 @@ extension MachOImage.ObjectiveC {
                     .assumingMemoryBound(to: Class.Layout.self)
                     .pointee
                 return .init(layout: layout, offset: numericCast(offset))
+            }
+    }
+
+    func _readProtocols<
+        Protocol: ObjCProtocolProtocol
+    >(
+        from section: any SectionProtocol,
+        in machO: MachOImage
+    ) -> [Protocol]? {
+        guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
+        guard let start = UnsafeRawPointer(
+            bitPattern: section.address + vmaddrSlide
+        ) else { return nil }
+
+        typealias Pointer = Protocol.Layout.Pointer
+        let pointerSize: Int = MemoryLayout<Pointer>.size
+        let offsets: MemorySequence<Pointer> = .init(
+            basePointer: start.assumingMemoryBound(to: Pointer.self),
+            numberOfElements: section.size / pointerSize
+        )
+
+        return offsets
+            .compactMap { UnsafeRawPointer(bitPattern: UInt($0)) }
+            .map {
+                $0.assumingMemoryBound(to: Protocol.self).pointee
             }
     }
 }
