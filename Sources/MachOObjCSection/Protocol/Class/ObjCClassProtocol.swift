@@ -39,6 +39,16 @@ public protocol ObjCClassProtocol: _FixupResolvable where LayoutField == ObjCCla
 }
 
 extension ObjCClassProtocol {
+    // https://github.com/apple-oss-distributions/objc4/blob/89543e2c0f67d38ca5211cea33f42c51500287d5/runtime/objc-runtime-new.h#L2998C10-L2998C21
+    // https://github.com/swiftlang/swift/blob/main/docs/ObjCInterop.md
+    // https://github.com/swiftlang/swift/blob/643cbd15e637ece615b911cce1e1bf96a28297e3/lib/IRGen/GenClass.cpp#L2613
+    public var isStubClass: Bool {
+        let isa = layout.isa
+        return 1 <= isa && isa < 16
+    }
+}
+
+extension ObjCClassProtocol {
     /// class is a Swift class from the pre-stable Swift ABI
     public var isSwiftLegacy: Bool {
         layout.dataVMAddrAndFastFlags & numericCast(FAST_IS_SWIFT_LEGACY) != 0
