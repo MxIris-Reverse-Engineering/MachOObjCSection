@@ -24,6 +24,38 @@ extension MachOImage {
 }
 
 extension MachOImage.ObjectiveC {
+    public var isLoaded: Bool {
+        let cache: DyldCacheLoaded = .current
+
+        func _isLoaded(
+            rw: some ObjCHeaderOptimizationRWProtocol,
+            ro: some ObjCHeaderOptimizationROProtocol
+        ) -> Bool {
+            let headerInfos = rw.headerInfos(in: cache)
+            guard let info = ro.headerInfo(in: cache, for: machO) else {
+                return false
+            }
+            let imageIndex = info.index
+            if 0 <= imageIndex, imageIndex < headerInfos.count {
+                return headerInfos[AnyIndex(imageIndex)].isLoaded
+            }
+            return false
+        }
+
+        if machO.is64Bit,
+           let rw = cache.headerOptimizationRW64,
+           let ro = cache.headerOptimizationRO64 {
+            return _isLoaded(rw: rw, ro: ro)
+        } else if let rw = cache.headerOptimizationRW32,
+                  let ro = cache.headerOptimizationRO32 {
+            return _isLoaded(rw: rw, ro: ro)
+        }
+
+        return false
+    }
+}
+
+extension MachOImage.ObjectiveC {
     public var imageInfo: ObjCImageInfo? {
         guard let vmaddrSlide = machO.vmaddrSlide else { return nil }
 
