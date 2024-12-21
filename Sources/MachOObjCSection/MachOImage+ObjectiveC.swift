@@ -324,7 +324,7 @@ extension MachOImage.ObjectiveC {
         )
         return offsets
             .compactMap {
-                let offset = $0 - numericCast(UInt(bitPattern: machO.ptr))
+                let offset = Int64($0) - numericCast(UInt(bitPattern: machO.ptr))
                 guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
                     return nil
                 }
@@ -358,7 +358,7 @@ extension MachOImage.ObjectiveC {
         )
         return offsets
             .compactMap {
-                let offset = $0 - numericCast(UInt(bitPattern: machO.ptr))
+                let offset = Int64($0) - numericCast(UInt(bitPattern: machO.ptr))
                 guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
                     return nil
                 }
@@ -388,9 +388,15 @@ extension MachOImage.ObjectiveC {
         )
 
         return offsets
-            .compactMap { UnsafeRawPointer(bitPattern: UInt($0)) }
-            .map {
-                $0.assumingMemoryBound(to: Protocol.self).pointee
+            .compactMap {
+                let offset = Int64($0) - numericCast(UInt(bitPattern: machO.ptr))
+                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                    return nil
+                }
+                let layout = ptr
+                    .assumingMemoryBound(to: Protocol.Layout.self)
+                    .pointee
+                return .init(layout: layout, offset: numericCast(offset))
             }
     }
 }
