@@ -59,6 +59,32 @@ extension DyldCache {
         }
         return nil
     }
+
+    var headerOptimizationRW64: ObjCHeaderOptimizationRW64? {
+        guard cpu.is64Bit else {
+            return nil
+        }
+        if let objcOptimization {
+            return objcOptimization.headerOptimizationRW64(in: self)
+        }
+        if let oldObjcOptimization {
+            return oldObjcOptimization.headerOptimizationRW64(in: self)
+        }
+        return nil
+    }
+
+    var headerOptimizationRW32: ObjCHeaderOptimizationRW32? {
+        guard cpu.is64Bit else {
+            return nil
+        }
+        if let objcOptimization {
+            return objcOptimization.headerOptimizationRW32(in: self)
+        }
+        if let oldObjcOptimization {
+            return oldObjcOptimization.headerOptimizationRW32(in: self)
+        }
+        return nil
+    }
 }
 
 extension DyldCache {

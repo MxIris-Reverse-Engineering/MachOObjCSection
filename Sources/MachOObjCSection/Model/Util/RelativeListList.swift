@@ -94,7 +94,7 @@ extension RelativeListListProtocol {
         var fileHandle = machO.fileHandle
 
         if let (_cache, _offset) = machO.cacheAndFileOffset(
-            fromStart: UInt64(offset)// + cache.mainCacheHeader.sharedRegionStart
+            fromStart: UInt64(offset)
         ) {
             resolvedOffset = _offset
             fileHandle = _cache.fileHandle
@@ -125,35 +125,11 @@ extension RelativeListListProtocol {
 }
 
 extension RelativeListListEntry {
-    public func isLoaded(in machO: MachOImage) -> Bool {
-        let cache: DyldCacheLoaded = .current
+    public func machO(in cache: DyldCacheLoaded) -> MachOImage? {
+        cache.machO(at: imageIndex)
+    }
 
-        func _isLoaded(rw: some ObjCHeaderOptimizationRWProtocol) -> Bool {
-            let headerInfos = rw.headerInfos(in: cache)
-            if 0 <= imageIndex, imageIndex < headerInfos.count {
-                return headerInfos[AnyIndex(imageIndex)].isLoaded
-            }
-            return false
-        }
-
-        if let objcOptimization = cache.objcOptimization {
-            if machO.is64Bit,
-               let rw = objcOptimization.headerOptimizationRW64(in: cache) {
-                return _isLoaded(rw: rw)
-            } else if let rw = objcOptimization.headerOptimizationRW64(in: cache) {
-                return _isLoaded(rw: rw)
-            }
-        }
-
-        if let objcOptimization = cache.oldObjcOptimization {
-            if machO.is64Bit,
-               let rw = objcOptimization.headerOptimizationRW64(in: cache) {
-                return _isLoaded(rw: rw)
-            } else if let rw = objcOptimization.headerOptimizationRW64(in: cache) {
-                return _isLoaded(rw: rw)
-            }
-        }
-
-        return false
+    public func machO(in cache: DyldCache) -> MachOFile? {
+        cache.machO(at: imageIndex)
     }
 }

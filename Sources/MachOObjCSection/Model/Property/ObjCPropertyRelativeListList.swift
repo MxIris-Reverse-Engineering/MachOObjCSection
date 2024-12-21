@@ -28,17 +28,7 @@ public struct ObjCPropertyRelativeListList: RelativeListListProtocol {
         let ptr = machO.ptr.advanced(by: offset)
 
         let cache: DyldCacheLoaded = .current
-        guard let objcOptimization = cache.objcOptimization,
-              let ro = objcOptimization.headerOptimizationRO64(in: cache) else {
-            return nil
-        }
-
-        guard let header = ro.headerInfos(in: cache).first(
-            where: { $0.index == entry.imageIndex }
-        ),
-              let machO = header.machO(in: cache) else {
-            return nil
-        }
+        guard let machO = entry.machO(in: cache) else { return nil }
 
         let list = List(
             ptr: ptr,
@@ -56,9 +46,7 @@ public struct ObjCPropertyRelativeListList: RelativeListListProtocol {
             return nil
         }
 
-        guard let listMachO = cache.machO(at: entry.imageIndex) else {
-            return nil
-        }
+        guard let machO = entry.machO(in: cache) else { return nil }
 
         let data = cache.fileHandle.readData(
             offset: resolvedOffset,
@@ -77,6 +65,6 @@ public struct ObjCPropertyRelativeListList: RelativeListListProtocol {
 
         guard let list else { return nil }
 
-        return (listMachO, list)
+        return (machO, list)
     }
 }
