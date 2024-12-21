@@ -9,9 +9,11 @@
 import Foundation
 @_spi(Support) import MachOKit
 
+// https://github.com/apple-oss-distributions/objc4/blob/main/runtime/objc-runtime-new.h#L3265-L3286
 public struct ObjCCategory64: LayoutWrapper, ObjCCategoryProtocol {
     public typealias Pointer = UInt64
     public typealias ObjCClass = ObjCClass64
+    public typealias ObjCStubClass = ObjCStubClass64
 
     public struct Layout: _ObjCCategoryLayoutProtocol {
         public let name: Pointer // UnsafePointer<CChar>

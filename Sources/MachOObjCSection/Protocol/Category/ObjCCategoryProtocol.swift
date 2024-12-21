@@ -12,6 +12,7 @@ import Foundation
 public protocol ObjCCategoryProtocol: _FixupResolvable where LayoutField == ObjCCategoryLayoutField {
     associatedtype Layout: _ObjCCategoryLayoutProtocol
     associatedtype ObjCClass: ObjCClassProtocol
+    associatedtype ObjCStubClass: ObjCStubClassProtocol
     typealias ObjCProtocolList = ObjCClass.ClassROData.ObjCProtocolList
 
     var layout: Layout { get }
@@ -24,6 +25,7 @@ public protocol ObjCCategoryProtocol: _FixupResolvable where LayoutField == ObjC
 
     func name(in machO: MachOFile) -> String?
     func `class`(in machO: MachOFile) -> ObjCClass?
+    func stubClass(in machO: MachOFile) -> ObjCStubClass?
     func className(in machO: MachOFile) -> String?
     func instanceMethods(in machO: MachOFile) -> ObjCMethodList?
     func classMethods(in machO: MachOFile) -> ObjCMethodList?
@@ -33,6 +35,7 @@ public protocol ObjCCategoryProtocol: _FixupResolvable where LayoutField == ObjC
 
     func name(in machO: MachOImage) -> String?
     func `class`(in machO: MachOImage) -> ObjCClass?
+    func stubClass(in machO: MachOImage) -> ObjCStubClass?
     func className(in machO: MachOImage) -> String?
     func instanceMethods(in machO: MachOImage) -> ObjCMethodList?
     func classMethods(in machO: MachOImage) -> ObjCMethodList?
@@ -54,19 +57,55 @@ extension ObjCCategoryProtocol {
     }
 
     public func `class`(in machO: MachOFile) -> ObjCClass? {
-        _readClass(
+        guard let cls = _readClass(
             at: numericCast(layout.cls),
             field: .cls,
             in: machO
-        )
+        ) else { return nil }
+
+        if cls.isStubClass { return nil }
+
+        return cls
+    }
+    public func stubClass(in machO: MachOFile) -> ObjCStubClass? {
+        guard let cls = _readStubClass(
+            at: numericCast(layout.cls),
+            field: .cls,
+            in: machO
+        ) else { return nil }
+
+        guard cls.isStubClass else { return nil }
+
+        return cls
     }
 
     public func className(in machO: MachOFile) -> String? {
-        _readClassName(
+        if let name = _readClassName(
             at: numericCast(layout.cls),
             field: .cls,
             in: machO
-        )
+        ) {
+            return name
+        }
+
+        var offset = offset
+        if let cache = machO.cache {
+            offset += numericCast(
+                cache.mainCacheHeader.sharedRegionStart
+            )
+        }
+
+        if let section = machO.sectionNumber(for: .__objc_const),
+           let symbol = machO.symbol(for: offset, inSection: section),
+           symbol.name.starts(with: "__CATEGORY_"){
+            let className = symbol.name
+                .replacingOccurrences(of: "__CATEGORY_", with: "")
+                .components(separatedBy: "_$_")
+                .first
+            return className
+        }
+
+        return nil
     }
 
     public func instanceMethods(in machO: MachOFile) -> ObjCMethodList? {
@@ -128,14 +167,46 @@ extension ObjCCategoryProtocol {
             return nil
         }
         let offset: Int = numericCast(layout.cls) - Int(bitPattern: machO.ptr)
+
         let layout = ptr.assumingMemoryBound(to: ObjCClass.Layout.self).pointee
-        return .init(layout: layout, offset: offset)
+        let cls: ObjCClass = .init(layout: layout, offset: offset)
+
+        if cls.isStubClass { return nil }
+
+        return cls
+    }
+
+    public func stubClass(in machO: MachOImage) -> ObjCStubClass? {
+        guard layout.cls > 0 else { return nil }
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.cls)) else {
+            return nil
+        }
+        let offset: Int = numericCast(layout.cls) - Int(bitPattern: machO.ptr)
+
+        let layout = ptr.assumingMemoryBound(to: ObjCStubClass.Layout.self).pointee
+        let cls: ObjCStubClass = .init(layout: layout, offset: offset)
+
+        guard cls.isStubClass else { return nil }
+
+        return cls
     }
 
     public func className(in machO: MachOImage) -> String? {
         guard let cls = `class`(in: machO) else {
+            if let section = machO.sectionNumber(for: .__objc_const),
+               let symbol = machO.symbol(
+                for: offset, inSection: section
+               ),
+               symbol.name.starts(with: "__CATEGORY_") {
+                let className = symbol.name
+                    .replacingOccurrences(of: "__CATEGORY_", with: "")
+                    .components(separatedBy: "_$_")
+                    .first
+                return className
+            }
             return nil
         }
+
         var data: ObjCClass.ClassROData?
         if let _data = cls.classROData(in: machO) {
             data = _data
@@ -214,6 +285,31 @@ extension ObjCCategoryProtocol {
         return .init(layout: layout, offset: numericCast(offset))
     }
 
+    func _readStubClass(
+        at offset: UInt64,
+        field: LayoutField,
+        in machO: MachOFile
+    ) -> ObjCStubClass? {
+        guard offset > 0 else { return nil }
+        var offset: UInt64 = numericCast(offset) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+
+        if let resolved = resolveRebase(field, in: machO) {
+            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        }
+        if isBind(field, in: machO) { return nil }
+
+        var resolvedOffset = offset
+        if let cache = machO.cache {
+            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
+                return nil
+            }
+            resolvedOffset = _offset
+        }
+
+        let layout: ObjCStubClass.Layout = machO.fileHandle.read(offset: resolvedOffset)
+        return .init(layout: layout, offset: numericCast(offset))
+    }
+
     private func _readClassName(
         at offset: UInt64,
         field: LayoutField,
@@ -225,7 +321,8 @@ extension ObjCCategoryProtocol {
             at: offset,
             field: field,
             in: machO
-        ), let data = cls.classROData(in: machO) {
+        ), !cls.isStubClass ,
+           let data = cls.classROData(in: machO) {
             return data.name(in: machO)
         }
 

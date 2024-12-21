@@ -30,3 +30,28 @@ extension MachORepresentable {
         return buildVersion.platform == .iOSSimulator
     }
 }
+
+extension MachORepresentable {
+    func sectionNumber(for section: ObjCMachOSection) -> Int? {
+        guard let index = sections.firstIndex(where: {
+            $0.sectionName == section.rawValue
+        }) else { return nil }
+        return index + 1
+    }
+}
+
+// FIXME: move to `MachOKit`
+extension MachORepresentable {
+    public func symbol(
+        for offset: Int,
+        inSection section: Int,
+        isGlobalOnly: Bool = false
+    ) -> Symbol? {
+        let best = closestSymbol(
+            at: offset,
+            inSection: section,
+            isGlobalOnly: isGlobalOnly
+        )
+        return best?.offset == offset ? best : nil
+    }
+}
