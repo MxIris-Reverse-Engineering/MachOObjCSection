@@ -21,4 +21,6 @@ enum ObjCMachOSection: String {
     case __objc_catlist
     case __objc_catlist2
     case __objc_nlcatlist
+
+    case __objc_const
 }
