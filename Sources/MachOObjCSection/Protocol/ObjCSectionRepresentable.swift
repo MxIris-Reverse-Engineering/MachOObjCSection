@@ -81,11 +81,17 @@ public protocol ObjCSectionRepresentable {
     ///
     /// It exists in a section named `__DATA*.__objc_catlist2`
     /// This category is for swift stub class
+    ///
+    /// - Warning: The category.`class` retrieved from this property is a stub class automatically generated from the swift class.
+    /// Therefore, some methods will not work.
     var categories2_64: [ObjCCategory64]? { get }
     /// List of objective-c categories exist in this mach-o image
     /// Only available from 32-bit mach-o images
     ///
     /// It exists in a section named `__DATA*.__objc_catlist2`
     /// This category is for swift stub class
+    ///
+    /// - Warning: The category.`class` retrieved from this property is a stub class automatically generated from the swift class.
+    /// Therefore, some methods will not work.
     var categories2_32: [ObjCCategory32]? { get }
 }
