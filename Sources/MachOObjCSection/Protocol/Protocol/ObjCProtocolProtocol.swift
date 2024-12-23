@@ -273,7 +273,7 @@ extension ObjCProtocolProtocol {
     }
 
     public func extendedMethodTypes(in machO: MachOFile) -> String? {
-        let offset = machO.is64Bit ? 72 : 40
+        let offset = layoutOffset(of: ._extendedMethodTypes)
         guard size >= offset + MemoryLayout<Layout.Pointer>.size else {
             return nil
         }
@@ -338,7 +338,7 @@ extension ObjCProtocolProtocol {
     }
 
     public func demangledName(in machO: MachOFile) -> String? {
-        let offset = machO.is64Bit ? 80 : 44
+        let offset = layoutOffset(of: ._demangledName)
         guard size >= offset + MemoryLayout<Layout.Pointer>.size else {
             return nil
         }
@@ -362,7 +362,12 @@ extension ObjCProtocolProtocol {
     }
 
     public func classProperties(in machO: MachOFile) -> ObjCPropertyList? {
-        _readObjCPropertyList(
+        let offset = layoutOffset(of: ._classProperties)
+        guard size >= offset + MemoryLayout<Layout.Pointer>.size else {
+            return nil
+        }
+        guard layout._classProperties > 0 else { return nil }
+        return _readObjCPropertyList(
             in: machO,
             offset: numericCast(layout._classProperties)
         )
