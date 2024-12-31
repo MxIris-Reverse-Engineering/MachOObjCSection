@@ -6,6 +6,12 @@ A Swift library for parsing mach-o files to obtain Objecteve-C information.
 > [!NOTE]
 > This library is developed as an extension of [MachOKit](https://github.com/p-x9/MachOKit) for Objective-C
 
+> [!NOTE]
+> To retrieve ObjC information from a mach-o image in memory using ObjC rumtime, the library [ObjCDump](https://github.com/p-x9/swift-objc-dump) can be used.
+>
+> On the other hand, more detailed information can be obtained using this library.
+> (Especially for category, it is not possible to get it with objc runtime).
+
 <!-- # Badges -->
 
 [![Github issues](https://img.shields.io/github/issues/p-x9/MachOObjCSection)](https://github.com/p-x9/MachOObjCSection/issues)
