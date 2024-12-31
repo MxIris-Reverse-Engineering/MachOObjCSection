@@ -143,16 +143,17 @@ extension ObjCClass32 {
     }
 
     private func _classROData(in machO: MachOFile) -> ClassROData? {
-        var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32) + numericCast(machO.headerStartOffset)
+        let offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32) + numericCast(machO.headerStartOffset)
 
+        var resolved = offset
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
-            offset = _offset
+            resolved = _offset
         }
 
-        let layout: ClassROData.Layout = machO.fileHandle.read(offset: offset)
+        let layout: ClassROData.Layout = machO.fileHandle.read(offset: resolved)
         let classData = ClassROData(layout: layout, offset: Int(offset))
 
         return classData

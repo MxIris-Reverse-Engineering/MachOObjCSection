@@ -162,13 +162,14 @@ extension ObjCClass64 {
         var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & FAST_DATA_MASK + numericCast(machO.headerStartOffset)
         offset &= 0x7ffffffff
 
+        var resolved = offset
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
             }
-            offset = _offset
+            resolved = _offset
         }
-        let layout: ClassROData.Layout = machO.fileHandle.read(offset: offset)
+        let layout: ClassROData.Layout = machO.fileHandle.read(offset: resolved)
         let classData = ClassROData(layout: layout, offset: Int(offset))
 
         return classData
