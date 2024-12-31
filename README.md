@@ -134,7 +134,7 @@ let header = methodInfo.headerString
 // class
 let header = classInfo.headerString
 // protocol
-let header =  protocolInfo.headerString
+let header = protocolInfo.headerString
 // category
 let header = categoryInfo.headerString
 ```
