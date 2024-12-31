@@ -225,12 +225,6 @@ extension ObjCClassRODataProtocol {
 
         if let resolved = resolveRebase(.baseProtocols, in: machO),
            resolved != offset {
-            let ss = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
-            if ss == 16 {
-                print("sjaspoda");
-                return nil
-            }
-            resolveRebase(.baseProtocols, in: machO)
             offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.baseProtocols, in: machO) { return nil }
