@@ -22,9 +22,9 @@ public protocol ObjCClassRWDataExtProtocol {
 
     func classROData(in machO: MachOImage) -> ObjCClassROData?
 
-    func methods(in machO: MachOImage) -> ObjCMethodArray?
-    func properties(in machO: MachOImage) -> ObjCPropertyArray?
-    func protocols(in machO: MachOImage) -> ObjCProtocolArray?
+    func methodList(in machO: MachOImage) -> ObjCMethodArray?
+    func propertyList(in machO: MachOImage) -> ObjCPropertyArray?
+    func protocolList(in machO: MachOImage) -> ObjCProtocolArray?
     func demangledName(in machO: MachOImage) -> String?
 }
 
@@ -45,7 +45,7 @@ extension ObjCClassRWDataExtProtocol {
         return classData
     }
 
-    public func methods(in machO: MachOImage) -> ObjCMethodArray? {
+    public func methodList(in machO: MachOImage) -> ObjCMethodArray? {
         guard layout.methods > 0 else { return nil }
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.methods)
@@ -61,7 +61,7 @@ extension ObjCClassRWDataExtProtocol {
         return lists
     }
 
-    public func properties(in machO: MachOImage) -> ObjCPropertyArray? {
+    public func propertyList(in machO: MachOImage) -> ObjCPropertyArray? {
         guard layout.properties > 0 else { return nil }
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.properties)
@@ -75,7 +75,7 @@ extension ObjCClassRWDataExtProtocol {
         return lists
     }
 
-    public func protocols(in machO: MachOImage) -> ObjCProtocolArray? {
+    public func protocolList(in machO: MachOImage) -> ObjCProtocolArray? {
         guard layout.protocols > 0 else { return nil }
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.protocols)

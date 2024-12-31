@@ -25,7 +25,7 @@ public protocol ObjCIvarProtocol: _FixupResolvable where LayoutField == ObjCIvar
 
     func offset(in machO: MachOImage) -> UInt32?
     func name(in machO: MachOImage) -> String
-    func type(in machO: MachOImage) -> String
+    func type(in machO: MachOImage) -> String?
 }
 
 extension ObjCIvarProtocol {
@@ -123,7 +123,8 @@ extension ObjCIvarProtocol {
         return .init(cString: ptr!.assumingMemoryBound(to: CChar.self))
     }
 
-    public func type(in machO: MachOImage) -> String {
+    public func type(in machO: MachOImage) -> String? {
+        guard layout.type > 0 else { return nil }
         let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.type)
         )

@@ -27,21 +27,21 @@ public protocol ObjCCategoryProtocol: _FixupResolvable where LayoutField == ObjC
     func `class`(in machO: MachOFile) -> ObjCClass?
     func stubClass(in machO: MachOFile) -> ObjCStubClass?
     func className(in machO: MachOFile) -> String?
-    func instanceMethods(in machO: MachOFile) -> ObjCMethodList?
-    func classMethods(in machO: MachOFile) -> ObjCMethodList?
-    func instanceProperties(in machO: MachOFile) -> ObjCPropertyList?
-    func classProperties(in machO: MachOFile) -> ObjCPropertyList?
-    func protocols(in machO: MachOFile) -> ObjCProtocolList?
+    func instanceMethodList(in machO: MachOFile) -> ObjCMethodList?
+    func classMethodList(in machO: MachOFile) -> ObjCMethodList?
+    func instancePropertyList(in machO: MachOFile) -> ObjCPropertyList?
+    func classPropertyList(in machO: MachOFile) -> ObjCPropertyList?
+    func protocolList(in machO: MachOFile) -> ObjCProtocolList?
 
     func name(in machO: MachOImage) -> String?
     func `class`(in machO: MachOImage) -> ObjCClass?
     func stubClass(in machO: MachOImage) -> ObjCStubClass?
     func className(in machO: MachOImage) -> String?
-    func instanceMethods(in machO: MachOImage) -> ObjCMethodList?
-    func classMethods(in machO: MachOImage) -> ObjCMethodList?
-    func instanceProperties(in machO: MachOImage) -> ObjCPropertyList?
-    func classProperties(in machO: MachOImage) -> ObjCPropertyList?
-    func protocols(in machO: MachOImage) -> ObjCProtocolList?
+    func instanceMethodList(in machO: MachOImage) -> ObjCMethodList?
+    func classMethodList(in machO: MachOImage) -> ObjCMethodList?
+    func instancePropertyList(in machO: MachOImage) -> ObjCPropertyList?
+    func classPropertyList(in machO: MachOImage) -> ObjCPropertyList?
+    func protocolList(in machO: MachOImage) -> ObjCProtocolList?
 }
 
 extension ObjCCategoryProtocol {
@@ -108,7 +108,7 @@ extension ObjCCategoryProtocol {
         return nil
     }
 
-    public func instanceMethods(in machO: MachOFile) -> ObjCMethodList? {
+    public func instanceMethodList(in machO: MachOFile) -> ObjCMethodList? {
         _readMethodList(
             at: numericCast(layout.instanceMethods),
             field: .instanceMethods,
@@ -116,7 +116,7 @@ extension ObjCCategoryProtocol {
         )
     }
 
-    public func classMethods(in machO: MachOFile) -> ObjCMethodList? {
+    public func classMethodList(in machO: MachOFile) -> ObjCMethodList? {
         _readMethodList(
             at: numericCast(layout.classMethods),
             field: .classMethods,
@@ -124,7 +124,7 @@ extension ObjCCategoryProtocol {
         )
     }
 
-    public func instanceProperties(in machO: MachOFile) -> ObjCPropertyList? {
+    public func instancePropertyList(in machO: MachOFile) -> ObjCPropertyList? {
         _readPropertyList(
             at: numericCast(layout.instanceProperties),
             field: .instanceProperties,
@@ -132,7 +132,7 @@ extension ObjCCategoryProtocol {
         )
     }
 
-    public func classProperties(in machO: MachOFile) -> ObjCPropertyList? {
+    public func classPropertyList(in machO: MachOFile) -> ObjCPropertyList? {
         _readPropertyList(
             at: numericCast(layout._classProperties),
             field: ._classProperties,
@@ -140,7 +140,7 @@ extension ObjCCategoryProtocol {
         )
     }
 
-    public func protocols(in machO: MachOFile) -> ObjCProtocolList? {
+    public func protocolList(in machO: MachOFile) -> ObjCProtocolList? {
         _readProtocolList(
             at: numericCast(layout.protocols),
             field: .protocols,
@@ -223,35 +223,35 @@ extension ObjCCategoryProtocol {
         return data?.name(in: machO)
     }
 
-    public func instanceMethods(in machO: MachOImage) -> ObjCMethodList? {
+    public func instanceMethodList(in machO: MachOImage) -> ObjCMethodList? {
         _readMethodList(
             at: numericCast(layout.instanceMethods),
             in: machO
         )
     }
 
-    public func classMethods(in machO: MachOImage) -> ObjCMethodList? {
+    public func classMethodList(in machO: MachOImage) -> ObjCMethodList? {
         _readMethodList(
             at: numericCast(layout.classMethods),
             in: machO
         )
     }
 
-    public func instanceProperties(in machO: MachOImage) -> ObjCPropertyList? {
+    public func instancePropertyList(in machO: MachOImage) -> ObjCPropertyList? {
         _readPropertyList(
             at: numericCast(layout.instanceProperties),
             in: machO
         )
     }
 
-    public func classProperties(in machO: MachOImage) -> ObjCPropertyList? {
+    public func classPropertyList(in machO: MachOImage) -> ObjCPropertyList? {
         _readPropertyList(
             at: numericCast(layout._classProperties),
             in: machO
         )
     }
 
-    public func protocols(in machO: MachOImage) -> ObjCProtocolList? {
+    public func protocolList(in machO: MachOImage) -> ObjCProtocolList? {
         _readProtocolList(
             at: numericCast(layout.protocols),
             in: machO

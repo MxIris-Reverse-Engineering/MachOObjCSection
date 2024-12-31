@@ -26,18 +26,18 @@ public protocol ObjCClassRODataProtocol: _FixupResolvable where LayoutField == O
     func ivarLayout(in machO: MachOFile) -> [UInt8]?
     func weakIvarLayout(in machO: MachOFile) -> [UInt8]?
     func name(in machO: MachOFile) -> String?
-    func methods(in machO: MachOFile) -> ObjCMethodList?
-    func properties(in machO: MachOFile) -> ObjCPropertyList?
-    func protocols(in machO: MachOFile) -> ObjCProtocolList?
-    func ivars(in machO: MachOFile) -> ObjCIvarList?
+    func methodList(in machO: MachOFile) -> ObjCMethodList?
+    func propertyList(in machO: MachOFile) -> ObjCPropertyList?
+    func protocolList(in machO: MachOFile) -> ObjCProtocolList?
+    func ivarList(in machO: MachOFile) -> ObjCIvarList?
 
     func ivarLayout(in machO: MachOImage) -> [UInt8]?
     func weakIvarLayout(in machO: MachOImage) -> [UInt8]?
     func name(in machO: MachOImage) -> String?
-    func methods(in machO: MachOImage) -> ObjCMethodList?
-    func properties(in machO: MachOImage) -> ObjCPropertyList?
-    func protocols(in machO: MachOImage) -> ObjCProtocolList?
-    func ivars(in machO: MachOImage) -> ObjCIvarList?
+    func methodList(in machO: MachOImage) -> ObjCMethodList?
+    func propertyList(in machO: MachOImage) -> ObjCPropertyList?
+    func protocolList(in machO: MachOImage) -> ObjCProtocolList?
+    func ivarList(in machO: MachOImage) -> ObjCIvarList?
 
     func methodRelativeListList(in machO: MachOFile) -> ObjCMethodRelativeListList?
     func propertyRelativeListList(in machO: MachOFile) -> ObjCPropertyRelativeListList?
@@ -95,7 +95,7 @@ extension ObjCClassRODataProtocol {
         return machO.fileHandle.readString(offset: numericCast(offset))
     }
 
-    public func methods(in machO: MachOFile) -> ObjCMethodList? {
+    public func methodList(in machO: MachOFile) -> ObjCMethodList? {
         guard layout.baseMethods > 0 else { return nil }
         guard layout.baseMethods & 1 == 0 else { return nil }
 
@@ -134,7 +134,7 @@ extension ObjCClassRODataProtocol {
         return list
     }
 
-    public func properties(in machO: MachOFile) -> ObjCPropertyList? {
+    public func propertyList(in machO: MachOFile) -> ObjCPropertyList? {
         guard layout.baseProperties > 0 else { return nil }
         guard layout.baseProperties & 1 == 0 else { return nil }
 
@@ -175,7 +175,7 @@ extension ObjCClassRODataProtocol {
         return list
     }
 
-    public func ivars(in machO: MachOFile) -> ObjCIvarList? {
+    public func ivarList(in machO: MachOFile) -> ObjCIvarList? {
         guard layout.ivars > 0 else { return nil }
 
         var offset: UInt64 = numericCast(layout.ivars) & 0x7ffffffff + numericCast(machO.headerStartOffset)
@@ -217,7 +217,7 @@ extension ObjCClassRODataProtocol {
         return list
     }
 
-    public func protocols(in machO: MachOFile) -> ObjCProtocolList? {
+    public func protocolList(in machO: MachOFile) -> ObjCProtocolList? {
         guard layout.baseProtocols > 0 else { return nil }
         guard layout.baseProtocols & 1 == 0 else { return nil }
 
@@ -225,6 +225,12 @@ extension ObjCClassRODataProtocol {
 
         if let resolved = resolveRebase(.baseProtocols, in: machO),
            resolved != offset {
+            let ss = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+            if ss == 16 {
+                print("sjaspoda");
+                return nil
+            }
+            resolveRebase(.baseProtocols, in: machO)
             offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.baseProtocols, in: machO) { return nil }
@@ -277,7 +283,7 @@ extension ObjCClassRODataProtocol {
         )
     }
 
-    public func methods(in machO: MachOImage) -> ObjCMethodList? {
+    public func methodList(in machO: MachOImage) -> ObjCMethodList? {
         guard layout.baseMethods > 0 else { return nil }
         guard layout.baseMethods & 1 == 0 else { return nil }
 
@@ -301,7 +307,7 @@ extension ObjCClassRODataProtocol {
         return list
     }
 
-    public func properties(in machO: MachOImage) -> ObjCPropertyList? {
+    public func propertyList(in machO: MachOImage) -> ObjCPropertyList? {
         guard layout.baseProperties > 0 else { return nil }
         guard layout.baseProperties & 1 == 0 else { return nil }
 
@@ -324,7 +330,7 @@ extension ObjCClassRODataProtocol {
         return list
     }
 
-    public func ivars(in machO: MachOImage) -> ObjCIvarList? {
+    public func ivarList(in machO: MachOImage) -> ObjCIvarList? {
         guard layout.ivars > 0 else { return nil }
         guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.ivars)) else {
             return nil
@@ -343,7 +349,7 @@ extension ObjCClassRODataProtocol {
         return list
     }
 
-    public func protocols(in machO: MachOImage) -> ObjCProtocolList? {
+    public func protocolList(in machO: MachOImage) -> ObjCProtocolList? {
         guard layout.baseProtocols > 0 else { return nil }
         guard layout.baseProtocols & 1 == 0 else { return nil }
 

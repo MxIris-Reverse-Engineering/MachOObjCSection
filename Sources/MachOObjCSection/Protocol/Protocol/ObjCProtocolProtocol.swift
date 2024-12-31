@@ -23,26 +23,26 @@ public protocol ObjCProtocolProtocol: _FixupResolvable where LayoutField == ObjC
     var flags: UInt32 { get }
 
     func mangledName(in machO: MachOImage) -> String
-    func protocols(in machO: MachOImage) -> ObjCProtocolList?
-    func instanceMethods(in machO: MachOImage) -> ObjCMethodList?
-    func classMethods(in machO: MachOImage) -> ObjCMethodList?
-    func optionalInstanceMethods(in machO: MachOImage) -> ObjCMethodList?
-    func optionalClassMethods(in machO: MachOImage) -> ObjCMethodList?
-    func instanceProperties(in machO: MachOImage) -> ObjCPropertyList?
+    func protocolList(in machO: MachOImage) -> ObjCProtocolList?
+    func instanceMethodList(in machO: MachOImage) -> ObjCMethodList?
+    func classMethodList(in machO: MachOImage) -> ObjCMethodList?
+    func optionalInstanceMethodList(in machO: MachOImage) -> ObjCMethodList?
+    func optionalClassMethodList(in machO: MachOImage) -> ObjCMethodList?
+    func instancePropertyList(in machO: MachOImage) -> ObjCPropertyList?
     func extendedMethodTypes(in machO: MachOImage) -> String?
     func demangledName(in machO: MachOImage) -> String?
-    func classProperties(in machO: MachOImage) -> ObjCPropertyList?
+    func classPropertyList(in machO: MachOImage) -> ObjCPropertyList?
 
     func mangledName(in machO: MachOFile) -> String
-    func protocols(in machO: MachOFile) -> ObjCProtocolList?
-    func instanceMethods(in machO: MachOFile) -> ObjCMethodList?
-    func classMethods(in machO: MachOFile) -> ObjCMethodList?
-    func optionalInstanceMethods(in machO: MachOFile) -> ObjCMethodList?
-    func optionalClassMethods(in machO: MachOFile) -> ObjCMethodList?
-    func instanceProperties(in machO: MachOFile) -> ObjCPropertyList?
+    func protocolList(in machO: MachOFile) -> ObjCProtocolList?
+    func instanceMethodList(in machO: MachOFile) -> ObjCMethodList?
+    func classMethodList(in machO: MachOFile) -> ObjCMethodList?
+    func optionalInstanceMethodList(in machO: MachOFile) -> ObjCMethodList?
+    func optionalClassMethodList(in machO: MachOFile) -> ObjCMethodList?
+    func instancePropertyList(in machO: MachOFile) -> ObjCPropertyList?
     func extendedMethodTypes(in machO: MachOFile) -> String?
     func demangledName(in machO: MachOFile) -> String?
-    func classProperties(in machO: MachOFile) -> ObjCPropertyList?
+    func classPropertyList(in machO: MachOFile) -> ObjCPropertyList?
 }
 
 extension ObjCProtocolProtocol {
@@ -58,7 +58,7 @@ extension ObjCProtocolProtocol {
         return .init(cString: ptr!.assumingMemoryBound(to: CChar.self))
     }
 
-    public func protocols(in machO: MachOImage) -> ObjCProtocolList? {
+    public func protocolList(in machO: MachOImage) -> ObjCProtocolList? {
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.protocols)
         ) else {
@@ -70,7 +70,7 @@ extension ObjCProtocolProtocol {
         )
     }
 
-    public func instanceMethods(in machO: MachOImage) -> ObjCMethodList? {
+    public func instanceMethodList(in machO: MachOImage) -> ObjCMethodList? {
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.instanceMethods)
         ) else {
@@ -83,7 +83,7 @@ extension ObjCProtocolProtocol {
         )
     }
 
-    public func classMethods(in machO: MachOImage) -> ObjCMethodList? {
+    public func classMethodList(in machO: MachOImage) -> ObjCMethodList? {
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.classMethods)
         ) else {
@@ -96,7 +96,7 @@ extension ObjCProtocolProtocol {
         )
     }
 
-    public func optionalInstanceMethods(in machO: MachOImage) -> ObjCMethodList? {
+    public func optionalInstanceMethodList(in machO: MachOImage) -> ObjCMethodList? {
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.optionalInstanceMethods)
         ) else {
@@ -109,7 +109,7 @@ extension ObjCProtocolProtocol {
         )
     }
 
-    public func optionalClassMethods(in machO: MachOImage) -> ObjCMethodList? {
+    public func optionalClassMethodList(in machO: MachOImage) -> ObjCMethodList? {
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.optionalClassMethods)
         ) else {
@@ -122,7 +122,7 @@ extension ObjCProtocolProtocol {
         )
     }
 
-    public func instanceProperties(in machO: MachOImage) -> ObjCPropertyList? {
+    public func instancePropertyList(in machO: MachOImage) -> ObjCPropertyList? {
         guard let ptr = UnsafeRawPointer(
             bitPattern: UInt(layout.instanceProperties)
         ) else {
@@ -168,7 +168,7 @@ extension ObjCProtocolProtocol {
         )
     }
 
-    public func classProperties(in machO: MachOImage) -> ObjCPropertyList? {
+    public func classPropertyList(in machO: MachOImage) -> ObjCPropertyList? {
         let offset = machO.is64Bit ? 88 : 48
         guard size >= offset + MemoryLayout<Layout.Pointer>.size else {
             return nil
@@ -206,7 +206,7 @@ extension ObjCProtocolProtocol {
         ) ?? ""
     }
 
-    public func protocols(in machO: MachOFile) -> ObjCProtocolList? {
+    public func protocolList(in machO: MachOFile) -> ObjCProtocolList? {
         guard layout.protocols > 0 else { return nil }
 
         let headerStartOffset = machO.headerStartOffset
@@ -243,29 +243,29 @@ extension ObjCProtocolProtocol {
         }
     }
 
-    public func instanceMethods(in machO: MachOFile) -> ObjCMethodList? {
+    public func instanceMethodList(in machO: MachOFile) -> ObjCMethodList? {
         _readObjCMethodList(in: machO, offset: numericCast(layout.instanceMethods))
     }
 
-    public func classMethods(in machO: MachOFile) -> ObjCMethodList? {
+    public func classMethodList(in machO: MachOFile) -> ObjCMethodList? {
         _readObjCMethodList(in: machO, offset: numericCast(layout.classMethods))
     }
 
-    public func optionalInstanceMethods(in machO: MachOFile) -> ObjCMethodList? {
+    public func optionalInstanceMethodList(in machO: MachOFile) -> ObjCMethodList? {
         _readObjCMethodList(
             in: machO,
             offset: numericCast(layout.optionalInstanceMethods)
         )
     }
 
-    public func optionalClassMethods(in machO: MachOFile) -> ObjCMethodList? {
+    public func optionalClassMethodList(in machO: MachOFile) -> ObjCMethodList? {
         _readObjCMethodList(
             in: machO,
             offset: numericCast(layout.optionalClassMethods)
         )
     }
 
-    public func instanceProperties(in machO: MachOFile) -> ObjCPropertyList? {
+    public func instancePropertyList(in machO: MachOFile) -> ObjCPropertyList? {
         _readObjCPropertyList(
             in: machO,
             offset: numericCast(layout.instanceProperties)
@@ -361,7 +361,7 @@ extension ObjCProtocolProtocol {
         )
     }
 
-    public func classProperties(in machO: MachOFile) -> ObjCPropertyList? {
+    public func classPropertyList(in machO: MachOFile) -> ObjCPropertyList? {
         let offset = layoutOffset(of: ._classProperties)
         guard size >= offset + MemoryLayout<Layout.Pointer>.size else {
             return nil

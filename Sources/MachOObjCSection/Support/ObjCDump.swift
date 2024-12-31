@@ -27,8 +27,8 @@ extension ObjCIvarProtocol {
 
     public func info(in machO: MachOImage) -> ObjCIvarInfo? {
         let name = name(in: machO)
-        let type = type(in: machO)
-        guard let offset = offset(in: machO) else {
+        guard let type = type(in: machO),
+              let offset = offset(in: machO) else {
             return nil
         }
         return .init(
@@ -70,37 +70,37 @@ extension ObjCProtocolProtocol {
     public func info(in machO: MachOFile) -> ObjCProtocolInfo? {
         let name = mangledName(in: machO)
 
-        let protocolList = protocols(in: machO)
+        let protocolList = protocolList(in: machO)
         let protocols = protocolList?
             .protocols(in: machO)?
             .compactMap { $0.info(in: machO) } ?? []
 
-        let classPropertiesList = classProperties(in: machO)
+        let classPropertiesList = classPropertyList(in: machO)
         let classProperties = classPropertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: true) } ?? []
 
-        let propertiesList = instanceProperties(in: machO)
+        let propertiesList = instancePropertyList(in: machO)
         let properties = propertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: false) } ?? []
 
-        let classMethodsList = classMethods(in: machO)
+        let classMethodsList = classMethodList(in: machO)
         let classMethods = classMethodsList?
             .methods(in: machO)?
             .compactMap { $0.info(isClassMethod: true) } ?? []
 
-        let methodsList = instanceMethods(in: machO)
+        let methodsList = instanceMethodList(in: machO)
         let methods = methodsList?
             .methods(in: machO)?
             .compactMap { $0.info(isClassMethod: false) } ?? []
 
-        let optionalClassMethodsList = optionalClassMethods(in: machO)
+        let optionalClassMethodsList = optionalClassMethodList(in: machO)
         let optionalClassMethods = optionalClassMethodsList?
             .methods(in: machO)?
             .compactMap { $0.info(isClassMethod: true) } ?? []
 
-        let optionalMethodsList = optionalInstanceMethods(in: machO)
+        let optionalMethodsList = optionalInstanceMethodList(in: machO)
         let optionalMethods = optionalMethodsList?
             .methods(in: machO)?
             .compactMap { $0.info(isClassMethod: false) } ?? []
@@ -126,37 +126,37 @@ extension ObjCProtocolProtocol {
     public func info(in machO: MachOImage) -> ObjCProtocolInfo? {
         let name = mangledName(in: machO)
 
-        let protocolList = protocols(in: machO)
+        let protocolList = protocolList(in: machO)
         let protocols = protocolList?
             .protocols(in: machO)?
             .compactMap { $0.info(in: machO) } ?? []
 
-        let classPropertiesList = classProperties(in: machO)
+        let classPropertiesList = classPropertyList(in: machO)
         let classProperties = classPropertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: true) } ?? []
 
-        let propertiesList = instanceProperties(in: machO)
+        let propertiesList = instancePropertyList(in: machO)
         let properties = propertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: false) } ?? []
 
-        let classMethodsList = classMethods(in: machO)
+        let classMethodsList = classMethodList(in: machO)
         let classMethods = classMethodsList?
             .methods(in: machO)
             .compactMap { $0.info(isClassMethod: true) } ?? []
 
-        let methodsList = instanceMethods(in: machO)
+        let methodsList = instanceMethodList(in: machO)
         let methods = methodsList?
             .methods(in: machO)
             .compactMap { $0.info(isClassMethod: false) } ?? []
 
-        let optionalClassMethodsList = optionalClassMethods(in: machO)
+        let optionalClassMethodsList = optionalClassMethodList(in: machO)
         let optionalClassMethods = optionalClassMethodsList?
             .methods(in: machO)
             .compactMap { $0.info(isClassMethod: true) } ?? []
 
-        let optionalMethodsList = optionalInstanceMethods(in: machO)
+        let optionalMethodsList = optionalInstanceMethodList(in: machO)
         let optionalMethods = optionalMethodsList?
             .methods(in: machO)
             .compactMap { $0.info(isClassMethod: false) } ?? []
@@ -187,7 +187,7 @@ extension ObjCClassProtocol {
               let name = data.name(in: machO) else {
             return nil
         }
-        let protocolList = data.protocols(in: machO)
+        let protocolList = data.protocolList(in: machO)
         var protocols = protocolList?
             .protocols(in: machO)?
             .compactMap { $0.info(in: machO) } ?? []
@@ -200,13 +200,13 @@ extension ObjCClassProtocol {
                 }
         }
 
-        let ivarList = data.ivars(in: machO)
+        let ivarList = data.ivarList(in: machO)
         let ivars = ivarList?
             .ivars(in: machO)?
             .compactMap { $0.info(in: machO) } ?? []
 
         // Instance
-        let propertiesList = data.properties(in: machO)
+        let propertiesList = data.propertyList(in: machO)
         var properties = propertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: false) } ?? []
@@ -219,7 +219,7 @@ extension ObjCClassProtocol {
                 }
         }
 
-        let methodsList = data.methods(in: machO)
+        let methodsList = data.methodList(in: machO)
         var methods = methodsList?
             .methods(in: machO)?
             .compactMap { $0.info(isClassMethod: false) } ?? []
@@ -233,7 +233,7 @@ extension ObjCClassProtocol {
         }
 
         // Meta
-        let classPropertiesList = metaData.properties(in: machO)
+        let classPropertiesList = metaData.propertyList(in: machO)
         var classProperties = classPropertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: true) } ?? []
@@ -246,7 +246,7 @@ extension ObjCClassProtocol {
                 }
         }
 
-        let classMethodsList = metaData.methods(in: machO)
+        let classMethodsList = metaData.methodList(in: machO)
         var classMethods = classMethodsList?
             .methods(in: machO)?
             .compactMap { $0.info(isClassMethod: true) } ?? []
@@ -318,7 +318,7 @@ extension ObjCClassProtocol {
             return nil
         }
 
-        let protocolList = data.protocols(in: machO)
+        let protocolList = data.protocolList(in: machO)
         var protocols = protocolList?
             .protocols(in: machO)?
             .compactMap { $0.info(in: machO) } ?? []
@@ -331,13 +331,13 @@ extension ObjCClassProtocol {
                 }
         }
 
-        let ivarList = data.ivars(in: machO)
+        let ivarList = data.ivarList(in: machO)
         let ivars = ivarList?
             .ivars(in: machO)?
             .compactMap { $0.info(in: machO) } ?? []
 
         // Instance
-        let propertiesList = data.properties(in: machO)
+        let propertiesList = data.propertyList(in: machO)
         var properties = propertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: false) } ?? []
@@ -350,7 +350,7 @@ extension ObjCClassProtocol {
                 }
         }
 
-        let methodsList = data.methods(in: machO)
+        let methodsList = data.methodList(in: machO)
         var methods = methodsList?
             .methods(in: machO)
             .compactMap { $0.info(isClassMethod: false) } ?? []
@@ -364,7 +364,7 @@ extension ObjCClassProtocol {
         }
 
         // Meta
-        let classPropertiesList = metaData.properties(in: machO)
+        let classPropertiesList = metaData.propertyList(in: machO)
         var classProperties = classPropertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: true) } ?? []
@@ -377,7 +377,7 @@ extension ObjCClassProtocol {
                 }
         }
 
-        let classMethodsList = metaData.methods(in: machO)
+        let classMethodsList = metaData.methodList(in: machO)
         var classMethods = classMethodsList?
             .methods(in: machO)
             .compactMap { $0.info(isClassMethod: true) } ?? []
@@ -416,29 +416,29 @@ extension ObjCCategoryProtocol {
             return nil
         }
 
-        let protocolList = protocols(in: machO)
+        let protocolList = protocolList(in: machO)
         let protocols = protocolList?
             .protocols(in: machO)?
             .compactMap { $0.info(in: machO) } ?? []
 
         // Instance
-        let propertiesList = instanceProperties(in: machO)
+        let propertiesList = instancePropertyList(in: machO)
         let properties = propertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: false) } ?? []
 
-        let methodsList = instanceMethods(in: machO)
+        let methodsList = instanceMethodList(in: machO)
         let methods = methodsList?
             .methods(in: machO)
             .compactMap { $0.info(isClassMethod: false) } ?? []
 
         // Meta
-        let classPropertiesList = classProperties(in: machO)
+        let classPropertiesList = classPropertyList(in: machO)
         let classProperties = classPropertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: true) } ?? []
 
-        let classMethodsList = classMethods(in: machO)
+        let classMethodsList = classMethodList(in: machO)
         let classMethods = classMethodsList?
             .methods(in: machO)
             .compactMap { $0.info(isClassMethod: true) } ?? []
@@ -460,29 +460,29 @@ extension ObjCCategoryProtocol {
             return nil
         }
 
-        let protocolList = protocols(in: machO)
+        let protocolList = protocolList(in: machO)
         let protocols = protocolList?
             .protocols(in: machO)?
             .compactMap { $0.info(in: machO) } ?? []
 
         // Instance
-        let propertiesList = instanceProperties(in: machO)
+        let propertiesList = instancePropertyList(in: machO)
         let properties = propertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: false) } ?? []
 
-        let methodsList = instanceMethods(in: machO)
+        let methodsList = instanceMethodList(in: machO)
         let methods = methodsList?
             .methods(in: machO)?
             .compactMap { $0.info(isClassMethod: false) } ?? []
 
         // Meta
-        let classPropertiesList = classProperties(in: machO)
+        let classPropertiesList = classPropertyList(in: machO)
         let classProperties = classPropertiesList?
             .properties(in: machO)
             .compactMap { $0.info(isClassProperty: true) } ?? []
 
-        let classMethodsList = classMethods(in: machO)
+        let classMethodsList = classMethodList(in: machO)
         let classMethods = classMethodsList?
             .methods(in: machO)?
             .compactMap { $0.info(isClassMethod: true) } ?? []
