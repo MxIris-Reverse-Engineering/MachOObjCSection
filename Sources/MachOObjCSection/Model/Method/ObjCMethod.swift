@@ -36,7 +36,7 @@ extension ObjCMethod {
     public struct Pointer {
         public let name: UnsafePointer<CChar>
         public let types: UnsafePointer<CChar>
-        public let imp: IMP
+        public let imp: OpaquePointer
     }
 
     init(_ pointer: Pointer) {
@@ -94,7 +94,7 @@ extension ObjCMethod {
     public struct RelativeDirect {
         public let name: RelativeDirectPointer<CChar>
         public let types: RelativeDirectPointer<CChar>
-        public let imp: RelativeDirectPointer<IMP>
+        public let imp: RelativeDirectPointer<OpaquePointer>
     }
 
     init(_ relativeDirect: RelativeDirect, at pointer: UnsafeRawPointer) {
@@ -127,7 +127,7 @@ extension ObjCMethod {
     public struct RelativeInDirect {
         public let name: RelativeIndirectPointer<CChar>
         public let types: RelativeDirectPointer<CChar>
-        public let imp: RelativeDirectPointer<IMP>
+        public let imp: RelativeDirectPointer<OpaquePointer>
     }
 
     init(_ relativeIndirect: RelativeInDirect, at pointer: UnsafeRawPointer) {
