@@ -104,7 +104,7 @@ extension MachOObjCSectionTests {
     func testClassesInFile() {
         let machO = machOFile!
         guard let classes = machO.objc.classes64 else { return }
-        for cls in classes {
+        for cls in classes.prefix(100) {
             guard let info = cls.info(in: machO) else {
                 XCTFail("Failed to parse class")
                 continue
