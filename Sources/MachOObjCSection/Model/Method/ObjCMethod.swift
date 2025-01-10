@@ -98,14 +98,14 @@ extension ObjCMethod {
     }
 
     init(_ relativeDirect: RelativeDirect, at pointer: UnsafeRawPointer) {
-#if canImport(ObjectiveC)
+#if !canImport(ObjectiveC)
+        fatalError("Unsupported Platform")
+#else
         let base = unsafeBitCast(
             NSSelectorFromString("🤯"),
             to: UnsafeRawPointer.self
         )
-#else
-        fatalError("Unsupported Platform")
-#endif
+
         self.init(
             name: .init(
                 cString: relativeDirect.name
@@ -124,6 +124,7 @@ extension ObjCMethod {
                 )
             )
         )
+#endif
     }
 }
 
