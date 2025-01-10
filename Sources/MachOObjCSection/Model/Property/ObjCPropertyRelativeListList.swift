@@ -27,6 +27,7 @@ public struct ObjCPropertyRelativeListList: RelativeListListProtocol {
         let offset = entry.offset + entry.listOffset
         let ptr = machO.ptr.advanced(by: offset)
 
+#if canImport(MachO)
         let cache: DyldCacheLoaded = .current
         guard let machO = entry.machO(in: cache) else { return nil }
 
@@ -37,6 +38,9 @@ public struct ObjCPropertyRelativeListList: RelativeListListProtocol {
         )
 
         return (machO, list)
+#else
+        return nil
+#endif
     }
 
     public func list(in machO: MachOFile, for entry: Entry) -> (MachOFile, List)? {

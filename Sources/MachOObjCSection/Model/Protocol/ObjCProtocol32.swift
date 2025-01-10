@@ -12,6 +12,7 @@ import Foundation
 public struct ObjCProtocol32: LayoutWrapper, ObjCProtocolProtocol {
     public typealias Pointer = UInt32
     public typealias ObjCProtocolList = ObjCProtocolList32
+    public typealias LayoutField = ObjCProtocolLayoutField
 
     public struct Layout: _ObjCProtocolLayoutProtocol {
         public let isa: Pointer // UnsafeRawPointer?

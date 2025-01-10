@@ -11,6 +11,8 @@ import Foundation
 
 // https://github.com/apple-oss-distributions/dyld/blob/25174f1accc4d352d9e7e6294835f9e6e9b3c7bf/common/ObjCVisitor.h#L328
 public struct ObjCIvar64: LayoutWrapper, ObjCIvarProtocol {
+    public typealias LayoutField = ObjCIvarLayoutField
+
     public struct Layout: _ObjCIvarLayoutProtocol {
         public typealias Pointer = UInt64
 

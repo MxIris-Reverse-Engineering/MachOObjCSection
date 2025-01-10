@@ -14,6 +14,7 @@ public struct ObjCClass64: LayoutWrapper, ObjCClassProtocol {
     public typealias Pointer = UInt64
     public typealias ClassROData = ObjCClassROData64
     public typealias ClassRWData = ObjCClassRWData64
+    public typealias LayoutField = ObjCClassLayoutField
 
     public struct Layout: _ObjCClassLayoutProtocol {
         public let isa: Pointer // UnsafeRawPointer?

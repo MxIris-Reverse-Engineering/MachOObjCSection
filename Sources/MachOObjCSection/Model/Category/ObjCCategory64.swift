@@ -14,6 +14,7 @@ public struct ObjCCategory64: LayoutWrapper, ObjCCategoryProtocol {
     public typealias Pointer = UInt64
     public typealias ObjCClass = ObjCClass64
     public typealias ObjCStubClass = ObjCStubClass64
+    public typealias LayoutField = ObjCCategoryLayoutField
 
     public struct Layout: _ObjCCategoryLayoutProtocol {
         public let name: Pointer // UnsafePointer<CChar>

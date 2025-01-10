@@ -36,7 +36,7 @@ extension ObjCMethod {
     public struct Pointer {
         public let name: UnsafePointer<CChar>
         public let types: UnsafePointer<CChar>
-        public let imp: IMP
+        public let imp: OpaquePointer
     }
 
     init(_ pointer: Pointer) {
@@ -94,14 +94,18 @@ extension ObjCMethod {
     public struct RelativeDirect {
         public let name: RelativeDirectPointer<CChar>
         public let types: RelativeDirectPointer<CChar>
-        public let imp: RelativeDirectPointer<IMP>
+        public let imp: RelativeDirectPointer<OpaquePointer>
     }
 
     init(_ relativeDirect: RelativeDirect, at pointer: UnsafeRawPointer) {
+#if !canImport(ObjectiveC)
+        fatalError("Unsupported Platform")
+#else
         let base = unsafeBitCast(
             NSSelectorFromString("🤯"),
             to: UnsafeRawPointer.self
         )
+
         self.init(
             name: .init(
                 cString: relativeDirect.name
@@ -120,6 +124,7 @@ extension ObjCMethod {
                 )
             )
         )
+#endif
     }
 }
 
@@ -127,7 +132,7 @@ extension ObjCMethod {
     public struct RelativeInDirect {
         public let name: RelativeIndirectPointer<CChar>
         public let types: RelativeDirectPointer<CChar>
-        public let imp: RelativeDirectPointer<IMP>
+        public let imp: RelativeDirectPointer<OpaquePointer>
     }
 
     init(_ relativeIndirect: RelativeInDirect, at pointer: UnsafeRawPointer) {
