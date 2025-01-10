@@ -10,9 +10,10 @@ import Foundation
 @_spi(Support) import MachOKit
 
 public struct ObjCIvar32: LayoutWrapper, ObjCIvarProtocol {
+    public typealias LayoutField = ObjCIvarLayoutField
+
     public struct Layout: _ObjCIvarLayoutProtocol {
         public typealias Pointer = UInt32
-        public typealias LayoutField = ObjCIvarLayoutField
 
         public let offset: Pointer  // uint32_t*
         public let name: Pointer    // const char *
