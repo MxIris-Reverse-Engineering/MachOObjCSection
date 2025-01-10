@@ -13,6 +13,7 @@ import Foundation
 public struct ObjCIvar64: LayoutWrapper, ObjCIvarProtocol {
     public struct Layout: _ObjCIvarLayoutProtocol {
         public typealias Pointer = UInt64
+        public typealias LayoutField = ObjCIvarLayoutField
 
         public let offset: Pointer  // uint32_t*
         public let name: Pointer    // const char *

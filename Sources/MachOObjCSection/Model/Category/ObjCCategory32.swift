@@ -13,6 +13,7 @@ public struct ObjCCategory32: LayoutWrapper, ObjCCategoryProtocol {
     public typealias Pointer = UInt32
     public typealias ObjCClass = ObjCClass32
     public typealias ObjCStubClass = ObjCStubClass32
+    public typealias LayoutField = ObjCCategoryLayoutField
 
     public struct Layout: _ObjCCategoryLayoutProtocol {
         public let name: Pointer // UnsafePointer<CChar>
