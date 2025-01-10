@@ -8,6 +8,7 @@
 
 import MachOKit
 
+#if canImport(MachO)
 extension DyldCacheLoaded {
     static var current: DyldCacheLoaded {
         var size = 0
@@ -18,6 +19,7 @@ extension DyldCacheLoaded {
         return cache
     }
 }
+#endif
 
 extension DyldCacheLoaded {
     var headerOptimizationRO64: ObjCHeaderOptimizationRO64? {

@@ -28,6 +28,7 @@ public struct ObjCProtocolRelativeListList64: ObjCProtocolRelativeListListProtoc
         let offset = entry.offset + entry.listOffset
         let ptr = machO.ptr.advanced(by: offset)
 
+#if canImport(MachO)
         let cache: DyldCacheLoaded = .current
         guard let machO = entry.machO(in: cache) else { return nil }
 
@@ -37,6 +38,9 @@ public struct ObjCProtocolRelativeListList64: ObjCProtocolRelativeListListProtoc
         )
 
         return (machO, list)
+#else
+        return nil
+#endif
     }
 
     public func list(in machO: MachOFile, for entry: Entry) -> (MachOFile, List)? {
@@ -87,6 +91,7 @@ public struct ObjCProtocolRelativeListList32: ObjCProtocolRelativeListListProtoc
         let offset = entry.offset + entry.listOffset
         let ptr = machO.ptr.advanced(by: offset)
 
+#if canImport(MachO)
         let cache: DyldCacheLoaded = .current
         guard let objcOptimization = cache.objcOptimization,
               let ro = objcOptimization.headerOptimizationRO64(in: cache) else {
@@ -106,6 +111,9 @@ public struct ObjCProtocolRelativeListList32: ObjCProtocolRelativeListListProtoc
         )
 
         return (machO, list)
+#else
+        return nil
+#endif
     }
 
     public func list(in machO: MachOFile, for entry: Entry) -> (MachOFile, List)? {

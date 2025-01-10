@@ -23,6 +23,7 @@ extension MachOImage {
     }
 }
 
+#if canImport(MachO)
 extension MachOImage.ObjectiveC {
     public var isLoaded: Bool {
         let cache: DyldCacheLoaded = .current
@@ -54,6 +55,7 @@ extension MachOImage.ObjectiveC {
         return false
     }
 }
+#endif
 
 extension MachOImage.ObjectiveC {
     public var imageInfo: ObjCImageInfo? {
