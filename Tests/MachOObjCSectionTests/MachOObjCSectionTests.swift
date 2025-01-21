@@ -324,7 +324,7 @@ extension MachOObjCSectionTests {
 // MARK: - ObjC is Loaded
 extension MachOObjCSectionTests {
     func testIsLoadedMachOImage() {
-        let cache = DyldCacheLoaded.current
+        guard let cache: DyldCacheLoaded = .current else { return }
         for machO in cache.machOImages() {
             print(machO.objc.isLoaded, machO.path ?? "Unknown")
         }

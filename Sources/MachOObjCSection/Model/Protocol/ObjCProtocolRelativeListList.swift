@@ -29,7 +29,7 @@ public struct ObjCProtocolRelativeListList64: ObjCProtocolRelativeListListProtoc
         let ptr = machO.ptr.advanced(by: offset)
 
 #if canImport(MachO)
-        let cache: DyldCacheLoaded = .current
+        guard let cache: DyldCacheLoaded = .current else { return nil }
         guard let machO = entry.machO(in: cache) else { return nil }
 
         let list = List(
@@ -92,7 +92,7 @@ public struct ObjCProtocolRelativeListList32: ObjCProtocolRelativeListListProtoc
         let ptr = machO.ptr.advanced(by: offset)
 
 #if canImport(MachO)
-        let cache: DyldCacheLoaded = .current
+        guard let cache: DyldCacheLoaded = .current else { return nil }
         guard let objcOptimization = cache.objcOptimization,
               let ro = objcOptimization.headerOptimizationRO64(in: cache) else {
             return nil
