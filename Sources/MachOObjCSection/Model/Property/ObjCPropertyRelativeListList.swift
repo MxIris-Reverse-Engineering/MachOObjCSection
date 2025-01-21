@@ -28,7 +28,7 @@ public struct ObjCPropertyRelativeListList: RelativeListListProtocol {
         let ptr = machO.ptr.advanced(by: offset)
 
 #if canImport(MachO)
-        let cache: DyldCacheLoaded = .current
+        guard let cache: DyldCacheLoaded = .current else { return nil }
         guard let machO = entry.machO(in: cache) else { return nil }
 
         let list = List(
