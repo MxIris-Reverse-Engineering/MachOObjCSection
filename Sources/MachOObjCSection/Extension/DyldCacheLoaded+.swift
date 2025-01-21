@@ -8,19 +8,6 @@
 
 import MachOKit
 
-#if canImport(MachO)
-extension DyldCacheLoaded {
-    static var current: DyldCacheLoaded {
-        var size = 0
-        guard let ptr = _dyld_get_shared_cache_range(&size),
-              let cache = try? DyldCacheLoaded(ptr: ptr) else {
-            fatalError()
-        }
-        return cache
-    }
-}
-#endif
-
 extension DyldCacheLoaded {
     var headerOptimizationRO64: ObjCHeaderOptimizationRO64? {
         guard cpu.is64Bit else {

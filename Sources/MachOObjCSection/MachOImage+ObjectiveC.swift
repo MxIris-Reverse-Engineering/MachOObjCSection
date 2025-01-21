@@ -26,7 +26,7 @@ extension MachOImage {
 #if canImport(MachO)
 extension MachOImage.ObjectiveC {
     public var isLoaded: Bool {
-        let cache: DyldCacheLoaded = .current
+        guard let cache: DyldCacheLoaded = .current else { return true } // FIXME: check
 
         func _isLoaded(
             rw: some ObjCHeaderOptimizationRWProtocol,
