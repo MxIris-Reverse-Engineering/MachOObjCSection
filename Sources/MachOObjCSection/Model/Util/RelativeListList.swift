@@ -24,8 +24,6 @@ public struct RelativeListListEntry: LayoutWrapper {
 public protocol RelativeListListProtocol: EntrySizeListProtocol where Entry == RelativeListListEntry {
     associatedtype List
 
-    static var flagMask: UInt32 { get }
-
     var offset: Int { get }
     var header: EntrySizeListHeader { get }
 
