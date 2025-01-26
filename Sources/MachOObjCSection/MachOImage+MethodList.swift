@@ -63,7 +63,7 @@ extension MachOImage.ObjCMethodLists {
                 .advanced(by: nextOffset)
 
             let header = ptr.assumingMemoryBound(to: Element.Header.self).pointee
-            let listSize = Element.listSize(for: header)
+            let listSize = Element.size(for: header)
 
             guard nextOffset + listSize <= tableSize else {
                 return nil
@@ -79,7 +79,7 @@ extension MachOImage.ObjCMethodLists {
             }
 
             defer {
-                nextOffset += list.listSize
+                nextOffset += list.size
                 nextOffset += nextOffset % numericCast(power(2, align))
             }
 

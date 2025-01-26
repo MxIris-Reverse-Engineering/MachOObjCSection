@@ -42,12 +42,12 @@ extension EntrySizeListProtocol {
 }
 
 extension EntrySizeListProtocol {
-    public static func listSize(for header: Header) -> Int {
+    public static func size(for header: Header) -> Int {
         let entrySize: Int = numericCast(header.entsizeAndFlags & ~Self.flagMask)
         return Header.layoutSize + entrySize * numericCast(header.count)
     }
 
-    public var listSize: Int {
+    public var size: Int {
         Header.layoutSize + entrySize * numericCast(count)
     }
 }
