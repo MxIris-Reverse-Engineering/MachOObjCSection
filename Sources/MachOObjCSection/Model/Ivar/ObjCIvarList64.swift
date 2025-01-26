@@ -18,7 +18,7 @@ public struct ObjCIvarList64: ObjCIvarListProtocol {
 
     @_spi(Core)
     public init(
-        header: ObjCIvarListHeader,
+        header: Header,
         offset: Int
     ) {
         self.header = header

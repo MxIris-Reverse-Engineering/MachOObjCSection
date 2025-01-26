@@ -9,8 +9,7 @@
 import Foundation
 @_spi(Support) import MachOKit
 
-public protocol ObjCIvarListProtocol {
-    typealias Header = ObjCIvarListHeader
+public protocol ObjCIvarListProtocol: EntrySizeListProtocol where Entry == ObjCIvar {
     associatedtype ObjCIvar: ObjCIvarProtocol
 
     var offset: Int { get }
@@ -24,11 +23,7 @@ public protocol ObjCIvarListProtocol {
 }
 
 extension ObjCIvarListProtocol {
-    public var entrySize: Int { numericCast(header.entsize) }
-
-    public var count: Int {
-        numericCast(header.count)
-    }
+    public static var flagMask: UInt32 { 0 }
 }
 
 extension ObjCIvarListProtocol {
