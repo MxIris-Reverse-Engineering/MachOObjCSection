@@ -8,6 +8,7 @@
 
 import Foundation
 
+// https://github.com/apple-oss-distributions/objc4/blob/89543e2c0f67d38ca5211cea33f42c51500287d5/runtime/objc-runtime-new.h#L707
 public struct EntrySizeListHeader: LayoutWrapper {
     public struct Layout {
         public let entsizeAndFlags: UInt32
