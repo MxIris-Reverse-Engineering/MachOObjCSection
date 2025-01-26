@@ -11,6 +11,7 @@ import Foundation
 
 public struct ObjCIvarList32: ObjCIvarListProtocol {
     public typealias ObjCIvar = ObjCIvar32
+    public typealias Entry = ObjCIvar
 
     /// Offset from machO header start
     public let offset: Int
