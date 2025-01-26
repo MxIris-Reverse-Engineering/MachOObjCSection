@@ -7,6 +7,7 @@
 //
 
 import Foundation
+@_spi(Support) import MachOKit
 
 // https://github.com/apple-oss-distributions/objc4/blob/89543e2c0f67d38ca5211cea33f42c51500287d5/runtime/objc-runtime-new.h#L707
 public struct EntrySizeListHeader: LayoutWrapper {
@@ -41,7 +42,12 @@ extension EntrySizeListProtocol {
 }
 
 extension EntrySizeListProtocol {
+    public static func listSize(for header: Header) -> Int {
+        let entrySize: Int = numericCast(header.entsizeAndFlags & ~Self.flagMask)
+        return Header.layoutSize + entrySize * numericCast(header.count)
+    }
+
     public var listSize: Int {
-        MemoryLayout<EntrySizeListHeader>.size + entrySize * numericCast(count)
+        Header.layoutSize + entrySize * numericCast(count)
     }
 }

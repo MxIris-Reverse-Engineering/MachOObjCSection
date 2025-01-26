@@ -64,8 +64,9 @@ extension MachOFile.ObjCMethodLists {
                     .assumingMemoryBound(to: Element.Header.self)
                     .pointee
             }) else { return nil }
+            let listSize = Element.listSize(for: header)
 
-            guard nextOffset + header.listSize <= data.count else {
+            guard nextOffset + listSize <= data.count else {
                 return nil
             }
 
@@ -85,7 +86,7 @@ extension MachOFile.ObjCMethodLists {
             }
 
             defer {
-                nextOffset += list.size
+                nextOffset += list.listSize
                 nextOffset += nextOffset % numericCast(power(2, align))
             }
 

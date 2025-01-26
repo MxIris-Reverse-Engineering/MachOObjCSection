@@ -13,9 +13,9 @@ import Foundation
 
 // https://github.com/apple-oss-distributions/dyld/blob/25174f1accc4d352d9e7e6294835f9e6e9b3c7bf/common/ObjCVisitor.h#L191
 
-public struct ObjCMethodList {
-    public typealias Header = ObjCMethodListHeader
-
+public struct ObjCMethodList: EntrySizeListProtocol {
+    public typealias Entry = ObjCMethod
+    
     /// Offset from machO header start
     public let offset: Int
     public let header: Header
@@ -39,15 +39,11 @@ extension ObjCMethodList {
 }
 
 extension ObjCMethodList {
+    public static var flagMask: UInt32 { 0xffff0003 }
+}
+
+extension ObjCMethodList {
     typealias Mask = ObjCMethodListMask
-
-    public var entrySize: Int { header.entrySize }
-
-    public var flags: UInt32 { header.flags }
-
-    public var count: Int {
-        numericCast(header.count)
-    }
 
     public var listKind: ObjCMethod.Kind {
         if usesRelativeOffsets {
@@ -63,8 +59,6 @@ extension ObjCMethodList {
     public var usesRelativeOffsets: Bool {
         header.entsizeAndFlags & Mask.isRelative != 0
     }
-
-    public var size: Int { header.listSize }
 }
 
 extension ObjCMethodList {
