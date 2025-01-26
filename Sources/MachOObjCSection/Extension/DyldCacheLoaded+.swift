@@ -8,6 +8,16 @@
 
 import MachOKit
 
+#if !canImport(Darwin)
+extension DyldCacheLoaded {
+    // FIXME: fallback for linux
+    public static var current: DyldCacheLoaded? {
+        return nil
+    }
+}
+#endif
+
+
 extension DyldCacheLoaded {
     var headerOptimizationRO64: ObjCHeaderOptimizationRO64? {
         guard cpu.is64Bit else {

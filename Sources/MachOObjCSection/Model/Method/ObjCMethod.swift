@@ -99,12 +99,23 @@ extension ObjCMethod {
 
     init(_ relativeDirect: RelativeDirect, at pointer: UnsafeRawPointer) {
 #if !canImport(ObjectiveC)
-        fatalError("Unsupported Platform")
+        guard let cache: DyldCacheLoaded = .current else {
+            fatalError("Unsupported Platform")
+        }
+        let base: UnsafeRawPointer
+        if let objcOptimization = cache.objcOptimization {
+            base = objcOptimization.relativeMethodSelectorBaseAddress(in: cache)
+        } else if let objcOptimization = cache.oldObjcOptimization {
+            base = objcOptimization.relativeMethodSelectorBaseAddress(in: cache)
+        } else {
+            fatalError("Unsupported Platform")
+        }
 #else
         let base = unsafeBitCast(
             NSSelectorFromString("🤯"),
             to: UnsafeRawPointer.self
         )
+#endif
 
         self.init(
             name: .init(
@@ -124,7 +135,6 @@ extension ObjCMethod {
                 )
             )
         )
-#endif
     }
 }
 
