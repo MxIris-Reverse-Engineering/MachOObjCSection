@@ -11,6 +11,7 @@ import Foundation
 
 public struct ObjCIvarList32: ObjCIvarListProtocol {
     public typealias ObjCIvar = ObjCIvar32
+    public typealias Entry = ObjCIvar
 
     /// Offset from machO header start
     public let offset: Int
@@ -18,7 +19,7 @@ public struct ObjCIvarList32: ObjCIvarListProtocol {
 
     @_spi(Core)
     public init(
-        header: ObjCIvarListHeader,
+        header: Header,
         offset: Int
     ) {
         self.header = header

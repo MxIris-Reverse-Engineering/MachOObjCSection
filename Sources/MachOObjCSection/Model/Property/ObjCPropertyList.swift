@@ -9,8 +9,8 @@
 import Foundation
 @_spi(Support) import MachOKit
 
-public struct ObjCPropertyList {
-    public typealias Header = ObjCPropertyListHeader
+public struct ObjCPropertyList: EntrySizeListProtocol {
+    public typealias Entry = ObjCProperty
 
     /// Offset from machO header start
     public let offset: Int
@@ -35,11 +35,7 @@ extension ObjCPropertyList {
 }
 
 extension ObjCPropertyList {
-    public var entrySize: Int { numericCast(header.entsize) }
-
-    public var count: Int {
-        numericCast(header.count)
-    }
+    public static var flagMask: UInt32 { 0 }
 }
 
 extension ObjCPropertyList {

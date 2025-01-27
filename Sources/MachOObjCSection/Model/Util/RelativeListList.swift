@@ -11,14 +11,6 @@ import Foundation
 
 // https://github.com/apple-oss-distributions/objc4/blob/89543e2c0f67d38ca5211cea33f42c51500287d5/runtime/objc-runtime-new.h#L1482
 
-public struct RelativeListListHeader: LayoutWrapper {
-    public struct Layout {
-        public let entsizeAndFlags: UInt32
-        public let count: UInt32
-    }
-    public var layout: Layout
-}
-
 public struct RelativeListListEntry: LayoutWrapper {
     public typealias Layout = relative_list_list_entry_t
 
@@ -29,15 +21,11 @@ public struct RelativeListListEntry: LayoutWrapper {
     public var listOffset: Int { numericCast(layout.listOffset) }
 }
 
-public protocol RelativeListListProtocol {
+public protocol RelativeListListProtocol: EntrySizeListProtocol where Entry == RelativeListListEntry {
     associatedtype List
-    typealias Header = RelativeListListHeader
-    typealias Entry = RelativeListListEntry
-
-    static var flagMask: UInt32 { get }
 
     var offset: Int { get }
-    var header: Header { get }
+    var header: EntrySizeListHeader { get }
 
     func lists(in machO: MachOImage) -> [(MachOImage, List)]
     func list(in machO: MachOImage, for entry: Entry) -> (MachOImage, List)?
@@ -48,12 +36,6 @@ public protocol RelativeListListProtocol {
 
 extension RelativeListListProtocol {
     public static var flagMask: UInt32 { 0 }
-
-    public var entrySize: Int {
-        numericCast(header.entsizeAndFlags & ~Self.flagMask)
-    }
-
-    public var count: Int { numericCast(header.count) }
 }
 
 extension RelativeListListProtocol {

@@ -205,7 +205,7 @@ extension ObjCClassRODataProtocol {
             }
             return .init(
                 header: ptr
-                    .assumingMemoryBound(to: ObjCIvarListHeader.self)
+                    .assumingMemoryBound(to: ObjCIvarList.Header.self)
                     .pointee,
                 offset: numericCast(offset) - machO.headerStartOffset
             )
@@ -331,7 +331,7 @@ extension ObjCClassRODataProtocol {
         }
         let list = ObjCIvarList(
             header: ptr
-                .assumingMemoryBound(to: ObjCIvarListHeader.self)
+                .assumingMemoryBound(to: ObjCIvarList.Header.self)
                 .pointee,
             offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
         )
