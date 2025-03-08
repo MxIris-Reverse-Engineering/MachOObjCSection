@@ -190,7 +190,9 @@ extension ObjCProtocolProtocol {
     public func mangledName(in machO: MachOFile) -> String {
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
 
-        var offset: UInt64 = numericCast(layout.mangledName & 0x7ffffffff)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(layout.mangledName)
+        )  + numericCast(headerStartOffset)
 
         var fileHandle = machO.fileHandle
 
@@ -202,7 +204,7 @@ extension ObjCProtocolProtocol {
         }
 
         return fileHandle.readString(
-            offset: offset + numericCast(headerStartOffset)
+            offset: offset
         ) ?? ""
     }
 
@@ -211,11 +213,13 @@ extension ObjCProtocolProtocol {
 
         let headerStartOffset = machO.headerStartOffset
 
-        var offset: UInt64 = numericCast(layout.protocols) & 0x7ffffffff + numericCast(headerStartOffset)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(layout.protocols)
+        ) + numericCast(headerStartOffset)
 
         if let resolved = resolveRebase(.protocols, in: machO),
             resolved != offset {
-            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+            offset = machO.fileOffset(of: resolved) + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.protocols, in: machO) { return nil }
 
@@ -280,7 +284,9 @@ extension ObjCProtocolProtocol {
         guard layout._extendedMethodTypes > 0 else { return nil }
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
 
-        let _extendedMethodTypes = layout._extendedMethodTypes & 0x7ffffffff
+        let _extendedMethodTypes = machO.fileOffset(
+            of: UInt64(layout._extendedMethodTypes)
+        )
         if machO.is64Bit {
             var offset = UInt64(_extendedMethodTypes)
 
@@ -295,7 +301,8 @@ extension ObjCProtocolProtocol {
 
             offset = fileHandle.read(
                 offset: numericCast(headerStartOffset) + numericCast(offset)
-            ) & 0x7ffffffff
+            )
+            offset = machO.fileOffset(of: offset)
 
             if let (_cache, _offset) = machO.cacheAndFileOffset(
                 fromStart: offset
@@ -345,7 +352,9 @@ extension ObjCProtocolProtocol {
         guard layout._demangledName > 0 else { return nil }
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
 
-        var _demangledName = layout._demangledName & 0x7ffffffff
+        var _demangledName = machO.fileOffset(
+            of: numericCast(layout._demangledName)
+        )
 
         var fileHandle = machO.fileHandle
 
@@ -382,7 +391,7 @@ extension ObjCProtocolProtocol {
         guard offset > 0 else { return nil }
 
         let headerStartOffset = machO.headerStartOffset /*+ machO.headerStartOffsetInCache*/
-        let offset = offset & 0x7ffffffff
+        let offset = machO.fileOffset(of: offset)
         var resolvedOffset = offset
 
         var fileHandle = machO.fileHandle
@@ -415,7 +424,7 @@ extension ObjCProtocolProtocol {
         guard offset > 0 else { return nil }
 
         let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
-        let offset = offset & 0x7ffffffff
+        let offset = machO.fileOffset(of: offset)
         var resolvedOffset = offset
 
         var fileHandle = machO.fileHandle

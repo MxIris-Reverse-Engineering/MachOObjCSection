@@ -279,7 +279,7 @@ extension MachOFile.ObjectiveC {
         )
 
         return offsets
-            .map { UInt64($0) & 0x7ffffffff }
+            .map { machO.fileOffset(of: numericCast($0)) }
             .compactMap {
                 if let cache = machO.cache {
                     let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0
@@ -318,7 +318,7 @@ extension MachOFile.ObjectiveC {
         )
 
         return offsets
-            .map { UInt64($0) & 0x7ffffffff }
+            .map { machO.fileOffset(of: numericCast($0)) }
             .compactMap {
                 if let cache = machO.cache {
                     let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0
@@ -353,7 +353,7 @@ extension MachOFile.ObjectiveC {
         )
 
         return offsets
-            .map { UInt64($0) & 0x7ffffffff }
+            .map { machO.fileOffset(of: numericCast($0)) }
             .compactMap {
                 if let cache = machO.cache {
                     let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0

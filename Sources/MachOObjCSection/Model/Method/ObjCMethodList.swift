@@ -156,9 +156,9 @@ extension ObjCMethodList {
             )
             return sequence
                 .map {
-                    var name = UInt64($0.name) & 0x7ffffffff
-                    var types = UInt64($0.types) & 0x7ffffffff
-                    let imp = UInt64($0.imp) & 0x7ffffffff
+                    var name = machO.fileOffset(of: numericCast($0.name))
+                    var types = machO.fileOffset(of: numericCast($0.types))
+                    let imp = machO.fileOffset(of: numericCast($0.imp))
 
                     var nameFileHandle = machO.fileHandle
                     var typesFileHandle = machO.fileHandle
@@ -237,9 +237,11 @@ extension ObjCMethodList {
             return sequence.enumerated()
                 .map {
                     let offset = numericCast(offset) + $0 * size
-                    let name: UInt64 = machO.fileHandle.read(
-                        offset: numericCast(offset) + numericCast($1.name.offset)
-                    ) & 0x7ffffffff
+                    let name: UInt64 = machO.fileOffset(
+                        of: machO.fileHandle.read(
+                            offset: numericCast(offset) + numericCast($1.name.offset)
+                        )
+                    )
                     let types: Int64 = numericCast(offset) + numericCast($1.types.offset) + 4
                     let imp: UInt64 = numericCast(offset + numericCast($1.imp.offset)) + 8
 

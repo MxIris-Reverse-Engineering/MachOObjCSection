@@ -50,10 +50,17 @@ extension ObjCProtocolListProtocol {
         )
 
         return sequnece
-            .map {
-                UnsafeRawPointer(bitPattern: UInt($0))!
-                    .assumingMemoryBound(to: ObjCProtocol.self)
+            .compactMap {
+                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                    return nil
+                }
+                let layout = ptr
+                    .assumingMemoryBound(to: ObjCProtocol.Layout.self)
                     .pointee
+                return .init(
+                    layout: layout,
+                    offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+                )
             }
     }
 }

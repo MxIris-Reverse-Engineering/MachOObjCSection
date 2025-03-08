@@ -46,7 +46,9 @@ public protocol ObjCCategoryProtocol: _FixupResolvable where LayoutField == ObjC
 
 extension ObjCCategoryProtocol {
     public func name(in machO: MachOFile) -> String? {
-        var offset: UInt64 = numericCast(layout.name) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(layout.name)
+        ) + numericCast(machO.headerStartOffset)
         if let cache = machO.cache {
             guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
                 return nil
@@ -266,10 +268,12 @@ extension ObjCCategoryProtocol {
         in machO: MachOFile
     ) -> ObjCClass? {
         guard offset > 0 else { return nil }
-        var offset: UInt64 = numericCast(offset) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(offset)
+        ) + numericCast(machO.headerStartOffset)
 
         if let resolved = resolveRebase(field, in: machO) {
-            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+            offset = machO.fileOffset(of: resolved) + numericCast(machO.headerStartOffset)
         }
         if isBind(field, in: machO) { return nil }
 
@@ -282,7 +286,10 @@ extension ObjCCategoryProtocol {
         }
 
         let layout: ObjCClass.Layout = machO.fileHandle.read(offset: resolvedOffset)
-        return .init(layout: layout, offset: numericCast(offset))
+        return .init(
+            layout: layout,
+            offset: numericCast(offset) - machO.headerStartOffset
+        )
     }
 
     func _readStubClass(
@@ -291,10 +298,13 @@ extension ObjCCategoryProtocol {
         in machO: MachOFile
     ) -> ObjCStubClass? {
         guard offset > 0 else { return nil }
-        var offset: UInt64 = numericCast(offset) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(offset)
+        ) + numericCast(machO.headerStartOffset)
+
 
         if let resolved = resolveRebase(field, in: machO) {
-            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+            offset = machO.fileOffset(of: resolved) + numericCast(machO.headerStartOffset)
         }
         if isBind(field, in: machO) { return nil }
 
@@ -307,7 +317,10 @@ extension ObjCCategoryProtocol {
         }
 
         let layout: ObjCStubClass.Layout = machO.fileHandle.read(offset: resolvedOffset)
-        return .init(layout: layout, offset: numericCast(offset))
+        return .init(
+            layout: layout,
+            offset: numericCast(offset) - machO.headerStartOffset
+        )
     }
 
     private func _readClassName(
@@ -342,11 +355,13 @@ extension ObjCCategoryProtocol {
         guard offset > 0 else { return nil }
         guard offset & 1 == 0 else { return nil }
 
-        var offset: UInt64 = numericCast(offset) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(offset)
+        ) + numericCast(machO.headerStartOffset)
 
         if let resolved = resolveRebase(field, in: machO),
             resolved != offset {
-            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+            offset = machO.fileOffset(of: resolved) + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.baseMethods, in: machO) { return nil }
 
@@ -385,11 +400,13 @@ extension ObjCCategoryProtocol {
         guard offset > 0 else { return nil }
         guard offset & 1 == 0 else { return nil }
 
-        var offset: UInt64 = numericCast(offset) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(offset)
+        ) + numericCast(machO.headerStartOffset)
 
         if let resolved = resolveRebase(field, in: machO),
            resolved != offset {
-            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+            offset = machO.fileOffset(of: resolved) + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.baseProperties, in: machO) { return nil }
 
@@ -430,11 +447,13 @@ extension ObjCCategoryProtocol {
         guard offset > 0 else { return nil }
         guard offset & 1 == 0 else { return nil }
 
-        var offset: UInt64 = numericCast(offset) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(offset)
+        ) + numericCast(machO.headerStartOffset)
 
         if let resolved = resolveRebase(field, in: machO),
            resolved != offset {
-            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+            offset = machO.fileOffset(of: resolved) + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.baseProtocols, in: machO) { return nil }
 

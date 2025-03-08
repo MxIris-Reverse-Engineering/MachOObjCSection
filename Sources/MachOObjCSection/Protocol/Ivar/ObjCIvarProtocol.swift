@@ -41,10 +41,12 @@ extension ObjCIvarProtocol {
 extension ObjCIvarProtocol {
     public func offset(in machO: MachOFile) -> UInt32? {
         let headerStartOffset = machO.headerStartOffset
-        var offset: UInt64 = numericCast(layout.offset & 0x7ffffffff) + numericCast(headerStartOffset)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(layout.offset)
+        ) + numericCast(headerStartOffset)
 
         if let resolved = resolveRebase(.offset, in: machO) {
-            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+            offset = machO.fileOffset(of: resolved) + numericCast(headerStartOffset)
         }
 //        if isBind(\.offset, in: machO) { return nil }
 
@@ -66,10 +68,12 @@ extension ObjCIvarProtocol {
 
     public func name(in machO: MachOFile) -> String? {
         let headerStartOffset = machO.headerStartOffset
-        var offset: UInt64 = numericCast(layout.name & 0x7ffffffff) + numericCast(headerStartOffset)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(layout.name)
+        ) + numericCast(headerStartOffset)
 
         if let resolved = resolveRebase(.name, in: machO) {
-            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+            offset = machO.fileOffset(of: resolved) + numericCast(headerStartOffset)
         }
 //        if isBind(\.name, in: machO) { return nil }
 
@@ -87,10 +91,12 @@ extension ObjCIvarProtocol {
 
     public func type(in machO: MachOFile) -> String? {
         let headerStartOffset = machO.headerStartOffset
-        var offset: UInt64 = numericCast(layout.type & 0x7ffffffff) + numericCast(headerStartOffset)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(layout.type)
+        ) + numericCast(headerStartOffset)
 
         if let resolved = resolveRebase(.type, in: machO) {
-            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+            offset = machO.fileOffset(of: resolved) + numericCast(headerStartOffset)
         }
 //        if isBind(\.type, in: machO) { return nil }
 

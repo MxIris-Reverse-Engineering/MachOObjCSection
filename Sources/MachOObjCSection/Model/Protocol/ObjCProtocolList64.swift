@@ -60,7 +60,7 @@ extension ObjCProtocolList64 {
 
         return sequnece
             .map {
-                let offset = $0 & 0x7ffffffff + numericCast(headerStartOffset)
+                let offset = machO.fileOffset(of: $0) + numericCast(headerStartOffset)
                 var resolvedOffset = offset
 
                 var fileHandle = machO.fileHandle
@@ -76,7 +76,10 @@ extension ObjCProtocolList64 {
                     offset:  numericCast(resolvedOffset),
                     swapHandler: { _ in }
                 )
-                return .init(layout: layout, offset: numericCast(offset))
+                return .init(
+                    layout: layout,
+                    offset: numericCast(offset) - machO.headerStartOffset
+                )
             }
     }
 }

@@ -140,10 +140,12 @@ extension ObjCClassProtocol {
         in machO: MachOFile
     ) -> Self? {
         guard offset > 0 else { return nil }
-        var offset: UInt64 = numericCast(offset) & 0x7ffffffff + numericCast(machO.headerStartOffset)
+        var offset: UInt64 = machO.fileOffset(
+            of: numericCast(offset)
+        ) + numericCast(machO.headerStartOffset)
 
         if let resolved = resolveRebase(field, in: machO) {
-            offset = resolved & 0x7ffffffff + numericCast(machO.headerStartOffset)
+            offset = machO.fileOffset(of: resolved) + numericCast(machO.headerStartOffset)
         }
         if isBind(field, in: machO) { return nil }
 
@@ -156,7 +158,10 @@ extension ObjCClassProtocol {
         }
 
         let layout: Layout = machO.fileHandle.read(offset: resolvedOffset)
-        return .init(layout: layout, offset: numericCast(offset))
+        return .init(
+            layout: layout,
+            offset: numericCast(offset) - machO.headerStartOffset
+        )
     }
 
     private func _readClassName(
