@@ -94,8 +94,8 @@ extension ObjCPropertyList {
                 )
             return sequence
                 .compactMap {
-                    var name = UInt64($0.name) & 0x7ffffffff
-                    var attributes = UInt64($0.attributes) & 0x7ffffffff
+                    var name = machO.fileOffset(of: numericCast($0.name))
+                    var attributes = machO.fileOffset(of: numericCast($0.attributes))
 
                     var nameFileHandle = machO.fileHandle
                     var attributesFileHandle = machO.fileHandle

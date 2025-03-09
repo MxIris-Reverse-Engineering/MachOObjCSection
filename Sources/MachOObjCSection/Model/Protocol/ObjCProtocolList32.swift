@@ -76,7 +76,10 @@ extension ObjCProtocolList32 {
                     offset: numericCast(resolvedOffset),
                     swapHandler: { _ in }
                 )
-                return .init(layout: layout, offset: numericCast(offset))
+                return .init(
+                    layout: layout,
+                    offset: numericCast(offset) - machO.headerStartOffset
+                )
             }
     }
 }
