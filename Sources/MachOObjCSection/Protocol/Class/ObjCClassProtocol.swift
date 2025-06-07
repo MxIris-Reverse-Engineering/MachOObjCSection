@@ -21,15 +21,15 @@ public protocol ObjCClassProtocol: _FixupResolvable where LayoutField == ObjCCla
     @_spi(Core)
     init(layout: Layout, offset: Int)
 
-    func metaClass(in machO: MachOFile) -> Self?
-    func superClass(in machO: MachOFile) -> Self?
+    func metaClass(in machO: MachOFile) -> (MachOFile, Self)?
+    func superClass(in machO: MachOFile) -> (MachOFile, Self)?
     func superClassName(in machO: MachOFile) -> String?
     func classROData(in machO: MachOFile) -> ClassROData?
 
     func hasRWPointer(in machO: MachOImage) -> Bool
 
-    func metaClass(in machO: MachOImage) -> Self?
-    func superClass(in machO: MachOImage) -> Self?
+    func metaClass(in machO: MachOImage) -> (MachOImage, Self)?
+    func superClass(in machO: MachOImage) -> (MachOImage, Self)?
     func superClassName(in machO: MachOImage) -> String?
     func classROData(in machO: MachOImage) -> ClassROData?
     func classRWData(in machO: MachOImage) -> ClassRWData?
@@ -65,7 +65,7 @@ extension ObjCClassProtocol {
 }
 
 extension ObjCClassProtocol {
-    public func metaClass(in machO: MachOFile) -> Self? {
+    public func metaClass(in machO: MachOFile) -> (MachOFile, Self)? {
         _readClass(
             at: numericCast(layout.isa),
             field: .isa,
@@ -73,7 +73,7 @@ extension ObjCClassProtocol {
         )
     }
 
-    public func superClass(in machO: MachOFile) -> Self? {
+    public func superClass(in machO: MachOFile) -> (MachOFile, Self)? {
         _readClass(
             at: numericCast(layout.superclass),
             field: .superclass,
@@ -91,28 +91,54 @@ extension ObjCClassProtocol {
 }
 
 extension ObjCClassProtocol {
-    public func metaClass(in machO: MachOImage) -> Self? {
+    public func metaClass(in machO: MachOImage) -> (MachOImage, Self)? {
         guard layout.isa > 0 else { return nil }
         guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.isa)) else {
             return nil
         }
+
+        var targetMachO = machO
+        if !targetMachO.contains(ptr: ptr) {
+            guard let cache = DyldCacheLoaded.current,
+                  let _targetMachO = cache.machO(containing: ptr) else {
+                return nil
+            }
+            targetMachO = _targetMachO
+        }
+
+        let offset: Int = numericCast(layout.isa) - Int(bitPattern: targetMachO.ptr)
+
         let layout = ptr.assumingMemoryBound(to: Layout.self).pointee
-        let offset: Int = numericCast(layout.isa) - Int(bitPattern: machO.ptr)
-        return .init(layout: layout, offset: offset)
+        let cls: Self = .init(layout: layout, offset: offset)
+
+        return (targetMachO, cls)
     }
 
-    public func superClass(in machO: MachOImage) -> Self? {
+    public func superClass(in machO: MachOImage) -> (MachOImage, Self)? {
         guard layout.superclass > 0 else { return nil }
         guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.superclass)) else {
             return nil
         }
+
+        var targetMachO = machO
+        if !targetMachO.contains(ptr: ptr) {
+            guard let cache = DyldCacheLoaded.current,
+                  let _targetMachO = cache.machO(containing: ptr) else {
+                return nil
+            }
+            targetMachO = _targetMachO
+        }
+
+        let offset: Int = numericCast(layout.superclass) - Int(bitPattern: targetMachO.ptr)
+
         let layout = ptr.assumingMemoryBound(to: Layout.self).pointee
-        let offset: Int = numericCast(layout.superclass) - Int(bitPattern: machO.ptr)
-        return .init(layout: layout, offset: offset)
+        let cls: Self = .init(layout: layout, offset: offset)
+
+        return (targetMachO, cls)
     }
 
     public func superClassName(in machO: MachOImage) -> String? {
-        guard let superCls = superClass(in: machO) else {
+        guard let (machO, superCls) = superClass(in: machO) else {
             return nil
         }
 
@@ -134,11 +160,49 @@ extension ObjCClassProtocol {
 }
 
 extension ObjCClassProtocol {
+    @available(*, deprecated, renamed: "metaClass(in:)", message: "Use `metaClass(in:)` that returns machO that contains class")
+    public func metaClass(in machO: MachOFile) -> Self? {
+        guard let (_, cls) = self.metaClass(in: machO) else {
+            return nil
+        }
+        return cls
+    }
+
+    @available(*, deprecated, renamed: "superClass(in:)", message: "Use `superClass(in:)` that returns machO that contains class")
+    public func superClass(in machO: MachOFile) -> Self? {
+        guard let (_, cls) = self.superClass(in: machO) else {
+            return nil
+        }
+        return cls
+    }
+
+    @available(*, deprecated, renamed: "metaClass(in:)", message: "Use `metaClass(in:)` that returns machO that contains class")
+    func metaClass(in machO: MachOImage) -> Self? {
+        guard let (targetMachO, cls) = self.metaClass(in: machO) else { return nil }
+        let diff = Int(bitPattern: targetMachO.ptr) - Int(bitPattern: machO.ptr)
+        return .init(
+            layout: cls.layout,
+            offset: cls.offset + diff
+        )
+    }
+
+    @available(*, deprecated, renamed: "superClass(in:)", message: "Use `superClass(in:)` that returns machO that contains class")
+    func superClass(in machO: MachOImage) -> Self? {
+        guard let (targetMachO, cls) = self.superClass(in: machO) else { return nil }
+        let diff = Int(bitPattern: targetMachO.ptr) - Int(bitPattern: machO.ptr)
+        return .init(
+            layout: cls.layout,
+            offset: cls.offset + diff
+        )
+    }
+}
+
+extension ObjCClassProtocol {
     private func _readClass(
         at offset: UInt64,
         field: LayoutField,
         in machO: MachOFile
-    ) -> Self? {
+    ) -> (MachOFile, Self)? {
         guard offset > 0 else { return nil }
         var offset: UInt64 = machO.fileOffset(
             of: numericCast(offset)
@@ -149,19 +213,29 @@ extension ObjCClassProtocol {
         }
         if isBind(field, in: machO) { return nil }
 
+        var targetMachO = machO
+
+        var fileHandle = machO.fileHandle
         var resolvedOffset = offset
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
             resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+
+            let unslidAddress = offset + _cache.mainCacheHeader.sharedRegionStart
+            if !targetMachO.contains(unslidAddress: unslidAddress),
+               let machO = _cache.machO(containing: unslidAddress) {
+                targetMachO = machO
+            }
         }
 
-        let layout: Layout = machO.fileHandle.read(offset: resolvedOffset)
-        return .init(
+        let layout: Layout = fileHandle.read(offset: resolvedOffset)
+        let cls: Self = .init(
             layout: layout,
             offset: numericCast(offset) - machO.headerStartOffset
         )
+        return (targetMachO, cls)
     }
 
     private func _readClassName(
@@ -171,12 +245,12 @@ extension ObjCClassProtocol {
     ) -> String? {
         guard offset > 0 else { return nil }
 
-        if let cls = _readClass(
+        if let (targetMachO, cls) = _readClass(
             at: offset,
             field: field,
             in: machO
-        ), let data = cls.classROData(in: machO) {
-            return data.name(in: machO)
+        ), let data = cls.classROData(in: targetMachO) {
+            return data.name(in: targetMachO)
         }
 
         if let bindSymbolName = resolveBind(field, in: machO) {
