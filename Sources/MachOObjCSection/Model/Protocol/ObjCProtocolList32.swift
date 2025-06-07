@@ -26,13 +26,13 @@ public struct ObjCProtocolList32: ObjCProtocolListProtocol {
 extension ObjCProtocolList32 {
     public func protocols(
         in machO: MachOImage
-    ) -> [ObjCProtocol]? {
+    ) -> [(MachOImage, ObjCProtocol)]? {
         _readProtocols(in: machO, pointerType: UInt32.self)
     }
 
     public func protocols(
         in machO: MachOFile
-    ) -> [ObjCProtocol]? {
+    ) -> [(MachOFile, ObjCProtocol)]? {
         guard !isListOfLists else {
             assertionFailure()
             return nil
@@ -63,6 +63,8 @@ extension ObjCProtocolList32 {
                 let offset = $0 + numericCast(headerStartOffset)
                 var resolvedOffset = offset
 
+                var targetMachO = machO
+
                 var fileHandle = machO.fileHandle
 
                 if let (_cache, _offset) = machO.cacheAndFileOffset(
@@ -70,16 +72,23 @@ extension ObjCProtocolList32 {
                 ) {
                     resolvedOffset = _offset
                     fileHandle = _cache.fileHandle
+
+                    let unslidAddress = offset + _cache.mainCacheHeader.sharedRegionStart
+                    if !targetMachO.contains(unslidAddress: unslidAddress),
+                       let machO = _cache.machO(containing: unslidAddress) {
+                        targetMachO = machO
+                    }
                 }
 
                 let layout: ObjCProtocol32.Layout = fileHandle.read(
                     offset: numericCast(resolvedOffset),
                     swapHandler: { _ in }
                 )
-                return .init(
+                let `protocol`: ObjCProtocol = .init(
                     layout: layout,
                     offset: numericCast(offset) - machO.headerStartOffset
                 )
+                return (targetMachO, `protocol`)
             }
     }
 }

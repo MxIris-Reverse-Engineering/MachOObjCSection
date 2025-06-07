@@ -3,7 +3,7 @@
 //
 //
 //  Created by p-x9 on 2024/07/19
-//  
+//
 //
 
 import Foundation
@@ -23,8 +23,8 @@ public protocol ObjCProtocolListProtocol {
     @_spi(Core)
     init(ptr: UnsafeRawPointer, offset: Int)
 
-    func protocols(in machO: MachOImage) -> [ObjCProtocol]?
-    func protocols(in machO: MachOFile) -> [ObjCProtocol]?
+    func protocols(in machO: MachOImage) -> [(MachOImage, ObjCProtocol)]?
+    func protocols(in machO: MachOFile) -> [(MachOFile, ObjCProtocol)]?
 }
 
 extension ObjCProtocolListProtocol {
@@ -37,8 +37,7 @@ extension ObjCProtocolListProtocol {
     func _readProtocols<Pointer: FixedWidthInteger>(
         in machO: MachOImage,
         pointerType: Pointer.Type
-    ) -> [ObjCProtocol]? {
-        // TODO: Support listOfLists
+    ) -> [(MachOImage, ObjCProtocol)]? {
         guard !isListOfLists else { return nil }
 
         let ptr = machO.ptr.advanced(by: offset)
@@ -57,10 +56,21 @@ extension ObjCProtocolListProtocol {
                 let layout = ptr
                     .assumingMemoryBound(to: ObjCProtocol.Layout.self)
                     .pointee
-                return .init(
+
+                var targetMachO = machO
+                if !targetMachO.contains(ptr: ptr) {
+                    guard let cache = DyldCacheLoaded.current,
+                          let _targetMachO = cache.machO(containing: ptr) else {
+                        return nil
+                    }
+                    targetMachO = _targetMachO
+                }
+
+                let `protocol`: ObjCProtocol = .init(
                     layout: layout,
-                    offset: Int(bitPattern: ptr) - Int(bitPattern: machO.ptr)
+                    offset: Int(bitPattern: ptr) - Int(bitPattern: targetMachO.ptr)
                 )
+                return (targetMachO, `protocol`)
             }
     }
 }
