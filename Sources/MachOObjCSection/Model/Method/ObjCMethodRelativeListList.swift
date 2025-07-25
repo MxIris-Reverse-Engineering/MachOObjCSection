@@ -54,9 +54,9 @@ extension ObjCMethodRelativeListList {
 
         guard let machO = entry.machO(in: cache) else { return nil }
 
-        let data = cache.fileHandle.readData(
-            offset: resolvedOffset,
-            size: MemoryLayout<List.Header>.size
+        let data = try! cache.fileHandle.readData(
+            offset: numericCast(resolvedOffset),
+            length: MemoryLayout<List.Header>.size
         )
         let list: List? = data.withUnsafeBytes {
             guard let ptr = $0.baseAddress else {

@@ -57,10 +57,9 @@ extension ObjCIvarProtocol {
             offset = _offset
         }
 
-        return machO.fileHandle
-            .readData(
-                offset: offset,
-                size: MemoryLayout<UInt32>.size
+        return try! machO.fileHandle.readData(
+                offset: numericCast(offset),
+                length: MemoryLayout<UInt32>.size
             ).withUnsafeBytes {
                 $0.load(as: UInt32.self)
             }

@@ -238,7 +238,7 @@ extension ObjCMethodList {
                 .map {
                     let offset = numericCast(offset) + $0 * size
                     let name: UInt64 = machO.fileOffset(
-                        of: machO.fileHandle.read(
+                        of: try! machO.fileHandle.read(
                             offset: numericCast(offset) + numericCast($1.name.offset)
                         )
                     )

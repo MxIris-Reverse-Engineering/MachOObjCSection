@@ -11,7 +11,7 @@
 import Foundation
 @_spi(Support) import MachOKit
 #if compiler(>=6.0) || (compiler(>=5.10) && hasFeature(AccessLevelOnImport))
-private import FileIO
+internal import FileIO
 #else
 @_implementationOnly import FileIO
 #endif
