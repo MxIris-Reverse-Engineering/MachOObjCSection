@@ -3,7 +3,7 @@
 //
 //
 //  Created by p-x9 on 2024/09/28
-//  
+//
 //
 
 import Foundation
@@ -73,7 +73,7 @@ extension ObjCProtocolProtocol {
         let protocolList = protocolList(in: machO)
         let protocols = protocolList?
             .protocols(in: machO)?
-            .compactMap { $0.info(in: machO) } ?? []
+            .compactMap { $1.info(in: $0) } ?? []
 
         let classPropertiesList = classPropertyList(in: machO)
         let classProperties = classPropertiesList?
@@ -129,7 +129,7 @@ extension ObjCProtocolProtocol {
         let protocolList = protocolList(in: machO)
         let protocols = protocolList?
             .protocols(in: machO)?
-            .compactMap { $0.info(in: machO) } ?? []
+            .compactMap { $1.info(in: $0) } ?? []
 
         let classPropertiesList = classPropertyList(in: machO)
         let classProperties = classPropertiesList?
@@ -182,21 +182,21 @@ extension ObjCProtocolProtocol {
 extension ObjCClassProtocol {
     public func info(in machO: MachOFile) -> ObjCClassInfo? {
         guard let data = classROData(in: machO),
-              let meta = metaClass(in: machO),
-              let metaData = meta.classROData(in: machO),
+              let (targetMachO, meta) = metaClass(in: machO),
+              let metaData = meta.classROData(in: targetMachO),
               let name = data.name(in: machO) else {
             return nil
         }
         let protocolList = data.protocolList(in: machO)
         var protocols = protocolList?
             .protocols(in: machO)?
-            .compactMap { $0.info(in: machO) } ?? []
+            .compactMap { $1.info(in: $0) } ?? []
         if let relative = data.protocolRelativeListList(in: machO) {
             protocols = relative.lists(in: machO)
                 .filter({ $0.0.imagePath == machO.imagePath })
                 .flatMap { machO, list in
                     list.protocols(in: machO)?
-                        .compactMap { $0.info(in: machO) } ?? []
+                        .compactMap { $1.info(in: $0) } ?? []
                 }
         }
 
@@ -233,26 +233,26 @@ extension ObjCClassProtocol {
         }
 
         // Meta
-        let classPropertiesList = metaData.propertyList(in: machO)
+        let classPropertiesList = metaData.propertyList(in: targetMachO)
         var classProperties = classPropertiesList?
-            .properties(in: machO)
+            .properties(in: targetMachO)
             .compactMap { $0.info(isClassProperty: true) } ?? []
-        if let relative = metaData.propertyRelativeListList(in: machO) {
-            classProperties = relative.lists(in: machO)
-                .filter { $0.0.imagePath == machO.imagePath }
+        if let relative = metaData.propertyRelativeListList(in: targetMachO) {
+            classProperties = relative.lists(in: targetMachO)
+                .filter { $0.0.imagePath == targetMachO.imagePath }
                 .flatMap { machO, list in
                     list.properties(in: machO)
                         .compactMap { $0.info(isClassProperty: true) }
                 }
         }
 
-        let classMethodsList = metaData.methodList(in: machO)
+        let classMethodsList = metaData.methodList(in: targetMachO)
         var classMethods = classMethodsList?
-            .methods(in: machO)?
+            .methods(in: targetMachO)?
             .compactMap { $0.info(isClassMethod: true) } ?? []
-        if let relative = metaData.methodRelativeListList(in: machO) {
-            classMethods = relative.lists(in: machO)
-                .filter({ $0.0.imagePath == machO.imagePath })
+        if let relative = metaData.methodRelativeListList(in: targetMachO) {
+            classMethods = relative.lists(in: targetMachO)
+                .filter({ $0.0.imagePath == targetMachO.imagePath })
                 .flatMap { machO, list in
                     list.methods(in: machO)?
                         .compactMap { $0.info(isClassMethod: true) } ?? []
@@ -277,7 +277,7 @@ extension ObjCClassProtocol {
     }
 
     public func info(in machO: MachOImage) -> ObjCClassInfo? {
-        guard let meta = metaClass(in: machO) else {
+        guard let (targetMachO, meta) = metaClass(in: machO) else {
             return nil
         }
 
@@ -299,13 +299,13 @@ extension ObjCClassProtocol {
             return nil
         }
 
-        if let _data = meta.classROData(in: machO) {
+        if let _data = meta.classROData(in: targetMachO) {
             metaData = _data
-        } else if let rw = meta.classRWData(in: machO) {
-            if let _data = rw.classROData(in: machO) {
+        } else if let rw = meta.classRWData(in: targetMachO) {
+            if let _data = rw.classROData(in: targetMachO) {
                 metaData = _data
-            } else if let ext = rw.ext(in: machO),
-                      let _data = ext.classROData(in: machO) {
+            } else if let ext = rw.ext(in: targetMachO),
+                      let _data = ext.classROData(in: targetMachO) {
                 metaData = _data
             } else {
                 return nil
@@ -321,13 +321,13 @@ extension ObjCClassProtocol {
         let protocolList = data.protocolList(in: machO)
         var protocols = protocolList?
             .protocols(in: machO)?
-            .compactMap { $0.info(in: machO) } ?? []
+            .compactMap { $1.info(in: $0) } ?? []
         if let relative = data.protocolRelativeListList(in: machO) {
             protocols = relative.lists(in: machO)
-                .filter({ $0.0.path == machO.path })
+                .filter({ $0.0.ptr == machO.ptr })
                 .flatMap { machO, list in
                     list.protocols(in: machO)?
-                        .compactMap { $0.info(in: machO) } ?? []
+                        .compactMap { $1.info(in: $0) } ?? []
                 }
         }
 
@@ -364,26 +364,26 @@ extension ObjCClassProtocol {
         }
 
         // Meta
-        let classPropertiesList = metaData.propertyList(in: machO)
+        let classPropertiesList = metaData.propertyList(in: targetMachO)
         var classProperties = classPropertiesList?
-            .properties(in: machO)
+            .properties(in: targetMachO)
             .compactMap { $0.info(isClassProperty: true) } ?? []
-        if let relative = metaData.propertyRelativeListList(in: machO) {
-            classProperties = relative.lists(in: machO)
-                .filter { $0.0.ptr == machO.ptr }
+        if let relative = metaData.propertyRelativeListList(in: targetMachO) {
+            classProperties = relative.lists(in: targetMachO)
+                .filter { $0.0.ptr == targetMachO.ptr }
                 .flatMap { machO, list in
                     list.properties(in: machO)
                         .compactMap { $0.info(isClassProperty: true) }
                 }
         }
 
-        let classMethodsList = metaData.methodList(in: machO)
+        let classMethodsList = metaData.methodList(in: targetMachO)
         var classMethods = classMethodsList?
-            .methods(in: machO)
+            .methods(in: targetMachO)
             .compactMap { $0.info(isClassMethod: true) } ?? []
-        if let relative = metaData.methodRelativeListList(in: machO) {
-            classMethods = relative.lists(in: machO)
-                .filter({ $0.0.ptr == machO.ptr })
+        if let relative = metaData.methodRelativeListList(in: targetMachO) {
+            classMethods = relative.lists(in: targetMachO)
+                .filter({ $0.0.ptr == targetMachO.ptr })
                 .flatMap { machO, list in
                     list.methods(in: machO)
                         .compactMap { $0.info(isClassMethod: true) }
@@ -419,7 +419,7 @@ extension ObjCCategoryProtocol {
         let protocolList = protocolList(in: machO)
         let protocols = protocolList?
             .protocols(in: machO)?
-            .compactMap { $0.info(in: machO) } ?? []
+            .compactMap { $1.info(in: $0) } ?? []
 
         // Instance
         let propertiesList = instancePropertyList(in: machO)
@@ -463,7 +463,7 @@ extension ObjCCategoryProtocol {
         let protocolList = protocolList(in: machO)
         let protocols = protocolList?
             .protocols(in: machO)?
-            .compactMap { $0.info(in: machO) } ?? []
+            .compactMap { $1.info(in: $0) } ?? []
 
         // Instance
         let propertiesList = instancePropertyList(in: machO)

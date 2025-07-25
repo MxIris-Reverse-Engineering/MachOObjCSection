@@ -56,13 +56,19 @@ extension MachOFile.ObjectiveC {
             return nil
         }
 
+        let offset = if let cache = machO.cache {
+            __objc_methlist.address - numericCast(cache.mainCacheHeader.sharedRegionStart)
+        } else {
+            __objc_methlist.offset
+        }
+
         return .init(
             data: machO.fileHandle.readData(
                 offset: numericCast(__objc_methlist.offset + machO.headerStartOffset),
                 size: __objc_methlist.size
             ),
-            offset: numericCast(__objc_methlist.offset),
-            align: numericCast(__objc_methlist.align),
+            offset: offset,
+            align: __objc_methlist.align,
             is64Bit: machO.is64Bit
         )
     }

@@ -115,3 +115,14 @@ extension DyldCache {
         return nil
     }
 }
+
+extension DyldCache {
+    func machO(containing unslidAddress: UInt64) -> MachOFile? {
+        for machO in self.machOFiles() {
+            if machO.contains(unslidAddress: unslidAddress) {
+                return machO
+            }
+        }
+        return nil
+    }
+}

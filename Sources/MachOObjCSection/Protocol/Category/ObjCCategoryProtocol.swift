@@ -3,7 +3,7 @@
 //  MachOObjCSection
 //
 //  Created by p-x9 on 2024/12/06
-//  
+//
 //
 
 import Foundation
@@ -24,8 +24,8 @@ public protocol ObjCCategoryProtocol: _FixupResolvable where LayoutField == ObjC
     init(layout: Layout, offset: Int, isCatlist2: Bool)
 
     func name(in machO: MachOFile) -> String?
-    func `class`(in machO: MachOFile) -> ObjCClass?
-    func stubClass(in machO: MachOFile) -> ObjCStubClass?
+    func `class`(in machO: MachOFile) -> (MachOFile, ObjCClass)?
+    func stubClass(in machO: MachOFile) -> (MachOFile, ObjCStubClass)?
     func className(in machO: MachOFile) -> String?
     func instanceMethodList(in machO: MachOFile) -> ObjCMethodList?
     func classMethodList(in machO: MachOFile) -> ObjCMethodList?
@@ -34,8 +34,8 @@ public protocol ObjCCategoryProtocol: _FixupResolvable where LayoutField == ObjC
     func protocolList(in machO: MachOFile) -> ObjCProtocolList?
 
     func name(in machO: MachOImage) -> String?
-    func `class`(in machO: MachOImage) -> ObjCClass?
-    func stubClass(in machO: MachOImage) -> ObjCStubClass?
+    func `class`(in machO: MachOImage) -> (MachOImage, ObjCClass)?
+    func stubClass(in machO: MachOImage) -> (MachOImage, ObjCStubClass)?
     func className(in machO: MachOImage) -> String?
     func instanceMethodList(in machO: MachOImage) -> ObjCMethodList?
     func classMethodList(in machO: MachOImage) -> ObjCMethodList?
@@ -58,8 +58,8 @@ extension ObjCCategoryProtocol {
         return machO.fileHandle.readString(offset: numericCast(offset))
     }
 
-    public func `class`(in machO: MachOFile) -> ObjCClass? {
-        guard let cls = _readClass(
+    public func `class`(in machO: MachOFile) -> (MachOFile, ObjCClass)? {
+        guard let (machO, cls) = _readClass(
             at: numericCast(layout.cls),
             field: .cls,
             in: machO
@@ -67,10 +67,11 @@ extension ObjCCategoryProtocol {
 
         if cls.isStubClass { return nil }
 
-        return cls
+        return (machO, cls)
     }
-    public func stubClass(in machO: MachOFile) -> ObjCStubClass? {
-        guard let cls = _readStubClass(
+
+    public func stubClass(in machO: MachOFile) -> (MachOFile, ObjCStubClass)? {
+        guard let (machO, cls) = _readStubClass(
             at: numericCast(layout.cls),
             field: .cls,
             in: machO
@@ -78,7 +79,7 @@ extension ObjCCategoryProtocol {
 
         guard cls.isStubClass else { return nil }
 
-        return cls
+        return (machO, cls)
     }
 
     public func className(in machO: MachOFile) -> String? {
@@ -163,38 +164,58 @@ extension ObjCCategoryProtocol {
         )
     }
 
-    public func `class`(in machO: MachOImage) -> ObjCClass? {
+    public func `class`(in machO: MachOImage) -> (MachOImage, ObjCClass)? {
         guard layout.cls > 0 else { return nil }
         guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.cls)) else {
             return nil
         }
-        let offset: Int = numericCast(layout.cls) - Int(bitPattern: machO.ptr)
+
+        var targetMachO = machO
+        if !targetMachO.contains(ptr: ptr) {
+            guard let cache = DyldCacheLoaded.current,
+                  let _targetMachO = cache.machO(containing: ptr) else {
+                return nil
+            }
+            targetMachO = _targetMachO
+        }
+
+        let offset: Int = numericCast(layout.cls) - Int(bitPattern: targetMachO.ptr)
 
         let layout = ptr.assumingMemoryBound(to: ObjCClass.Layout.self).pointee
         let cls: ObjCClass = .init(layout: layout, offset: offset)
 
         if cls.isStubClass { return nil }
 
-        return cls
+        return (targetMachO, cls)
     }
 
-    public func stubClass(in machO: MachOImage) -> ObjCStubClass? {
+    public func stubClass(in machO: MachOImage) -> (MachOImage, ObjCStubClass)? {
         guard layout.cls > 0 else { return nil }
         guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.cls)) else {
             return nil
         }
-        let offset: Int = numericCast(layout.cls) - Int(bitPattern: machO.ptr)
+
+        var targetMachO = machO
+        if !targetMachO.contains(ptr: ptr) {
+            guard let cache = DyldCacheLoaded.current,
+                  let _targetMachO = cache.machO(containing: ptr) else {
+                return nil
+            }
+            targetMachO = _targetMachO
+        }
+
+        let offset: Int = numericCast(layout.cls) - Int(bitPattern: targetMachO.ptr)
 
         let layout = ptr.assumingMemoryBound(to: ObjCStubClass.Layout.self).pointee
         let cls: ObjCStubClass = .init(layout: layout, offset: offset)
 
         guard cls.isStubClass else { return nil }
 
-        return cls
+        return (targetMachO, cls)
     }
 
     public func className(in machO: MachOImage) -> String? {
-        guard let cls = `class`(in: machO) else {
+        guard let (machO, cls) = `class`(in: machO) else {
             if let section = machO.sectionNumber(for: .__objc_const),
                let symbol = machO.symbol(
                 for: offset, inSection: section
@@ -262,11 +283,49 @@ extension ObjCCategoryProtocol {
 }
 
 extension ObjCCategoryProtocol {
+    @available(*, deprecated, renamed: "class(in:)", message: "Use `class(in:)` that returns machO that contains class")
+    public func `class`(in machO: MachOFile) -> ObjCClass? {
+        guard let (_, cls) = self.class(in: machO) else {
+            return nil
+        }
+        return cls
+    }
+
+    @available(*, deprecated, renamed: "stubClass(in:)", message: "Use `stubCclass(in:)` that returns machO that contains class")
+    public func stubClass(in machO: MachOFile) -> ObjCStubClass? {
+        guard let (_, cls) = self.stubClass(in: machO) else {
+            return nil
+        }
+        return cls
+    }
+
+    @available(*, deprecated, renamed: "class(in:)", message: "Use `class(in:)` that returns machO that contains class")
+    func `class`(in machO: MachOImage) -> ObjCClass? {
+        guard let (targetMachO, cls) = self.class(in: machO) else { return nil }
+        let diff = Int(bitPattern: targetMachO.ptr) - Int(bitPattern: machO.ptr)
+        return .init(
+            layout: cls.layout,
+            offset: cls.offset + diff
+        )
+    }
+
+    @available(*, deprecated, renamed: "stubClass(in:)", message: "Use `stubCclass(in:)` that returns machO that contains class")
+    func stubClass(in machO: MachOImage) -> ObjCStubClass? {
+        guard let (targetMachO, cls) = self.stubClass(in: machO) else { return nil }
+        let diff = Int(bitPattern: targetMachO.ptr) - Int(bitPattern: machO.ptr)
+        return .init(
+            layout: cls.layout,
+            offset: cls.offset + diff
+        )
+    }
+}
+
+extension ObjCCategoryProtocol {
     private func _readClass(
         at offset: UInt64,
         field: LayoutField,
         in machO: MachOFile
-    ) -> ObjCClass? {
+    ) -> (MachOFile, ObjCClass)? {
         guard offset > 0 else { return nil }
         var offset: UInt64 = machO.fileOffset(
             of: numericCast(offset)
@@ -277,50 +336,69 @@ extension ObjCCategoryProtocol {
         }
         if isBind(field, in: machO) { return nil }
 
+        var targetMachO = machO
+
+        var fileHandle = machO.fileHandle
         var resolvedOffset = offset
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
             resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+
+            let unslidAddress = offset + _cache.mainCacheHeader.sharedRegionStart
+            if !targetMachO.contains(unslidAddress: unslidAddress),
+               let machO = _cache.machO(containing: unslidAddress) {
+                targetMachO = machO
+            }
         }
 
-        let layout: ObjCClass.Layout = machO.fileHandle.read(offset: resolvedOffset)
-        return .init(
+        let layout: ObjCClass.Layout = fileHandle.read(offset: resolvedOffset)
+        let cls: ObjCClass = .init(
             layout: layout,
             offset: numericCast(offset) - machO.headerStartOffset
         )
+        return (targetMachO, cls)
     }
 
     func _readStubClass(
         at offset: UInt64,
         field: LayoutField,
         in machO: MachOFile
-    ) -> ObjCStubClass? {
+    ) -> (MachOFile, ObjCStubClass)? {
         guard offset > 0 else { return nil }
         var offset: UInt64 = machO.fileOffset(
             of: numericCast(offset)
         ) + numericCast(machO.headerStartOffset)
-
 
         if let resolved = resolveRebase(field, in: machO) {
             offset = machO.fileOffset(of: resolved) + numericCast(machO.headerStartOffset)
         }
         if isBind(field, in: machO) { return nil }
 
+        var targetMachO = machO
+
+        var fileHandle = machO.fileHandle
         var resolvedOffset = offset
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
             resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
+
+            let unslidAddress = offset + _cache.mainCacheHeader.sharedRegionStart
+            if !targetMachO.contains(unslidAddress: unslidAddress),
+               let machO = _cache.machO(containing: unslidAddress) {
+                targetMachO = machO
+            }
         }
 
-        let layout: ObjCStubClass.Layout = machO.fileHandle.read(offset: resolvedOffset)
-        return .init(
+        let layout: ObjCStubClass.Layout = fileHandle.read(offset: resolvedOffset)
+        let cls: ObjCStubClass = .init(
             layout: layout,
             offset: numericCast(offset) - machO.headerStartOffset
         )
+        return (targetMachO, cls)
     }
 
     private func _readClassName(
@@ -330,13 +408,13 @@ extension ObjCCategoryProtocol {
     ) -> String? {
         guard offset > 0 else { return nil }
 
-        if let cls = _readClass(
+        if let (targetMachO, cls) = _readClass(
             at: offset,
             field: field,
             in: machO
         ), !cls.isStubClass ,
-           let data = cls.classROData(in: machO) {
-            return data.name(in: machO)
+           let data = cls.classROData(in: targetMachO) {
+            return data.name(in: targetMachO)
         }
 
         if let bindSymbolName = resolveBind(field, in: machO) {
@@ -360,7 +438,7 @@ extension ObjCCategoryProtocol {
         ) + numericCast(machO.headerStartOffset)
 
         if let resolved = resolveRebase(field, in: machO),
-            resolved != offset {
+           resolved != offset {
             offset = machO.fileOffset(of: resolved) + numericCast(machO.headerStartOffset)
         }
 //        if isBind(\.baseMethods, in: machO) { return nil }

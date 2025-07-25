@@ -99,3 +99,23 @@ extension DyldCacheLoaded {
         return nil
     }
 }
+
+extension DyldCacheLoaded {
+    func machO(containing ptr: UnsafeRawPointer) -> MachOImage? {
+        for machO in machOImages() {
+            if machO.contains(ptr: ptr) {
+                return machO
+            }
+        }
+        return nil
+    }
+
+    func machO(containing unslidAddress: UInt64) -> MachOImage? {
+        for machO in self.machOImages() {
+            if machO.contains(unslidAddress: unslidAddress) {
+                return machO
+            }
+        }
+        return nil
+    }
+}
