@@ -35,7 +35,7 @@ extension MachOFile.ObjectiveC {
             return nil
         }
 
-        return machO.fileHandle.read(
+        return try! machO.fileHandle.read(
             offset: numericCast(__objc_imageinfo.offset + machO.headerStartOffset)
         )
     }
@@ -63,9 +63,9 @@ extension MachOFile.ObjectiveC {
         }
 
         return .init(
-            data: machO.fileHandle.readData(
+            data: try! machO.fileHandle.readData(
                 offset: numericCast(__objc_methlist.offset + machO.headerStartOffset),
-                size: __objc_methlist.size
+                length: __objc_methlist.size
             ),
             offset: offset,
             align: __objc_methlist.align,
@@ -272,9 +272,9 @@ extension MachOFile.ObjectiveC {
         in machO: MachOFile,
         isCatlist2: Bool = false
     ) -> [Categgory]? {
-        let data = machO.fileHandle.readData(
+        let data = try! machO.fileHandle.readData(
             offset: numericCast(section.offset + machO.headerStartOffset),
-            size: section.size
+            length: section.size
         )
 
         typealias Pointer = Categgory.Layout.Pointer
@@ -311,9 +311,9 @@ extension MachOFile.ObjectiveC {
         from section: any SectionProtocol,
         in machO: MachOFile
     ) -> [Class]? {
-        let data = machO.fileHandle.readData(
+        let data = try! machO.fileHandle.readData(
             offset: numericCast(section.offset + machO.headerStartOffset),
-            size: section.size
+            length: section.size
         )
 
         typealias Pointer = Class.Layout.Pointer
@@ -346,9 +346,9 @@ extension MachOFile.ObjectiveC {
         from section: any SectionProtocol,
         in machO: MachOFile
     ) -> [Protocol]? {
-        let data = machO.fileHandle.readData(
+        let data = try! machO.fileHandle.readData(
             offset: numericCast(section.offset + machO.headerStartOffset),
-            size: section.size
+            length: section.size
         )
 
         typealias Pointer = Protocol.Layout.Pointer

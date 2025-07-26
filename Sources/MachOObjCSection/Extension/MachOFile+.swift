@@ -8,10 +8,17 @@
 
 import Foundation
 import MachOKit
+#if compiler(>=6.0) || (compiler(>=5.10) && hasFeature(AccessLevelOnImport))
+internal import FileIO
+#else
+@_implementationOnly import FileIO
+#endif
 
 extension MachOFile {
-    var fileHandle: FileHandle {
-        try! .init(forReadingFrom: url)
+    internal typealias File = MemoryMappedFile
+
+    var fileHandle: File {
+        try! .open(url: url, isWritable: false)
     }
 }
 

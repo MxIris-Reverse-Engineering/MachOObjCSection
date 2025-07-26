@@ -120,9 +120,9 @@ extension ObjCClassRODataProtocol {
             resolvedOffset = _offset
         }
 
-        let data = machO.fileHandle.readData(
-            offset: resolvedOffset,
-            size: MemoryLayout<ObjCMethodList.Header>.size
+        let data = try! machO.fileHandle.readData(
+            offset: numericCast(resolvedOffset),
+            length: MemoryLayout<ObjCMethodList.Header>.size
         )
         let list: ObjCMethodList? = data.withUnsafeBytes {
             guard let ptr = $0.baseAddress else { return nil }
@@ -161,9 +161,9 @@ extension ObjCClassRODataProtocol {
             resolvedOffset = _offset
         }
 
-        let data = machO.fileHandle.readData(
-            offset: resolvedOffset,
-            size: MemoryLayout<ObjCPropertyList.Header>.size
+        let data = try! machO.fileHandle.readData(
+            offset: numericCast(resolvedOffset),
+            length: MemoryLayout<ObjCPropertyList.Header>.size
         )
         let list: ObjCPropertyList? = data.withUnsafeBytes {
             guard let ptr = $0.baseAddress else {
@@ -204,9 +204,9 @@ extension ObjCClassRODataProtocol {
             resolvedOffset = _offset
         }
 
-        let data = machO.fileHandle.readData(
-            offset: resolvedOffset,
-            size: MemoryLayout<ObjCIvarList.Header>.size
+        let data = try! machO.fileHandle.readData(
+            offset: numericCast(resolvedOffset),
+            length: MemoryLayout<ObjCIvarList.Header>.size
         )
         let list: ObjCIvarList? = data.withUnsafeBytes {
             guard let ptr = $0.baseAddress else {
@@ -249,9 +249,9 @@ extension ObjCClassRODataProtocol {
             resolvedOffset = _offset
         }
 
-        let data = machO.fileHandle.readData(
-            offset: resolvedOffset,
-            size: MemoryLayout<ObjCProtocolList.Header>.size
+        let data = try! machO.fileHandle.readData(
+            offset: numericCast(resolvedOffset),
+            length: MemoryLayout<ObjCProtocolList.Header>.size
         )
 
         let list: ObjCProtocolList? = data.withUnsafeBytes {
@@ -399,9 +399,9 @@ extension ObjCClassRODataProtocol {
             fileHandle = _cache.fileHandle
         }
 
-        let data = fileHandle.readData(
-            offset: resolvedOffset,
-            size: MemoryLayout<ObjCMethodRelativeListList.Header>.size
+        let data = try! fileHandle.readData(
+            offset: numericCast(resolvedOffset),
+            length: MemoryLayout<ObjCMethodRelativeListList.Header>.size
         )
 
         let lists: ObjCMethodRelativeListList? = data.withUnsafeBytes {
@@ -442,9 +442,9 @@ extension ObjCClassRODataProtocol {
             fileHandle = _cache.fileHandle
         }
 
-        let data = fileHandle.readData(
-            offset: resolvedOffset,
-            size: MemoryLayout<ObjCPropertyRelativeListList.Header>.size
+        let data = try! fileHandle.readData(
+            offset: numericCast(resolvedOffset),
+            length: MemoryLayout<ObjCPropertyRelativeListList.Header>.size
         )
 
         let lists: ObjCPropertyRelativeListList? = data.withUnsafeBytes {
@@ -485,9 +485,9 @@ extension ObjCClassRODataProtocol {
             fileHandle = _cache.fileHandle
         }
 
-        let data = fileHandle.readData(
-            offset: resolvedOffset,
-            size: MemoryLayout<ObjCProtocolRelativeListList.Header>.size
+        let data = try! fileHandle.readData(
+            offset: numericCast(resolvedOffset),
+            length: MemoryLayout<ObjCProtocolRelativeListList.Header>.size
         )
 
         let lists: ObjCProtocolRelativeListList? = data.withUnsafeBytes {
