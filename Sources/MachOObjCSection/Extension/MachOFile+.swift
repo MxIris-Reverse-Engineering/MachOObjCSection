@@ -23,6 +23,15 @@ extension MachOFile {
 }
 
 extension MachOFile {
+    var fullCache: FullDyldCache? {
+        guard isLoadedFromDyldCache else { return nil }
+        return try? FullDyldCache(
+            url: url
+                .deletingPathExtension()
+                .deletingPathExtension()
+        )
+    }
+
     var cache: DyldCache? {
         guard isLoadedFromDyldCache else { return nil }
         guard let cache = try? DyldCache(url: url) else {
