@@ -35,9 +35,10 @@ extension MachOFile.ObjectiveC {
             return nil
         }
 
-        return try! machO.fileHandle.read(
-            offset: numericCast(__objc_imageinfo.offset + machO.headerStartOffset)
-        )
+        guard let fileSlice = machO._fileSliceForSection(section: __objc_imageinfo) else {
+            return nil
+        }
+        return try? fileSlice.read(offset: 0)
     }
 }
 
@@ -272,8 +273,11 @@ extension MachOFile.ObjectiveC {
         in machO: MachOFile,
         isCatlist2: Bool = false
     ) -> [Categgory]? {
-        let data = try! machO.fileHandle.readData(
-            offset: numericCast(section.offset + machO.headerStartOffset),
+        guard let fileSlice = machO._fileSliceForSection(section: section) else {
+            return nil
+        }
+        let data = try! fileSlice.readData(
+            offset: 0,
             length: section.size
         )
 
@@ -311,8 +315,11 @@ extension MachOFile.ObjectiveC {
         from section: any SectionProtocol,
         in machO: MachOFile
     ) -> [Class]? {
-        let data = try! machO.fileHandle.readData(
-            offset: numericCast(section.offset + machO.headerStartOffset),
+        guard let fileSlice = machO._fileSliceForSection(section: section) else {
+            return nil
+        }
+        let data = try! fileSlice.readData(
+            offset: 0,
             length: section.size
         )
 
@@ -346,8 +353,11 @@ extension MachOFile.ObjectiveC {
         from section: any SectionProtocol,
         in machO: MachOFile
     ) -> [Protocol]? {
-        let data = try! machO.fileHandle.readData(
-            offset: numericCast(section.offset + machO.headerStartOffset),
+        guard let fileSlice = machO._fileSliceForSection(section: section) else {
+            return nil
+        }
+        let data = try! fileSlice.readData(
+            offset: 0,
             length: section.size
         )
 
@@ -371,5 +381,47 @@ extension MachOFile.ObjectiveC {
                 let layout: Protocol.Layout = machO.fileHandle.read(offset: resolved + numericCast(machO.headerStartOffset))
                 return .init(layout: layout, offset: numericCast(offset))
             }
+    }
+}
+
+extension MachOFile {
+    fileprivate func _fileSliceForSection(
+        section: any SectionProtocol
+    ) -> File.FileSlice? {
+        let text: (any SegmentCommandProtocol)? = loadCommands.text64 ?? loadCommands.text
+        guard let text else { return nil }
+
+        let maxFileOffsetToCheck = text.fileOffset + section.address - text.virtualMemoryAddress
+        let isWithinFileRange: Bool = fileHandle.size >= maxFileOffsetToCheck
+
+        // 1) text.vmaddr < linkedit.vmaddr
+        // 2) fileoff_diff <= vmaddr_diff
+        // 3) If both exist in the same file
+        //    text.fileoff < linkedit.fileoff <= text.fileoff + vmaddr_diff
+        // 4) if fileHandle.size < text.fileoff + vmaddr_diff
+        //    both exist in the same file
+
+        // The linkedit data in iOS is stored together in a separate, independent cache.
+        // (.0x.linkeditdata)
+        if isLoadedFromDyldCache && !isWithinFileRange {
+            guard let fullCache = self.fullCache,
+                  let fileOffset = fullCache.fileOffset(
+                    of: numericCast(section.address)
+                  ),
+                  let segment = fullCache.fileSegment(
+                    forOffset: fileOffset
+                  ) else {
+                return nil
+            }
+            return try? segment._file.fileSlice(
+                offset: numericCast(fileOffset) - segment.offset,
+                length: section.size
+            )
+        } else {
+            return try? fileHandle.fileSlice(
+                offset: headerStartOffset + section.offset,
+                length: section.size
+            )
+        }
     }
 }
