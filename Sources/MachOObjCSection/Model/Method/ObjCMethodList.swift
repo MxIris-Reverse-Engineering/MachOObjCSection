@@ -264,7 +264,7 @@ extension ObjCMethodList {
             )
 
             let size = MemoryLayout<ObjCMethod.RelativeDirect>.size
-            let nameOffsetInCache = machO.cache?.mainCache?.objcOptimization?.relativeMethodSelectorBaseAddressOffset ?? 0
+            let nameOffsetInCache = machO.relativeMethodSelectorBaseAddressOffset ?? 0
 
             return sequence.enumerated()
                 .map {

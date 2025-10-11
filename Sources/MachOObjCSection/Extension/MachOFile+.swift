@@ -101,6 +101,20 @@ extension MachOFile {
 }
 
 extension MachOFile {
+    var relativeMethodSelectorBaseAddressOffset: UInt64? {
+        if let cache,
+           let offset = cache.relativeMethodSelectorBaseAddressOffset {
+            return offset
+        }
+
+        if let fullCache,
+           let offset = fullCache.relativeMethodSelectorBaseAddressOffset {
+            return offset
+        }
+
+        return nil
+    }
+
     func findObjCSection64(for section: ObjCMachOSection) -> Section64? {
         findObjCSection64(for: section.rawValue)
     }
