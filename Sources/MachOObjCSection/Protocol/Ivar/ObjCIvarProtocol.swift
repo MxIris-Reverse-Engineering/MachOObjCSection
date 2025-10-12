@@ -40,6 +40,7 @@ extension ObjCIvarProtocol {
 
 extension ObjCIvarProtocol {
     public func offset(in machO: MachOFile) -> UInt32? {
+        guard layout.offset > 0 else { return nil }
         let headerStartOffset = machO.headerStartOffset
         var offset: UInt64 = machO.fileOffset(
             of: numericCast(layout.offset)
@@ -89,6 +90,7 @@ extension ObjCIvarProtocol {
     }
 
     public func type(in machO: MachOFile) -> String? {
+        guard layout.type > 0 else { return nil }
         let headerStartOffset = machO.headerStartOffset
         var offset: UInt64 = machO.fileOffset(
             of: numericCast(layout.type)
