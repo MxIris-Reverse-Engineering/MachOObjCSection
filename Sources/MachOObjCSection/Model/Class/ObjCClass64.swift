@@ -167,14 +167,16 @@ extension ObjCClass64 {
             offset =  machO.fileOffset(of: resolved & FAST_DATA_MASK) + numericCast(machO.headerStartOffset)
         }
 
-        var resolved = offset
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
-            resolved = _offset
+        var fileHandle = machO.fileHandle
+        var resolvedOffset = offset
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
         }
-        let layout: ClassROData.Layout = machO.fileHandle.read(offset: resolved)
+
+        let layout: ClassROData.Layout = fileHandle.read(offset: resolvedOffset)
         let classData = ClassROData(
             layout: layout,
             offset: Int(offset) - machO.headerStartOffset

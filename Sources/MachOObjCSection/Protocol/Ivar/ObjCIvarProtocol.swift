@@ -51,14 +51,15 @@ extension ObjCIvarProtocol {
         }
 //        if isBind(\.offset, in: machO) { return nil }
 
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
+        var fileHandle = machO.fileHandle
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
             offset = _offset
+            fileHandle = _cache.fileHandle
         }
 
-        return try! machO.fileHandle.readData(
+        return try! fileHandle.readData(
                 offset: numericCast(offset),
                 length: MemoryLayout<UInt32>.size
             ).withUnsafeBytes {
@@ -77,14 +78,15 @@ extension ObjCIvarProtocol {
         }
 //        if isBind(\.name, in: machO) { return nil }
 
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
+        var fileHandle = machO.fileHandle
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
             offset = _offset
+            fileHandle = _cache.fileHandle
         }
 
-        return machO.fileHandle.readString(
+        return fileHandle.readString(
             offset: offset
         )
     }
@@ -101,14 +103,15 @@ extension ObjCIvarProtocol {
         }
 //        if isBind(\.type, in: machO) { return nil }
 
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
+        var fileHandle = machO.fileHandle
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
             offset = _offset
+            fileHandle = _cache.fileHandle
         }
 
-        return machO.fileHandle.readString(
+        return fileHandle.readString(
             offset: offset
         )
     }

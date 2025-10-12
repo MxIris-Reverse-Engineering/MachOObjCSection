@@ -49,13 +49,15 @@ extension ObjCCategoryProtocol {
         var offset: UInt64 = machO.fileOffset(
             of: numericCast(layout.name)
         ) + numericCast(machO.headerStartOffset)
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
+
+        var fileHandle = machO.fileHandle
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
             offset = _offset
+            fileHandle = _cache.fileHandle
         }
-        return machO.fileHandle.readString(offset: numericCast(offset))
+        return fileHandle.readString(offset: numericCast(offset))
     }
 
     public func `class`(in machO: MachOFile) -> (MachOFile, ObjCClass)? {
@@ -443,15 +445,16 @@ extension ObjCCategoryProtocol {
         }
 //        if isBind(\.baseMethods, in: machO) { return nil }
 
+        var fileHandle = machO.fileHandle
         var resolvedOffset = offset
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
             resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
         }
 
-        let data = try! machO.fileHandle.readData(
+        let data = try! fileHandle.readData(
             offset: numericCast(resolvedOffset),
             length: MemoryLayout<ObjCMethodList.Header>.size
         )
@@ -488,15 +491,16 @@ extension ObjCCategoryProtocol {
         }
 //        if isBind(\.baseProperties, in: machO) { return nil }
 
+        var fileHandle = machO.fileHandle
         var resolvedOffset = offset
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
             resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
         }
 
-        let data = try! machO.fileHandle.readData(
+        let data = try! fileHandle.readData(
             offset: numericCast(resolvedOffset),
             length: MemoryLayout<ObjCPropertyList.Header>.size
         )
@@ -535,16 +539,16 @@ extension ObjCCategoryProtocol {
         }
 //        if isBind(\.baseProtocols, in: machO) { return nil }
 
+        var fileHandle = machO.fileHandle
         var resolvedOffset = offset
-
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
+        if let (_cache, _offset) = machO.cacheAndFileOffset(
+            fromStart: offset
+        ) {
             resolvedOffset = _offset
+            fileHandle = _cache.fileHandle
         }
 
-        let data = try! machO.fileHandle.readData(
+        let data = try! fileHandle.readData(
             offset: numericCast(resolvedOffset),
             length: MemoryLayout<ObjCProtocolList.Header>.size
         )
