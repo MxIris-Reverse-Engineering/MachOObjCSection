@@ -36,8 +36,8 @@ public enum ObjCProtocolLayoutField {
     case optionalInstanceMethods
     case optionalClassMethods
     case instanceProperties
-    case size
-    case flags
+    // case size
+    // case flags
     case _extendedMethodTypes
     case _demangledName
     case _classProperties

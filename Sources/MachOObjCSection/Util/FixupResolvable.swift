@@ -3,18 +3,43 @@
 //  MachOObjCSection
 //
 //  Created by p-x9 on 2024/12/01
-//  
+//
 //
 
 import Foundation
 @_spi(Support) import MachOKit
 
-public protocol _FixupResolvable {
+public struct UnresolvedValue {
+    public let offset: Int
+    public let value: UInt64
+}
+
+public protocol _FixupResolvable: LayoutWrapper {
     associatedtype LayoutField
+    associatedtype Pointer: FixedWidthInteger
 
     var offset: Int { get }
 
+    func keyPath(of field: LayoutField) -> KeyPath<Layout, Pointer>
+
     func layoutOffset(of field: LayoutField) -> Int
+    func unresolvedValue(of field: LayoutField) -> UnresolvedValue
+}
+
+extension _FixupResolvable {
+    public func layoutOffset(of field: LayoutField) -> Int {
+        let keyPath = keyPath(of: field)
+        return layoutOffset(of: keyPath)
+    }
+
+    public func unresolvedValue(of field: LayoutField) -> UnresolvedValue {
+        let value = layout[keyPath: keyPath(of: field)]
+        let offset = offset + layoutOffset(of: field)
+        return .init(
+            offset: offset,
+            value: numericCast(value)
+        )
+    }
 }
 
 extension _FixupResolvable {

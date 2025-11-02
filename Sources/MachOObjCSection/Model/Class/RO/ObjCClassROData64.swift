@@ -41,22 +41,15 @@ public struct ObjCClassROData64: LayoutWrapper, ObjCClassRODataProtocol {
         self.offset = offset
     }
 
-    public func layoutOffset(of field: LayoutField) -> Int {
-        let keyPath: PartialKeyPath<Layout>
-
+    public func keyPath(of field: LayoutField) -> KeyPath<Layout, Pointer> {
         switch field {
-        case .flags: keyPath = \.flags
-        case .instanceStart: keyPath = \.instanceStart
-        case .instanceSize: keyPath = \.instanceSize
-        case .ivarLayout: keyPath = \.ivarLayout
-        case .name: keyPath = \.name
-        case .baseMethods: keyPath = \.baseMethods
-        case .baseProtocols: keyPath = \.baseProtocols
-        case .ivars: keyPath = \.ivars
-        case .weakIvarLayout: keyPath = \.weakIvarLayout
-        case .baseProperties: keyPath = \.baseProperties
+        case .ivarLayout: \.ivarLayout
+        case .name: \.name
+        case .baseMethods: \.baseMethods
+        case .baseProtocols: \.baseProtocols
+        case .ivars: \.ivars
+        case .weakIvarLayout: \.weakIvarLayout
+        case .baseProperties: \.baseProperties
         }
-
-        return layoutOffset(of: keyPath)
     }
 }

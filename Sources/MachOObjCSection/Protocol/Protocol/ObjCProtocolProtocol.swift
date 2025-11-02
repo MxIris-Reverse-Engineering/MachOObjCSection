@@ -9,11 +9,13 @@
 import Foundation
 @_spi(Support) import MachOKit
 
-public protocol ObjCProtocolProtocol: _FixupResolvable where LayoutField == ObjCProtocolLayoutField {
-    associatedtype Layout: _ObjCProtocolLayoutProtocol
+public protocol ObjCProtocolProtocol: _FixupResolvable
+where LayoutField == ObjCProtocolLayoutField,
+    Layout: _ObjCProtocolLayoutProtocol
+{
     associatedtype ObjCProtocolList: ObjCProtocolListProtocol where ObjCProtocolList.ObjCProtocol == Self
 
-    var layout: Layout { get }
+    // var layout: Layout { get }
     var offset: Int { get }
 
     @_spi(Core)

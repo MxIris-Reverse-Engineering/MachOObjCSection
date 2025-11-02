@@ -44,19 +44,15 @@ public struct ObjCCategory32: LayoutWrapper, ObjCCategoryProtocol {
         self.isCatlist2 = isCatlist2
     }
 
-    public func layoutOffset(of field: LayoutField) -> Int {
-        let keyPath: PartialKeyPath<Layout>
-
+    public func keyPath(of field: LayoutField) -> KeyPath<Layout, Pointer> {
         switch field {
-        case .name: keyPath = \.name
-        case .cls: keyPath = \.cls
-        case .instanceMethods: keyPath = \.instanceMethods
-        case .classMethods: keyPath = \.classMethods
-        case .protocols: keyPath = \.protocols
-        case .instanceProperties: keyPath = \.instanceProperties
-        case ._classProperties: keyPath = \._classProperties
+        case .name: \.name
+        case .cls: \.cls
+        case .instanceMethods: \.instanceMethods
+        case .classMethods: \.classMethods
+        case .protocols: \.protocols
+        case .instanceProperties: \.instanceProperties
+        case ._classProperties: \._classProperties
         }
-
-        return layoutOffset(of: keyPath)
     }
 }

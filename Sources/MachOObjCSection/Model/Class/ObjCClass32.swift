@@ -37,19 +37,14 @@ public struct ObjCClass32: LayoutWrapper, ObjCClassProtocol {
         self.offset = offset
     }
 
-    public func layoutOffset(of field: LayoutField) -> Int {
-        let keyPath: PartialKeyPath<Layout>
-
+    public func keyPath(of field: LayoutField) -> KeyPath<Layout, Pointer> {
         switch field {
-        case .isa: keyPath = \.isa
-        case .superclass: keyPath = \.superclass
-        case .methodCacheBuckets: keyPath = \.methodCacheBuckets
-        case .methodCacheProperties: keyPath = \.methodCacheProperties
-        case .dataVMAddrAndFastFlags: keyPath = \.dataVMAddrAndFastFlags
-        case .swiftClassFlags: keyPath = \.swiftClassFlags
+        case .isa: \.isa
+        case .superclass: \.superclass
+        case .methodCacheBuckets: \.methodCacheBuckets
+        case .methodCacheProperties: \.methodCacheProperties
+        case .dataVMAddrAndFastFlags: \.dataVMAddrAndFastFlags
         }
-
-        return layoutOffset(of: keyPath)
     }
 }
 

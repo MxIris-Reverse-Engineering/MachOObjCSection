@@ -10,10 +10,11 @@ import Foundation
 import MachOObjCSectionC
 @_spi(Support) import MachOKit
 
-public protocol ObjCIvarProtocol: _FixupResolvable where LayoutField == ObjCIvarLayoutField {
-    associatedtype Layout: _ObjCIvarLayoutProtocol
-
-    var layout: Layout { get }
+public protocol ObjCIvarProtocol: _FixupResolvable
+where LayoutField == ObjCIvarLayoutField,
+      Layout: _ObjCIvarLayoutProtocol
+{
+    // var layout: Layout { get }
     var offset: Int { get }
 
     @_spi(Core)

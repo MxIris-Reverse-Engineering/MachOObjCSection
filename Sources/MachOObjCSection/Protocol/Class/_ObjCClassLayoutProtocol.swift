@@ -29,5 +29,5 @@ public enum ObjCClassLayoutField {
     case methodCacheBuckets
     case methodCacheProperties
     case dataVMAddrAndFastFlags
-    case swiftClassFlags
+    // case swiftClassFlags
 }

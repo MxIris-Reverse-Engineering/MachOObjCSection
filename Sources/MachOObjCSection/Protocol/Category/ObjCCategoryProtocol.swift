@@ -9,13 +9,15 @@
 import Foundation
 @_spi(Support) import MachOKit
 
-public protocol ObjCCategoryProtocol: _FixupResolvable where LayoutField == ObjCCategoryLayoutField {
-    associatedtype Layout: _ObjCCategoryLayoutProtocol
+public protocol ObjCCategoryProtocol: _FixupResolvable
+where LayoutField == ObjCCategoryLayoutField,
+      Layout: _ObjCCategoryLayoutProtocol
+{
     associatedtype ObjCClass: ObjCClassProtocol
     associatedtype ObjCStubClass: ObjCStubClassProtocol
     typealias ObjCProtocolList = ObjCClass.ClassROData.ObjCProtocolList
 
-    var layout: Layout { get }
+    // var layout: Layout { get }
     var offset: Int { get }
 
     var isCatlist2: Bool { get }

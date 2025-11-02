@@ -10,12 +10,14 @@ import Foundation
 @_spi(Support) import MachOKit
 import MachOObjCSectionC
 
-public protocol ObjCClassProtocol: _FixupResolvable where LayoutField == ObjCClassLayoutField {
-    associatedtype Layout: _ObjCClassLayoutProtocol
+public protocol ObjCClassProtocol: _FixupResolvable
+where LayoutField == ObjCClassLayoutField,
+      Layout: _ObjCClassLayoutProtocol
+{
     associatedtype ClassROData: LayoutWrapper, ObjCClassRODataProtocol where ClassROData.Layout.Pointer == Layout.Pointer
     associatedtype ClassRWData: LayoutWrapper, ObjCClassRWDataProtocol where ClassRWData.Layout.Pointer == Layout.Pointer, ClassRWData.ObjCClassROData == ClassROData
 
-    var layout: Layout { get }
+    // var layout: Layout { get }
     var offset: Int { get }
 
     @_spi(Core)
