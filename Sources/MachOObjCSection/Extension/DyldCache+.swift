@@ -29,18 +29,6 @@ extension DyldCache {
 }
 
 extension DyldCache {
-    var mainCache: DyldCache? {
-        if url.lastPathComponent.contains(".") {
-            var url = url
-            url.deletePathExtension()
-            return try? .init(url: url)
-        } else {
-            return self
-        }
-    }
-}
-
-extension DyldCache {
     var headerOptimizationRO64: ObjCHeaderOptimizationRO64? {
         guard cpu.is64Bit else {
             return nil
