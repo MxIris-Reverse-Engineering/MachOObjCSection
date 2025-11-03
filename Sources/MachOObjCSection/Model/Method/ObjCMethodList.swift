@@ -150,13 +150,13 @@ extension ObjCMethodList {
             return sequence
                 .map {
                     var name = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast($0.name)) {
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast($0.name)) {
                         name = fileHandle.readString(
                             offset: numericCast(fileOffset)
                         ) ?? ""
                     }
                     var types = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast($0.types)) {
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast($0.types)) {
                         types = fileHandle.readString(
                             offset: numericCast(fileOffset)
                         ) ?? ""
@@ -183,13 +183,13 @@ extension ObjCMethodList {
             return sequence
                 .map {
                     var name = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast($0.name)) {
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast($0.name)) {
                         name = fileHandle.readString(
                             offset: numericCast(fileOffset)
                         ) ?? ""
                     }
                     var types = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast($0.types)) {
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast($0.types)) {
                         types = fileHandle.readString(
                             offset: numericCast(fileOffset)
                         ) ?? ""
