@@ -162,10 +162,10 @@ extension ObjCMethodList {
                         ) ?? ""
                     }
 
-                    let imp: UInt64 = if let cache = machO.cache {
+                    let imp: UInt64 = if let cache = machO.cache, $0.imp > 0 {
                         numericCast($0.imp) - cache.mainCacheHeader.sharedRegionStart
                     } else {
-                        machO.fileOffset(of: numericCast($0.imp))!
+                        machO.fileOffset(of: numericCast($0.imp)) ?? 0
                     }
 
                     return ObjCMethod(
@@ -195,10 +195,10 @@ extension ObjCMethodList {
                         ) ?? ""
                     }
 
-                    let imp: UInt64 = if let cache = machO.cache {
+                    let imp: UInt64 = if let cache = machO.cache, $0.imp > 0 {
                         numericCast($0.imp) - cache.mainCacheHeader.sharedRegionStart
                     } else {
-                        machO.fileOffset(of: numericCast($0.imp))!
+                        machO.fileOffset(of: numericCast($0.imp)) ?? 0
                     }
 
                     return ObjCMethod(
