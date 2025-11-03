@@ -42,78 +42,47 @@ extension ObjCIvarProtocol {
 extension ObjCIvarProtocol {
     public func offset(in machO: MachOFile) -> UInt32? {
         guard layout.offset > 0 else { return nil }
-        let headerStartOffset = machO.headerStartOffset
-        var offset: UInt64 = machO.fileOffset(
-            of: numericCast(layout.offset)
-        ) + numericCast(headerStartOffset)
 
-        if let resolved = resolveRebase(.offset, in: machO) {
-            offset = machO.fileOffset(of: resolved) + numericCast(headerStartOffset)
-        }
-//        if isBind(\.offset, in: machO) { return nil }
+        let unresolved = unresolvedValue(of: .offset)
+        let resolved = machO.resolveRebase(unresolved)
 
-        var fileHandle = machO.fileHandle
-        if let (_cache, _offset) = machO.cacheAndFileOffset(
-            fromStart: offset
-        ) {
-            offset = _offset
-            fileHandle = _cache.fileHandle
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+            return nil
         }
 
         return try! fileHandle.readData(
-                offset: numericCast(offset),
-                length: MemoryLayout<UInt32>.size
-            ).withUnsafeBytes {
-                $0.load(as: UInt32.self)
-            }
+            offset: numericCast(fileOffset),
+            length: MemoryLayout<UInt32>.size
+        ).withUnsafeBytes {
+            $0.load(as: UInt32.self)
+        }
     }
 
     public func name(in machO: MachOFile) -> String? {
-        let headerStartOffset = machO.headerStartOffset
-        var offset: UInt64 = machO.fileOffset(
-            of: numericCast(layout.name)
-        ) + numericCast(headerStartOffset)
+        let unresolved = unresolvedValue(of: .name)
+        let resolved = machO.resolveRebase(unresolved)
 
-        if let resolved = resolveRebase(.name, in: machO) {
-            offset = machO.fileOffset(of: resolved) + numericCast(headerStartOffset)
-        }
-//        if isBind(\.name, in: machO) { return nil }
-
-        var fileHandle = machO.fileHandle
-        if let (_cache, _offset) = machO.cacheAndFileOffset(
-            fromStart: offset
-        ) {
-            offset = _offset
-            fileHandle = _cache.fileHandle
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+            return nil
         }
 
         return fileHandle.readString(
-            offset: offset
+            offset: fileOffset
         )
     }
 
     public func type(in machO: MachOFile) -> String? {
         guard layout.type > 0 else { return nil }
-        let headerStartOffset = machO.headerStartOffset
-        var offset: UInt64 = machO.fileOffset(
-            of: numericCast(layout.type)
-        ) + numericCast(headerStartOffset)
 
-        if let resolved = resolveRebase(.type, in: machO) {
-            offset = machO.fileOffset(of: resolved) + numericCast(headerStartOffset)
-        }
-//        if isBind(\.type, in: machO) { return nil }
+        let unresolved = unresolvedValue(of: .type)
+        let resolved = machO.resolveRebase(unresolved)
 
-        var fileHandle = machO.fileHandle
-        if let (_cache, _offset) = machO.cacheAndFileOffset(
-            fromStart: offset
-        ) {
-            offset = _offset
-            fileHandle = _cache.fileHandle
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+            return nil
         }
 
         return fileHandle.readString(
-            offset: offset
+            offset: fileOffset
         )
     }
 }

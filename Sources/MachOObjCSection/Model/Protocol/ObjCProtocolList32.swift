@@ -38,55 +38,46 @@ extension ObjCProtocolList32 {
             return nil
         }
 
-        let headerStartOffset = machO.headerStartOffset/* + machO.headerStartOffsetInCache*/
-        let offset: UInt64 = numericCast(headerStartOffset + offset)
-
-        var resolvedOffset = offset
-
-        var fileHandle = machO.fileHandle
-
-        if let (_cache, _offset) = machO.cacheAndFileOffset(
-            fromStart: offset
-        ) {
-            resolvedOffset = _offset
-            fileHandle = _cache.fileHandle
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast(offset)) else {
+            return nil
         }
 
-        let sequnece: DataSequence<UInt64> = fileHandle
+        let sequnece: DataSequence<UInt32> = fileHandle
             .readDataSequence(
-                offset: resolvedOffset + numericCast(MemoryLayout<Header>.size),
+                offset: fileOffset + numericCast(MemoryLayout<Header>.size),
                 numberOfElements: numericCast(header.count)
             )
 
-        return sequnece
-            .map {
-                let offset = $0 + numericCast(headerStartOffset)
-                var resolvedOffset = offset
+        return sequnece.enumerated()
+            .map { i, value in
+                UnresolvedValue(
+                    fieldOffset: offset
+                    + MemoryLayout<Header>.size
+                    + MemoryLayout<UInt32>.stride * i,
+                    value: numericCast(value)
+                )
+            }
+            .compactMap { unresolved in
+                let resolved = machO.resolveRebase(unresolved)
+
+                guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+                    return nil
+                }
 
                 var targetMachO = machO
-
-                var fileHandle = machO.fileHandle
-
-                if let (_cache, _offset) = machO.cacheAndFileOffset(
-                    fromStart: offset
-                ) {
-                    resolvedOffset = _offset
-                    fileHandle = _cache.fileHandle
-
-                    let unslidAddress = offset + _cache.mainCacheHeader.sharedRegionStart
-                    if !targetMachO.contains(unslidAddress: unslidAddress),
-                       let machO = _cache.machO(containing: unslidAddress) {
-                        targetMachO = machO
-                    }
+                if !targetMachO.contains(unslidAddress: resolved.address),
+                   let cache = machO.cache(for: resolved.address),
+                   let machO = cache.machO(containing: resolved.address) {
+                    targetMachO = machO
                 }
 
                 let layout: ObjCProtocol32.Layout = fileHandle.read(
-                    offset: numericCast(resolvedOffset),
+                    offset: numericCast(fileOffset),
                     swapHandler: { _ in }
                 )
                 let `protocol`: ObjCProtocol = .init(
                     layout: layout,
-                    offset: numericCast(offset) - machO.headerStartOffset
+                    offset: numericCast(resolved.offset)
                 )
                 return (targetMachO, `protocol`)
             }

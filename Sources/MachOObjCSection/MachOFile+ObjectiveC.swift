@@ -3,7 +3,7 @@
 //
 //
 //  Created by p-x9 on 2024/08/01
-//  
+//
 //
 
 import Foundation
@@ -281,31 +281,40 @@ extension MachOFile.ObjectiveC {
             length: section.size
         )
 
+        let offset: UInt64 = if let cache = machO.cache {
+            numericCast(section.address) - cache.mainCacheHeader.sharedRegionStart
+        } else {
+            numericCast(section.offset)
+        }
+
         typealias Pointer = Categgory.Layout.Pointer
         let pointerSize: Int = MemoryLayout<Pointer>.size
-        let offsets: DataSequence<Pointer> = .init(
+        let sequnece: DataSequence<Pointer> = .init(
             data: data,
             numberOfElements: section.size / pointerSize
         )
 
-        return offsets
-            .map { machO.fileOffset(of: numericCast($0)) }
-            .map { offset in
-                var fileHandle = machO.fileHandle
-                var resolvedOffset = offset
-                if let (_cache, _offset) = machO.cacheAndFileOffset(
-                    fromStart: offset
-                ) {
-                    resolvedOffset = _offset
-                    fileHandle = _cache.fileHandle
+        return sequnece.enumerated()
+            .map { i, value in
+                UnresolvedValue(
+                    fieldOffset: numericCast(offset)
+                    + pointerSize * i,
+                    value: numericCast(value)
+                )
+            }
+            .compactMap { unresolved in
+                let resolved = machO.resolveRebase(unresolved)
+
+                guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+                    return nil
                 }
 
                 let layout: Categgory.Layout = fileHandle.read(
-                    offset: resolvedOffset + numericCast(machO.headerStartOffset)
+                    offset: fileOffset
                 )
                 return .init(
                     layout: layout,
-                    offset: numericCast(offset),
+                    offset: numericCast(resolved.offset),
                     isCatlist2: isCatlist2
                 )
             }
@@ -325,29 +334,41 @@ extension MachOFile.ObjectiveC {
             length: section.size
         )
 
+        let offset: UInt64 = if let cache = machO.cache {
+            numericCast(section.address) - cache.mainCacheHeader.sharedRegionStart
+        } else {
+            numericCast(section.offset)
+        }
+
         typealias Pointer = Class.Layout.Pointer
         let pointerSize: Int = MemoryLayout<Pointer>.size
-        let offsets: DataSequence<Pointer> = .init(
+        let sequnece: DataSequence<Pointer> = .init(
             data: data,
             numberOfElements: section.size / pointerSize
         )
 
-        return offsets
-            .map { machO.fileOffset(of: numericCast($0)) }
-            .map { offset in
-                var fileHandle = machO.fileHandle
-                var resolvedOffset = offset
-                if let (_cache, _offset) = machO.cacheAndFileOffset(
-                    fromStart: offset
-                ) {
-                    resolvedOffset = _offset
-                    fileHandle = _cache.fileHandle
+        return sequnece.enumerated()
+            .map { i, value in
+                UnresolvedValue(
+                    fieldOffset: numericCast(offset)
+                    + pointerSize * i,
+                    value: numericCast(value)
+                )
+            }
+            .compactMap { unresolved in
+                let resolved = machO.resolveRebase(unresolved)
+
+                guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+                    return nil
                 }
 
                 let layout: Class.Layout = fileHandle.read(
-                    offset: resolvedOffset + numericCast(machO.headerStartOffset)
+                    offset: fileOffset
                 )
-                return .init(layout: layout, offset: numericCast(offset))
+                return .init(
+                    layout: layout,
+                    offset: numericCast(resolved.offset)
+                )
             }
     }
 
@@ -365,29 +386,41 @@ extension MachOFile.ObjectiveC {
             length: section.size
         )
 
+        let offset: UInt64 = if let cache = machO.cache {
+            numericCast(section.address) - cache.mainCacheHeader.sharedRegionStart
+        } else {
+            numericCast(section.offset)
+        }
+
         typealias Pointer = Protocol.Layout.Pointer
         let pointerSize: Int = MemoryLayout<Pointer>.size
-        let offsets: DataSequence<Pointer> = .init(
+        let sequnece: DataSequence<Pointer> = .init(
             data: data,
             numberOfElements: section.size / pointerSize
         )
 
-        return offsets
-            .map { machO.fileOffset(of: numericCast($0)) }
-            .map { offset in
-                var fileHandle = machO.fileHandle
-                var resolvedOffset = offset
-                if let (_cache, _offset) = machO.cacheAndFileOffset(
-                    fromStart: offset
-                ) {
-                    resolvedOffset = _offset
-                    fileHandle = _cache.fileHandle
+        return sequnece.enumerated()
+            .map { i, value in
+                UnresolvedValue(
+                    fieldOffset: numericCast(offset)
+                    + pointerSize * i,
+                    value: numericCast(value)
+                )
+            }
+            .compactMap { unresolved in
+                let resolved = machO.resolveRebase(unresolved)
+
+                guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+                    return nil
                 }
 
                 let layout: Protocol.Layout = fileHandle.read(
-                    offset: resolvedOffset + numericCast(machO.headerStartOffset)
+                    offset: fileOffset
                 )
-                return .init(layout: layout, offset: numericCast(offset))
+                return .init(
+                    layout: layout,
+                    offset: numericCast(resolved.offset)
+                )
             }
     }
 }

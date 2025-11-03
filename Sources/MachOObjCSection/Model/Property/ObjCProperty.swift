@@ -44,3 +44,15 @@ extension ObjCProperty {
         let attributes: UInt32
     }
 }
+
+extension ObjCProperty {
+    struct UnresolvedProperty {
+        let name: UnresolvedValue
+        let attributes: UnresolvedValue
+    }
+
+    struct ResolvedProperty {
+        let name: ResolvedValue
+        let attributes: ResolvedValue
+    }
+}

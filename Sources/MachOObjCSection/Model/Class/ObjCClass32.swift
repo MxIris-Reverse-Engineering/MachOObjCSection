@@ -135,25 +135,26 @@ extension ObjCClass32 {
 
     private func _classROData(in machO: MachOFile) -> ClassROData? {
         let FAST_DATA_MASK: UInt64 = numericCast(FAST_DATA_MASK_32)
-        var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & FAST_DATA_MASK + numericCast(machO.headerStartOffset)
 
-        if let resolved = resolveRebase(.dataVMAddrAndFastFlags, in: machO) {
-            offset =  machO.fileOffset(of: resolved & FAST_DATA_MASK) + numericCast(machO.headerStartOffset)
+        var unresolved = unresolvedValue(of: .dataVMAddrAndFastFlags)
+        unresolved.value &= FAST_DATA_MASK
+        var resolved = machO.resolveRebase(unresolved)
+        resolved.address &= FAST_DATA_MASK
+
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast(resolved.address)) else {
+            return nil
         }
 
-        var fileHandle = machO.fileHandle
-        var resolvedOffset = offset
-        if let (_cache, _offset) = machO.cacheAndFileOffset(
-            fromStart: offset
-        ) {
-            resolvedOffset = _offset
-            fileHandle = _cache.fileHandle
+        let offset: Int = if let cache = machO.cache {
+            numericCast(resolved.address - cache.mainCacheHeader.sharedRegionStart)
+        } else {
+            numericCast(machO.fileOffset(of: resolved.address)!)
         }
 
-        let layout: ClassROData.Layout = fileHandle.read(offset: resolvedOffset)
+        let layout: ClassROData.Layout = fileHandle.read(offset: fileOffset)
         let classData = ClassROData(
             layout: layout,
-            offset: Int(offset) - machO.headerStartOffset
+            offset: offset
         )
 
         return classData

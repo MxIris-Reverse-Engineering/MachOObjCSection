@@ -10,8 +10,13 @@ import Foundation
 @_spi(Support) import MachOKit
 
 public struct UnresolvedValue {
-    public let offset: Int
-    public let value: UInt64
+    public var fieldOffset: Int
+    public var value: UInt64
+}
+
+public struct ResolvedValue {
+    public var address: UInt64
+    public var offset: UInt64
 }
 
 public protocol _FixupResolvable: LayoutWrapper {
@@ -36,22 +41,13 @@ extension _FixupResolvable {
         let value = layout[keyPath: keyPath(of: field)]
         let offset = offset + layoutOffset(of: field)
         return .init(
-            offset: offset,
+            fieldOffset: offset,
             value: numericCast(value)
         )
     }
 }
 
 extension _FixupResolvable {
-    @_spi(Core)
-    public func resolveRebase(
-        _ field: LayoutField,
-        in machO: MachOFile
-    ) -> UInt64? {
-        let offset = self.offset + layoutOffset(of: field)
-        return resolveRebase(fileOffset: offset, in: machO)
-    }
-
     @_spi(Core)
     public func resolveBind(
         _ field: LayoutField,
@@ -103,6 +99,7 @@ extension _FixupResolvable where Self: LayoutWrapper {
 #endif
 
 extension _FixupResolvable {
+#if false
     /// Resolves the rebase operation at the specified file offset within the given MachO file.
     ///
     /// This function determines if the rebase operation can be resolved from the provided file offset
@@ -121,7 +118,7 @@ extension _FixupResolvable {
         let offset: UInt64 = numericCast(fileOffset)
         if let (cache, _offset) = resolveCacheStartOffsetIfNeeded(offset: offset, in: machO),
            let resolved = cache.resolveOptionalRebase(at: _offset) {
-            return resolved - cache.mainCacheHeader.sharedRegionStart
+            return resolved// - cache.mainCacheHeader.sharedRegionStart
         }
 
         if machO.cache != nil {
@@ -133,6 +130,7 @@ extension _FixupResolvable {
         }
         return nil
     }
+#endif
 
     /// Resolves the bind operation at the specified file offset within the given MachO file.
     ///
@@ -192,6 +190,7 @@ extension _FixupResolvable {
     }
 }
 
+#if false
 extension _FixupResolvable {
     func resolveCacheStartOffsetIfNeeded(
         offset: UInt64,
@@ -205,3 +204,4 @@ extension _FixupResolvable {
         return nil
     }
 }
+#endif
