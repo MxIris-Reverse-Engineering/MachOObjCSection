@@ -136,7 +136,7 @@ extension ObjCMethodList {
         }
 
         let offset: UInt64 = numericCast(offset + MemoryLayout<Header>.size)
-        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast(offset)) else {
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: offset) else {
             return nil
         }
 
@@ -150,13 +150,13 @@ extension ObjCMethodList {
             return sequence
                 .map {
                     var name = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast($0.name)) {
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.name) {
                         name = fileHandle.readString(
                             offset: numericCast(fileOffset)
                         ) ?? ""
                     }
                     var types = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast($0.types)) {
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.types) {
                         types = fileHandle.readString(
                             offset: numericCast(fileOffset)
                         ) ?? ""

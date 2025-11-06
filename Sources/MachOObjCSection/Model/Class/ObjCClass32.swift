@@ -141,7 +141,7 @@ extension ObjCClass32 {
         var resolved = machO.resolveRebase(unresolved)
         resolved.address &= FAST_DATA_MASK
 
-        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast(resolved.address)) else {
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
         }
 
