@@ -24,29 +24,6 @@ extension MachOFile {
 
 // MARK: - dyld cache
 extension MachOFile {
-    var fullCache: FullDyldCache? {
-        guard isLoadedFromDyldCache else { return nil }
-        return try? FullDyldCache(
-            url: url
-                .deletingPathExtension()
-                .deletingPathExtension()
-        )
-    }
-
-    var cache: DyldCache? {
-        guard isLoadedFromDyldCache else { return nil }
-        guard let cache = try? DyldCache(url: url) else {
-            return nil
-        }
-        if let mainCache = cache.mainCache {
-            return try? .init(
-                subcacheUrl: cache.url,
-                mainCacheHeader: mainCache.header
-            )
-        }
-        return cache
-    }
-
     func cache(for address: UInt64) -> DyldCache? {
         cacheAndFileOffset(for: address)?.0
     }
