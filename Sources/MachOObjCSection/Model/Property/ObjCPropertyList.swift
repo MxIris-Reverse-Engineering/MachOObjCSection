@@ -108,14 +108,14 @@ extension ObjCPropertyList {
                     var name = ""
                     if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.name.address) {
                         name = fileHandle.readString(
-                            offset: numericCast(fileOffset)
+                            offset: fileOffset
                         ) ?? ""
                     }
 
                     var attributes = ""
                     if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.attributes.address) {
                         attributes = fileHandle.readString(
-                            offset: numericCast(fileOffset)
+                            offset: fileOffset
                         ) ?? ""
                     }
 
@@ -153,14 +153,14 @@ extension ObjCPropertyList {
                     var name = ""
                     if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.name.address) {
                         name = fileHandle.readString(
-                            offset: numericCast(fileOffset)
+                            offset: fileOffset
                         ) ?? ""
                     }
 
                     var attributes = ""
                     if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.attributes.address) {
                         attributes = fileHandle.readString(
-                            offset: numericCast(fileOffset)
+                            offset: fileOffset
                         ) ?? ""
                     }
 

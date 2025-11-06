@@ -152,13 +152,13 @@ extension ObjCMethodList {
                     var name = ""
                     if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.name) {
                         name = fileHandle.readString(
-                            offset: numericCast(fileOffset)
+                            offset: fileOffset
                         ) ?? ""
                     }
                     var types = ""
                     if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.types) {
                         types = fileHandle.readString(
-                            offset: numericCast(fileOffset)
+                            offset: fileOffset
                         ) ?? ""
                     }
 
@@ -185,13 +185,13 @@ extension ObjCMethodList {
                     var name = ""
                     if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast($0.name)) {
                         name = fileHandle.readString(
-                            offset: numericCast(fileOffset)
+                            offset: fileOffset
                         ) ?? ""
                     }
                     var types = ""
                     if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast($0.types)) {
                         types = fileHandle.readString(
-                            offset: numericCast(fileOffset)
+                            offset: fileOffset
                         ) ?? ""
                     }
 
@@ -227,7 +227,7 @@ extension ObjCMethodList {
                         )
                     ) {
                         name = fileHandle.readString(
-                            offset: numericCast(fileOffset)
+                            offset: fileOffset
                         ) ?? ""
                     }
 
@@ -264,14 +264,14 @@ extension ObjCMethodList {
                     var name = ""
                     if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: nameOffsetInCache + numericCast(_name)) {
                         name = fileHandle.readString(
-                            offset: numericCast(fileOffset)
+                            offset: fileOffset
                         ) ?? ""
                     }
 
                     var types = ""
                     if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast(_types)) {
                         types = fileHandle.readString(
-                            offset: numericCast(fileOffset)
+                            offset: fileOffset
                         ) ?? ""
                     }
 
