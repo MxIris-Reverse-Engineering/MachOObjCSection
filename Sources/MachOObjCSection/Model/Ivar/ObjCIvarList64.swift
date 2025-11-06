@@ -29,33 +29,21 @@ public struct ObjCIvarList64: ObjCIvarListProtocol {
 
 extension ObjCIvarList64 {
     public func ivars(in machO: MachOFile) -> [ObjCIvar]? {
-        let headerStartOffset = machO.headerStartOffset
-
-        var fileHandle = machO.fileHandle
-
-        let offset: UInt64 = numericCast(
-            headerStartOffset + offset + MemoryLayout<Header>.size
-        )
-        var resolvedOffset = offset
-        if let (_cache, _offset) = machO.cacheAndFileOffset(
-            fromStart: offset
-        ) {
-            resolvedOffset = _offset
-            fileHandle = _cache.fileHandle
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast(offset)) else {
+            return []
         }
 
         let size = MemoryLayout<ObjCIvar.Layout>.size
         let sequence: DataSequence<ObjCIvar.Layout> = fileHandle
             .readDataSequence(
-                offset: resolvedOffset,
+                offset: fileOffset + numericCast(MemoryLayout<Header>.size),
                 numberOfElements: count
             )
-        return sequence
-            .enumerated()
+        return sequence.enumerated()
             .map {
                 .init(
                     layout: $1,
-                    offset: numericCast(offset) - headerStartOffset + size * $0
+                    offset: offset + MemoryLayout<Header>.size + size * $0
                 )
             }
     }
