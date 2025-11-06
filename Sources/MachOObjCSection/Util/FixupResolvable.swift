@@ -118,7 +118,7 @@ extension _FixupResolvable {
         let offset: UInt64 = numericCast(fileOffset)
         if let (cache, _offset) = resolveCacheStartOffsetIfNeeded(offset: offset, in: machO),
            let resolved = cache.resolveOptionalRebase(at: _offset) {
-            return resolved// - cache.mainCacheHeader.sharedRegionStart
+            return resolved
         }
 
         if machO.cache != nil {
