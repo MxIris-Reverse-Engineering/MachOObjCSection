@@ -93,7 +93,7 @@ extension MachOFile {
     func fileHandleAndOffset(
         forOffset offset: UInt64
     ) -> (File, UInt64)? {
-        if !isLoadedFromDyldCache{
+        if !isLoadedFromDyldCache {
             return (fileHandle, offset + numericCast(headerStartOffset))
         }
 
