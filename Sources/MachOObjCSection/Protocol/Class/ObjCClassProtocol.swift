@@ -10,12 +10,14 @@ import Foundation
 @_spi(Support) import MachOKit
 import MachOObjCSectionC
 
-public protocol ObjCClassProtocol: _FixupResolvable where LayoutField == ObjCClassLayoutField {
-    associatedtype Layout: _ObjCClassLayoutProtocol
+public protocol ObjCClassProtocol: _FixupResolvable
+where LayoutField == ObjCClassLayoutField,
+      Layout: _ObjCClassLayoutProtocol
+{
     associatedtype ClassROData: LayoutWrapper, ObjCClassRODataProtocol where ClassROData.Layout.Pointer == Layout.Pointer
     associatedtype ClassRWData: LayoutWrapper, ObjCClassRWDataProtocol where ClassRWData.Layout.Pointer == Layout.Pointer, ClassRWData.ObjCClassROData == ClassROData
 
-    var layout: Layout { get }
+    // var layout: Layout { get }
     var offset: Int { get }
 
     @_spi(Core)
@@ -67,7 +69,6 @@ extension ObjCClassProtocol {
 extension ObjCClassProtocol {
     public func metaClass(in machO: MachOFile) -> (MachOFile, Self)? {
         _readClass(
-            at: numericCast(layout.isa),
             field: .isa,
             in: machO
         )
@@ -75,7 +76,6 @@ extension ObjCClassProtocol {
 
     public func superClass(in machO: MachOFile) -> (MachOFile, Self)? {
         _readClass(
-            at: numericCast(layout.superclass),
             field: .superclass,
             in: machO
         )
@@ -83,7 +83,6 @@ extension ObjCClassProtocol {
 
     public func superClassName(in machO: MachOFile) -> String? {
         _readClassName(
-            at: numericCast(layout.superclass),
             field: .superclass,
             in: machO
         )
@@ -199,54 +198,43 @@ extension ObjCClassProtocol {
 
 extension ObjCClassProtocol {
     private func _readClass(
-        at offset: UInt64,
         field: LayoutField,
         in machO: MachOFile
     ) -> (MachOFile, Self)? {
-        guard offset > 0 else { return nil }
-        var offset: UInt64 = machO.fileOffset(
-            of: numericCast(offset)
-        ) + numericCast(machO.headerStartOffset)
+        let unresolved = unresolvedValue(of: field)
+        guard unresolved.value > 0 else { return nil }
 
-        if let resolved = resolveRebase(field, in: machO) {
-            offset = machO.fileOffset(of: resolved) + numericCast(machO.headerStartOffset)
-        }
         if isBind(field, in: machO) { return nil }
 
-        var targetMachO = machO
+        let resolved = machO.resolveRebase(unresolved)
 
-        var fileHandle = machO.fileHandle
-        var resolvedOffset = offset
-        if let (_cache, _offset) = machO.cacheAndFileOffset(
-            fromStart: offset
-        ) {
-            resolvedOffset = _offset
-            fileHandle = _cache.fileHandle
-
-            let unslidAddress = offset + _cache.mainCacheHeader.sharedRegionStart
-            if !targetMachO.contains(unslidAddress: unslidAddress),
-               let machO = _cache.machO(containing: unslidAddress) {
-                targetMachO = machO
-            }
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+            return nil
         }
 
-        let layout: Layout = fileHandle.read(offset: resolvedOffset)
+        var targetMachO = machO
+        if !targetMachO.contains(unslidAddress: resolved.address),
+           let cache = machO.cache(for: resolved.address),
+           let machO = cache.machO(containing: resolved.address) {
+            targetMachO = machO
+        }
+
+        let layout: Layout = fileHandle.read(offset: fileOffset)
         let cls: Self = .init(
             layout: layout,
-            offset: numericCast(offset) - machO.headerStartOffset
+            offset: numericCast(resolved.offset)
         )
         return (targetMachO, cls)
     }
 
     private func _readClassName(
-        at offset: UInt64,
         field: LayoutField,
         in machO: MachOFile
     ) -> String? {
-        guard offset > 0 else { return nil }
+        let unresolved = unresolvedValue(of: field)
+        guard unresolved.value > 0 else { return nil }
 
         if let (targetMachO, cls) = _readClass(
-            at: offset,
             field: field,
             in: machO
         ), let data = cls.classROData(in: targetMachO) {

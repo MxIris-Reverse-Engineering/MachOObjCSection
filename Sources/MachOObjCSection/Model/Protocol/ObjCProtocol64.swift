@@ -42,25 +42,19 @@ public struct ObjCProtocol64: LayoutWrapper, ObjCProtocolProtocol {
         self.offset = offset
     }
 
-    public func layoutOffset(of field: LayoutField) -> Int {
-        let keyPath: PartialKeyPath<Layout>
-
+    public func keyPath(of field: LayoutField) -> KeyPath<Layout, Pointer> {
         switch field {
-        case .isa: keyPath = \.isa
-        case .mangledName: keyPath = \.mangledName
-        case .protocols: keyPath = \.protocols
-        case .instanceMethods: keyPath = \.instanceMethods
-        case .classMethods: keyPath = \.classMethods
-        case .optionalInstanceMethods: keyPath = \.optionalInstanceMethods
-        case .optionalClassMethods: keyPath = \.optionalClassMethods
-        case .instanceProperties: keyPath = \.instanceProperties
-        case .size: keyPath = \.size
-        case .flags: keyPath = \.flags
-        case ._extendedMethodTypes: keyPath = \._extendedMethodTypes
-        case ._demangledName: keyPath = \._demangledName
-        case ._classProperties: keyPath = \._classProperties
+        case .isa: \.isa
+        case .mangledName: \.mangledName
+        case .protocols: \.protocols
+        case .instanceMethods: \.instanceMethods
+        case .classMethods: \.classMethods
+        case .optionalInstanceMethods: \.optionalInstanceMethods
+        case .optionalClassMethods: \.optionalClassMethods
+        case .instanceProperties: \.instanceProperties
+        case ._extendedMethodTypes: \._extendedMethodTypes
+        case ._demangledName: \._demangledName
+        case ._classProperties: \._classProperties
         }
-
-        return layoutOffset(of: keyPath)
     }
 }

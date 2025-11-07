@@ -75,91 +75,111 @@ extension ObjCPropertyList {
             return []
         }
 
-        let headerStartOffset = machO.headerStartOffset
-        var offset: UInt64 = numericCast(headerStartOffset + offset)
-
-        var fileHandle = machO.fileHandle
-        if let (_cache, _offset) = machO.cacheAndFileOffset(
-            fromStart: offset
-        ) {
-            offset = _offset
-            fileHandle = _cache.fileHandle
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast(offset)) else {
+            return []
         }
 
         if machO.is64Bit {
             let sequence: DataSequence<ObjCProperty.Property64> = fileHandle
                 .readDataSequence(
-                    offset: offset + numericCast(MemoryLayout<Header>.size),
+                    offset: fileOffset + numericCast(MemoryLayout<Header>.size),
                     numberOfElements: count
                 )
-            return sequence
+            return sequence.enumerated()
+                .map { i, property in
+                    let fieldOffset: Int = offset
+                    + MemoryLayout<Header>.size
+                    + MemoryLayout<ObjCProperty.Property64>.size * i
+                    return ObjCProperty.UnresolvedProperty(
+                        name: .init(
+                            fieldOffset: fieldOffset,
+                            value: property.name
+                        ),
+                        attributes: .init(
+                            fieldOffset: fieldOffset + 8,
+                            value: property.attributes
+                        )
+                    )
+                }
+                .map {
+                    machO.resolveRebase($0)
+                }
                 .compactMap {
-                    var name = machO.fileOffset(of: numericCast($0.name))
-                    var attributes = machO.fileOffset(of: numericCast($0.attributes))
-
-                    var nameFileHandle = machO.fileHandle
-                    var attributesFileHandle = machO.fileHandle
-
-                    if let (_cache, _offset) = machO.cacheAndFileOffset(
-                        fromStart: name
-                    ) {
-                        name = _offset
-                        nameFileHandle = _cache.fileHandle
+                    var name = ""
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.name.address) {
+                        name = fileHandle.readString(
+                            offset: fileOffset
+                        ) ?? ""
                     }
 
-                    if let (_cache, _offset) = machO.cacheAndFileOffset(
-                        fromStart: attributes
-                    ) {
-                        attributes = _offset
-                        attributesFileHandle = _cache.fileHandle
+                    var attributes = ""
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.attributes.address) {
+                        attributes = fileHandle.readString(
+                            offset: fileOffset
+                        ) ?? ""
                     }
 
                     return ObjCProperty(
-                        name: nameFileHandle.readString(
-                            offset: numericCast(machO.headerStartOffset) + name
-                        ) ?? "",
-                        attributes: attributesFileHandle.readString(
-                            offset: numericCast(headerStartOffset) + attributes
-                        ) ?? ""
+                        name: name,
+                        attributes: attributes
                     )
                 }
         } else {
             let sequence: DataSequence<ObjCProperty.Property32> = fileHandle
                 .readDataSequence(
-                    offset: offset + numericCast(MemoryLayout<Header>.size),
+                    offset: fileOffset + numericCast(MemoryLayout<Header>.size),
                     numberOfElements: count
                 )
-            return sequence
+            return sequence.enumerated()
+                .map { i, property in
+                    let fieldOffset: Int = offset
+                    + MemoryLayout<Header>.size
+                    + MemoryLayout<ObjCProperty.Property32>.size * i
+                    return ObjCProperty.UnresolvedProperty(
+                        name: .init(
+                            fieldOffset: fieldOffset,
+                            value: numericCast(property.name)
+                        ),
+                        attributes: .init(
+                            fieldOffset: fieldOffset + 4,
+                            value: numericCast(property.attributes)
+                        )
+                    )
+                }
                 .map {
-                    var name = UInt64($0.name)
-                    var attributes = UInt64($0.attributes)
-
-                    var nameFileHandle = machO.fileHandle
-                    var attributesFileHandle = machO.fileHandle
-
-                    if let (_cache, _offset) = machO.cacheAndFileOffset(
-                        fromStart: name
-                    ) {
-                        name = _offset
-                        nameFileHandle = _cache.fileHandle
+                    machO.resolveRebase($0)
+                }
+                .map {
+                    var name = ""
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.name.address) {
+                        name = fileHandle.readString(
+                            offset: fileOffset
+                        ) ?? ""
                     }
 
-                    if let (_cache, _offset) = machO.cacheAndFileOffset(
-                        fromStart: attributes
-                    ) {
-                        attributes = _offset
-                        attributesFileHandle = _cache.fileHandle
+                    var attributes = ""
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.attributes.address) {
+                        attributes = fileHandle.readString(
+                            offset: fileOffset
+                        ) ?? ""
                     }
 
                     return ObjCProperty(
-                        name: nameFileHandle.readString(
-                            offset: numericCast(headerStartOffset) + name
-                        ) ?? "",
-                        attributes: attributesFileHandle.readString(
-                            offset: numericCast(headerStartOffset) + attributes
-                        ) ?? ""
+                        name: name,
+                        attributes: attributes
                     )
                 }
         }
+    }
+}
+
+extension MachOFile {
+    func resolveRebase(
+        _ unresolvedValue: ObjCProperty.UnresolvedProperty
+    ) -> ObjCProperty.ResolvedProperty {
+        ObjCProperty.ResolvedProperty(
+            name: resolveRebase(unresolvedValue.name),
+            attributes: resolveRebase(unresolvedValue.attributes)
+        )
     }
 }

@@ -37,19 +37,14 @@ public struct ObjCClass64: LayoutWrapper, ObjCClassProtocol {
         self.offset = offset
     }
 
-    public func layoutOffset(of field: LayoutField) -> Int {
-        let keyPath: PartialKeyPath<Layout>
-
+    public func keyPath(of field: LayoutField) -> KeyPath<Layout, Pointer> {
         switch field {
-        case .isa: keyPath = \.isa
-        case .superclass: keyPath = \.superclass
-        case .methodCacheBuckets: keyPath = \.methodCacheBuckets
-        case .methodCacheProperties: keyPath = \.methodCacheProperties
-        case .dataVMAddrAndFastFlags: keyPath = \.dataVMAddrAndFastFlags
-        case .swiftClassFlags: keyPath = \.swiftClassFlags
+        case .isa: \.isa
+        case .superclass: \.superclass
+        case .methodCacheBuckets: \.methodCacheBuckets
+        case .methodCacheProperties: \.methodCacheProperties
+        case .dataVMAddrAndFastFlags: \.dataVMAddrAndFastFlags
         }
-
-        return layoutOffset(of: keyPath)
     }
 }
 
@@ -160,24 +155,25 @@ extension ObjCClass64 {
             FAST_DATA_MASK = numericCast(FAST_DATA_MASK_64)
         }
 
-        var offset: UInt64 = numericCast(layout.dataVMAddrAndFastFlags) & FAST_DATA_MASK + numericCast(machO.headerStartOffset)
-        offset = machO.fileOffset(of: offset)
+        var unresolved = unresolvedValue(of: .dataVMAddrAndFastFlags)
+        unresolved.value &= FAST_DATA_MASK
+        var resolved = machO.resolveRebase(unresolved)
+        resolved.address &= FAST_DATA_MASK
 
-        if let resolved = resolveRebase(.dataVMAddrAndFastFlags, in: machO) {
-            offset =  machO.fileOffset(of: resolved & FAST_DATA_MASK) + numericCast(machO.headerStartOffset)
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+            return nil
         }
 
-        var resolved = offset
-        if let cache = machO.cache {
-            guard let _offset = cache.fileOffset(of: offset + cache.mainCacheHeader.sharedRegionStart) else {
-                return nil
-            }
-            resolved = _offset
+        let offset: Int = if let cache = machO.cache {
+            numericCast(resolved.address - cache.mainCacheHeader.sharedRegionStart)
+        } else {
+            numericCast(machO.fileOffset(of: resolved.address)!)
         }
-        let layout: ClassROData.Layout = machO.fileHandle.read(offset: resolved)
+
+        let layout: ClassROData.Layout = fileHandle.read(offset: fileOffset)
         let classData = ClassROData(
             layout: layout,
-            offset: Int(offset) - machO.headerStartOffset
+            offset: offset
         )
 
         return classData

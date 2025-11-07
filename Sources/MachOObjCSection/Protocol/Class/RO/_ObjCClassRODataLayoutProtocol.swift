@@ -24,9 +24,9 @@ public protocol _ObjCClassRODataLayoutProtocol {
 }
 
 public enum ObjCClassRODataLayoutField {
-    case flags
-    case instanceStart
-    case instanceSize
+    // case flags
+    // case instanceStart
+    // case instanceSize
     case ivarLayout
     case name
     case baseMethods

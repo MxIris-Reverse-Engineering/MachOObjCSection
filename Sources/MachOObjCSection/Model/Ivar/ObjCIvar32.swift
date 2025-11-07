@@ -11,10 +11,9 @@ import Foundation
 
 public struct ObjCIvar32: LayoutWrapper, ObjCIvarProtocol {
     public typealias LayoutField = ObjCIvarLayoutField
+    public typealias Pointer = UInt32
 
     public struct Layout: _ObjCIvarLayoutProtocol {
-        public typealias Pointer = UInt32
-
         public let offset: Pointer  // uint32_t*
         public let name: Pointer    // const char *
         public let type: Pointer    // const char *
@@ -31,17 +30,11 @@ public struct ObjCIvar32: LayoutWrapper, ObjCIvarProtocol {
         self.offset = offset
     }
 
-    public func layoutOffset(of field: LayoutField) -> Int {
-        let keyPath: PartialKeyPath<Layout>
-
+    public func keyPath(of field: LayoutField) -> KeyPath<Layout, Pointer> {
         switch field {
-        case .offset: keyPath = \.offset
-        case .name: keyPath = \.name
-        case .type: keyPath = \.type
-        case .alignment: keyPath = \.alignment
-        case .size: keyPath = \.size
+        case .offset: \.offset
+        case .name: \.name
+        case .type: \.type
         }
-
-        return layoutOffset(of: keyPath)
     }
 }

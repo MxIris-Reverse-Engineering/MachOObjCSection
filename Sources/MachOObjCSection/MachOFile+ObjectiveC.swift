@@ -3,7 +3,7 @@
 //
 //
 //  Created by p-x9 on 2024/08/01
-//  
+//
 //
 
 import Foundation
@@ -35,9 +35,10 @@ extension MachOFile.ObjectiveC {
             return nil
         }
 
-        return try! machO.fileHandle.read(
-            offset: numericCast(__objc_imageinfo.offset + machO.headerStartOffset)
-        )
+        guard let fileSlice = machO._fileSliceForSection(section: __objc_imageinfo) else {
+            return nil
+        }
+        return try? fileSlice.read(offset: 0)
     }
 }
 
@@ -272,34 +273,48 @@ extension MachOFile.ObjectiveC {
         in machO: MachOFile,
         isCatlist2: Bool = false
     ) -> [Categgory]? {
-        let data = try! machO.fileHandle.readData(
-            offset: numericCast(section.offset + machO.headerStartOffset),
+        guard let fileSlice = machO._fileSliceForSection(section: section) else {
+            return nil
+        }
+        let data = try! fileSlice.readData(
+            offset: 0,
             length: section.size
         )
 
+        let offset: UInt64 = if let cache = machO.cache {
+            numericCast(section.address) - cache.mainCacheHeader.sharedRegionStart
+        } else {
+            numericCast(section.offset)
+        }
+
         typealias Pointer = Categgory.Layout.Pointer
         let pointerSize: Int = MemoryLayout<Pointer>.size
-        let offsets: DataSequence<Pointer> = .init(
+        let sequnece: DataSequence<Pointer> = .init(
             data: data,
             numberOfElements: section.size / pointerSize
         )
 
-        return offsets
-            .map { machO.fileOffset(of: numericCast($0)) }
-            .compactMap {
-                if let cache = machO.cache {
-                    let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0
-                    return ($0, resolved)
-                }
-                return ($0, $0)
+        return sequnece.enumerated()
+            .map { i, value in
+                UnresolvedValue(
+                    fieldOffset: numericCast(offset)
+                    + pointerSize * i,
+                    value: numericCast(value)
+                )
             }
-            .map { (offset: UInt64, resolved: UInt64) in
-                let layout: Categgory.Layout = machO.fileHandle.read(
-                    offset: resolved + numericCast(machO.headerStartOffset)
+            .compactMap { unresolved in
+                let resolved = machO.resolveRebase(unresolved)
+
+                guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+                    return nil
+                }
+
+                let layout: Categgory.Layout = fileHandle.read(
+                    offset: fileOffset
                 )
                 return .init(
                     layout: layout,
-                    offset: numericCast(offset),
+                    offset: numericCast(resolved.offset),
                     isCatlist2: isCatlist2
                 )
             }
@@ -311,32 +326,49 @@ extension MachOFile.ObjectiveC {
         from section: any SectionProtocol,
         in machO: MachOFile
     ) -> [Class]? {
-        let data = try! machO.fileHandle.readData(
-            offset: numericCast(section.offset + machO.headerStartOffset),
+        guard let fileSlice = machO._fileSliceForSection(section: section) else {
+            return nil
+        }
+        let data = try! fileSlice.readData(
+            offset: 0,
             length: section.size
         )
 
+        let offset: UInt64 = if let cache = machO.cache {
+            numericCast(section.address) - cache.mainCacheHeader.sharedRegionStart
+        } else {
+            numericCast(section.offset)
+        }
+
         typealias Pointer = Class.Layout.Pointer
         let pointerSize: Int = MemoryLayout<Pointer>.size
-        let offsets: DataSequence<Pointer> = .init(
+        let sequnece: DataSequence<Pointer> = .init(
             data: data,
             numberOfElements: section.size / pointerSize
         )
 
-        return offsets
-            .map { machO.fileOffset(of: numericCast($0)) }
-            .compactMap {
-                if let cache = machO.cache {
-                    let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0
-                    return ($0, resolved)
-                }
-                return ($0, $0)
-            }
-            .map { (offset: UInt64, resolved: UInt64) in
-                let layout: Class.Layout = machO.fileHandle.read(
-                    offset: resolved + numericCast(machO.headerStartOffset)
+        return sequnece.enumerated()
+            .map { i, value in
+                UnresolvedValue(
+                    fieldOffset: numericCast(offset)
+                    + pointerSize * i,
+                    value: numericCast(value)
                 )
-                return .init(layout: layout, offset: numericCast(offset))
+            }
+            .compactMap { unresolved in
+                let resolved = machO.resolveRebase(unresolved)
+
+                guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+                    return nil
+                }
+
+                let layout: Class.Layout = fileHandle.read(
+                    offset: fileOffset
+                )
+                return .init(
+                    layout: layout,
+                    offset: numericCast(resolved.offset)
+                )
             }
     }
 
@@ -346,30 +378,91 @@ extension MachOFile.ObjectiveC {
         from section: any SectionProtocol,
         in machO: MachOFile
     ) -> [Protocol]? {
-        let data = try! machO.fileHandle.readData(
-            offset: numericCast(section.offset + machO.headerStartOffset),
+        guard let fileSlice = machO._fileSliceForSection(section: section) else {
+            return nil
+        }
+        let data = try! fileSlice.readData(
+            offset: 0,
             length: section.size
         )
 
+        let offset: UInt64 = if let cache = machO.cache {
+            numericCast(section.address) - cache.mainCacheHeader.sharedRegionStart
+        } else {
+            numericCast(section.offset)
+        }
+
         typealias Pointer = Protocol.Layout.Pointer
         let pointerSize: Int = MemoryLayout<Pointer>.size
-        let offsets: DataSequence<Pointer> = .init(
+        let sequnece: DataSequence<Pointer> = .init(
             data: data,
             numberOfElements: section.size / pointerSize
         )
 
-        return offsets
-            .map { machO.fileOffset(of: numericCast($0)) }
-            .compactMap {
-                if let cache = machO.cache {
-                    let resolved = cache.fileOffset(of: $0 + cache.mainCacheHeader.sharedRegionStart) ?? $0
-                    return ($0, resolved)
+        return sequnece.enumerated()
+            .map { i, value in
+                UnresolvedValue(
+                    fieldOffset: numericCast(offset)
+                    + pointerSize * i,
+                    value: numericCast(value)
+                )
+            }
+            .compactMap { unresolved in
+                let resolved = machO.resolveRebase(unresolved)
+
+                guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+                    return nil
                 }
-                return ($0, $0)
+
+                let layout: Protocol.Layout = fileHandle.read(
+                    offset: fileOffset
+                )
+                return .init(
+                    layout: layout,
+                    offset: numericCast(resolved.offset)
+                )
             }
-            .map { (offset: UInt64, resolved: UInt64) in
-                let layout: Protocol.Layout = machO.fileHandle.read(offset: resolved + numericCast(machO.headerStartOffset))
-                return .init(layout: layout, offset: numericCast(offset))
+    }
+}
+
+extension MachOFile {
+    fileprivate func _fileSliceForSection(
+        section: any SectionProtocol
+    ) -> File.FileSlice? {
+        let text: (any SegmentCommandProtocol)? = loadCommands.text64 ?? loadCommands.text
+        guard let text else { return nil }
+
+        let maxFileOffsetToCheck = text.fileOffset + section.address - text.virtualMemoryAddress
+        let isWithinFileRange: Bool = fileHandle.size >= maxFileOffsetToCheck
+
+        // 1) text.vmaddr < linkedit.vmaddr
+        // 2) fileoff_diff <= vmaddr_diff
+        // 3) If both exist in the same file
+        //    text.fileoff < linkedit.fileoff <= text.fileoff + vmaddr_diff
+        // 4) if fileHandle.size < text.fileoff + vmaddr_diff
+        //    both exist in the same file
+
+        // The linkedit data in iOS is stored together in a separate, independent cache.
+        // (.0x.linkeditdata)
+        if isLoadedFromDyldCache && !isWithinFileRange {
+            guard let fullCache = self.fullCache,
+                  let fileOffset = fullCache.fileOffset(
+                    of: numericCast(section.address)
+                  ),
+                  let segment = fullCache.fileSegment(
+                    forOffset: fileOffset
+                  ) else {
+                return nil
             }
+            return try? segment._file.fileSlice(
+                offset: numericCast(fileOffset) - segment.offset,
+                length: section.size
+            )
+        } else {
+            return try? fileHandle.fileSlice(
+                offset: headerStartOffset + section.offset,
+                length: section.size
+            )
+        }
     }
 }

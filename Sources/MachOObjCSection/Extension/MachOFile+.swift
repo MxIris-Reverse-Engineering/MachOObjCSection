@@ -22,21 +22,8 @@ extension MachOFile {
     }
 }
 
+// MARK: - dyld cache
 extension MachOFile {
-    var cache: DyldCache? {
-        guard isLoadedFromDyldCache else { return nil }
-        guard let cache = try? DyldCache(url: url) else {
-            return nil
-        }
-        if let mainCache = cache.mainCache {
-            return try? .init(
-                subcacheUrl: cache.url,
-                mainCacheHeader: mainCache.header
-            )
-        }
-        return cache
-    }
-
     func cache(for address: UInt64) -> DyldCache? {
         cacheAndFileOffset(for: address)?.0
     }
@@ -83,15 +70,120 @@ extension MachOFile {
     }
 }
 
+// MARK: - FileIO
+extension MachOFile {
+    func fileHandleAndOffset(
+        forAddress address: UInt64
+    ) -> (File, UInt64)? {
+        if !isLoadedFromDyldCache,
+           let fileOffset = fileOffset(of: address) {
+            return (fileHandle, fileOffset + numericCast(headerStartOffset))
+        }
+
+        if let cache,
+           let (_cache, fileOffset) = cacheAndFileOffset(
+            fromStart: address - cache.mainCacheHeader.sharedRegionStart
+           ) {
+            return (_cache.fileHandle, fileOffset)
+        }
+
+        return nil
+    }
+
+    func fileHandleAndOffset(
+        forOffset offset: UInt64
+    ) -> (File, UInt64)? {
+        if !isLoadedFromDyldCache {
+            return (fileHandle, offset + numericCast(headerStartOffset))
+        }
+
+        if let (_cache, fileOffset) = cacheAndFileOffset(
+            fromStart: offset
+           ) {
+            return (_cache.fileHandle, fileOffset)
+        }
+
+        return nil
+    }
+}
+
+// MARK: - rebase / bind
 extension MachOFile {
     func isBind(
         _ offset: Int
     ) -> Bool {
         resolveBind(at: numericCast(offset)) != nil
     }
+
+    func isBind(
+        _ unresolvedValue: UnresolvedValue
+    ) -> Bool {
+        isBind(unresolvedValue.fieldOffset)
+    }
+
+    /// Resolves a rebase from an `UnresolvedValue`.
+    ///
+    /// If the Mach-O is backed by dyld shared cache(s):
+    /// - find which cache actually contains this offset
+    /// - ask that cache to resolve the rebase at its local file offset
+    /// - return the resolved address together with the “offset from the main cache start”
+    ///
+    /// Otherwise (non-cache Mach-O):
+    /// - resolve against the file directly
+    ///
+    /// If it cannot be resolved, we still return a `ResolvedValue` that contains:
+    /// - the raw input value (unrebased)
+    /// - file offset resolved from that raw value
+    ///
+    /// - Parameter unresolvedValue: position (file offset) and raw pointer value stored in the image
+    /// - Returns: resolved value and offset
+    func resolveRebase(
+        _ unresolvedValue: UnresolvedValue
+    ) -> ResolvedValue {
+        let offset: UInt64 = numericCast(unresolvedValue.fieldOffset)
+
+        if let (cache, _offset) = cacheAndFileOffset(
+            fromStart: offset
+        ) {
+            let address = cache.resolveOptionalRebase(at: _offset) ?? unresolvedValue.value
+            return .init(
+                address: address,
+                offset: address - cache.mainCacheHeader.sharedRegionStart
+            )
+        }
+
+        if let resolved = resolveOptionalRebase(
+            at: offset
+        ) {
+            return .init(
+                address: resolved,
+                offset: fileOffset(of: resolved)!
+            )
+        }
+
+        return .init(
+            address: unresolvedValue.value,
+            offset: fileOffset(of: unresolvedValue.value)!
+        )
+    }
 }
 
+// MARK: - Objective-C
 extension MachOFile {
+    var relativeMethodSelectorBaseAddressOffset: UInt64? {
+        if let cache,
+           let offset = cache.relativeMethodSelectorBaseAddressOffset {
+            return offset
+        }
+
+        if let fullCache,
+           let offset = fullCache.relativeMethodSelectorBaseAddressOffset {
+            return offset
+        }
+
+        return nil
+    }
+
     func findObjCSection64(for section: ObjCMachOSection) -> Section64? {
         findObjCSection64(for: section.rawValue)
     }

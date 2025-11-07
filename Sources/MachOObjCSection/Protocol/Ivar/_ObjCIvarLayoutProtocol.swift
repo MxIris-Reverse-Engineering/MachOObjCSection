@@ -22,6 +22,6 @@ public enum ObjCIvarLayoutField {
     case offset
     case name
     case type
-    case alignment
-    case size
+//    case alignment
+//    case size
 }

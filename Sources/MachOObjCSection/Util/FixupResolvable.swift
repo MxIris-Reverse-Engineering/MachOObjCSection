@@ -3,30 +3,51 @@
 //  MachOObjCSection
 //
 //  Created by p-x9 on 2024/12/01
-//  
+//
 //
 
 import Foundation
 @_spi(Support) import MachOKit
 
-public protocol _FixupResolvable {
+public struct UnresolvedValue {
+    public var fieldOffset: Int
+    public var value: UInt64
+}
+
+public struct ResolvedValue {
+    public var address: UInt64
+    public var offset: UInt64
+}
+
+public protocol _FixupResolvable: LayoutWrapper {
     associatedtype LayoutField
+    associatedtype Pointer: FixedWidthInteger
 
     var offset: Int { get }
 
+    func keyPath(of field: LayoutField) -> KeyPath<Layout, Pointer>
+
     func layoutOffset(of field: LayoutField) -> Int
+    func unresolvedValue(of field: LayoutField) -> UnresolvedValue
 }
 
 extension _FixupResolvable {
-    @_spi(Core)
-    public func resolveRebase(
-        _ field: LayoutField,
-        in machO: MachOFile
-    ) -> UInt64? {
-        let offset = self.offset + layoutOffset(of: field)
-        return resolveRebase(fileOffset: offset, in: machO)
+    public func layoutOffset(of field: LayoutField) -> Int {
+        let keyPath = keyPath(of: field)
+        return layoutOffset(of: keyPath)
     }
 
+    public func unresolvedValue(of field: LayoutField) -> UnresolvedValue {
+        let value = layout[keyPath: keyPath(of: field)]
+        let offset = offset + layoutOffset(of: field)
+        return .init(
+            fieldOffset: offset,
+            value: numericCast(value)
+        )
+    }
+}
+
+extension _FixupResolvable {
     @_spi(Core)
     public func resolveBind(
         _ field: LayoutField,
@@ -78,6 +99,7 @@ extension _FixupResolvable where Self: LayoutWrapper {
 #endif
 
 extension _FixupResolvable {
+#if false
     /// Resolves the rebase operation at the specified file offset within the given MachO file.
     ///
     /// This function determines if the rebase operation can be resolved from the provided file offset
@@ -96,7 +118,7 @@ extension _FixupResolvable {
         let offset: UInt64 = numericCast(fileOffset)
         if let (cache, _offset) = resolveCacheStartOffsetIfNeeded(offset: offset, in: machO),
            let resolved = cache.resolveOptionalRebase(at: _offset) {
-            return resolved - cache.mainCacheHeader.sharedRegionStart
+            return resolved
         }
 
         if machO.cache != nil {
@@ -108,6 +130,7 @@ extension _FixupResolvable {
         }
         return nil
     }
+#endif
 
     /// Resolves the bind operation at the specified file offset within the given MachO file.
     ///
@@ -167,6 +190,7 @@ extension _FixupResolvable {
     }
 }
 
+#if false
 extension _FixupResolvable {
     func resolveCacheStartOffsetIfNeeded(
         offset: UInt64,
@@ -180,3 +204,4 @@ extension _FixupResolvable {
         return nil
     }
 }
+#endif
