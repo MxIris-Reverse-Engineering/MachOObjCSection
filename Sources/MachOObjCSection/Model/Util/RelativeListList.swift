@@ -69,25 +69,16 @@ extension RelativeListListProtocol {
 
 extension RelativeListListProtocol {
     public func entries(in machO: MachOFile) -> [Entry] {
-        let offset = offset + machO.headerStartOffset
-
-        var resolvedOffset: UInt64 = numericCast(offset)
-
-        var fileHandle = machO.fileHandle
-
-        if let (_cache, _offset) = machO.cacheAndFileOffset(
-            fromStart: UInt64(offset)
-        ) {
-            resolvedOffset = _offset
-            fileHandle = _cache.fileHandle
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast(offset)) else {
+            return []
         }
 
         let sequence: DataSequence<Entry.Layout> = fileHandle.readDataSequence(
-            offset: resolvedOffset + numericCast(MemoryLayout<Header>.size),
+            offset: fileOffset + numericCast(MemoryLayout<Header>.size),
             numberOfElements: numericCast(header.count)
         )
 
-        let baseOffset = offset + MemoryLayout<Header>.size - machO.headerStartOffset
+        let baseOffset = offset + MemoryLayout<Header>.size
         let entrySize = MemoryLayout<Entry.Layout>.size
         return sequence.enumerated()
             .map { i, layout in
