@@ -28,6 +28,39 @@ extension DyldCache {
     }
 }
 
+// MARK: - locate value
+extension DyldCache {
+    typealias LocateValue<V> = (cache: DyldCache, value: V)
+
+    func locateValue<V>(
+        _ keyPath: KeyPath<DyldCache, V?>
+    ) -> LocateValue<V>? {
+        locateValue({ $0[keyPath: keyPath] })
+    }
+
+    func locateValue<V>(
+        _ resolver: (DyldCache) -> V?
+    ) -> LocateValue<V>? {
+        if let value = resolver(self) { return (self, value) }
+
+        guard let mainCache else { return nil }
+        if let value = resolver(mainCache) { return (mainCache, value) }
+
+        guard let subCaches = mainCache.subCaches else {
+            return nil
+        }
+        for subCache in subCaches {
+            guard let cache = try? subCache.subcache(for: mainCache) else {
+                continue
+            }
+            if let value = resolver(cache) {
+                return (cache, value)
+            }
+        }
+        return nil
+    }
+}
+
 extension DyldCache {
     var headerOptimizationRO64: ObjCHeaderOptimizationRO64? {
         guard cpu.is64Bit else {
