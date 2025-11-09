@@ -30,17 +30,38 @@ extension DyldCache {
 
 // MARK: - locate value
 extension DyldCache {
-    typealias LocateValue<V> = (cache: DyldCache, value: V)
+    /// A tuple containing the DyldCache where the value was found and the resolved value itself.
+    /// Useful because values may be located either in the current cache, the main cache,
+    /// or one of its subcaches.
+    typealias LocatedValue<V> = (cache: DyldCache, value: V)
 
+    /// Locate a value for a given optional KeyPath within this cache hierarchy.
+    ///
+    /// This resolves the value by checking:
+    /// 1. This cache
+    /// 2. The main cache
+    /// 3. Any subcaches derived from `mainCache`
+    ///
+    /// - Parameter keyPath: A keyPath returning an optional value.
+    /// - Returns: A tuple of `(cache, value)` if resolved, or `nil` if not found.
     func locateValue<V>(
         _ keyPath: KeyPath<DyldCache, V?>
-    ) -> LocateValue<V>? {
+    ) -> LocatedValue<V>? {
         locateValue({ $0[keyPath: keyPath] })
     }
 
+    /// Locate a value using a custom resolver function running against each cache in the hierarchy.
+    ///
+    /// Resolution order:
+    /// 1. This cache
+    /// 2. The main cache
+    /// 3. Each subcache of the main cache
+    ///
+    /// - Parameter resolver: A closure returning an optional value for a given DyldCache.
+    /// - Returns: A tuple of `(cache, value)` if resolution is successful; otherwise `nil`.
     func locateValue<V>(
         _ resolver: (DyldCache) -> V?
-    ) -> LocateValue<V>? {
+    ) -> LocatedValue<V>? {
         if let value = resolver(self) { return (self, value) }
 
         guard let mainCache else { return nil }
