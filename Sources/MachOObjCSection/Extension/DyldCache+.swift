@@ -82,89 +82,82 @@ extension DyldCache {
     }
 }
 
+// MARK: - Objective-C
+extension DyldCache {
+    var _objcOptimization: LocatedValue<ObjCOptimization>? {
+        locateValue(\.objcOptimization)
+    }
+
+    var _oldObjcOptimization: LocatedValue<OldObjCOptimization>? {
+        locateValue(\.oldObjcOptimization)
+    }
+}
+
 extension DyldCache {
     var headerOptimizationRO64: ObjCHeaderOptimizationRO64? {
-        guard cpu.is64Bit else {
-            return nil
+        guard cpu.is64Bit else { return nil }
+        if let _objcOptimization {
+            return _objcOptimization.value.headerOptimizationRO64(in: self)
         }
-        if let objcOptimization {
-            return objcOptimization.headerOptimizationRO64(in: self)
-        }
-        if let oldObjcOptimization {
-            return oldObjcOptimization.headerOptimizationRO64(in: self)
+        if let _oldObjcOptimization {
+            return _oldObjcOptimization.value.headerOptimizationRO64(in: self)
         }
         return nil
     }
 
     var headerOptimizationRO32: ObjCHeaderOptimizationRO32? {
-        guard cpu.is64Bit else {
-            return nil
+        guard !cpu.is64Bit else { return nil }
+        if let _objcOptimization {
+            return _objcOptimization.value.headerOptimizationRO32(in: self)
         }
-        if let objcOptimization {
-            return objcOptimization.headerOptimizationRO32(in: self)
-        }
-        if let oldObjcOptimization {
-            return oldObjcOptimization.headerOptimizationRO32(in: self)
-        }
-        return nil
-    }
-
-    var headerOptimizationRW64: ObjCHeaderOptimizationRW64? {
-        guard cpu.is64Bit else {
-            return nil
-        }
-        if let objcOptimization {
-            return objcOptimization.headerOptimizationRW64(in: self)
-        }
-        if let oldObjcOptimization {
-            return oldObjcOptimization.headerOptimizationRW64(in: self)
-        }
-        return nil
-    }
-
-    var headerOptimizationRW32: ObjCHeaderOptimizationRW32? {
-        guard cpu.is64Bit else {
-            return nil
-        }
-        if let objcOptimization {
-            return objcOptimization.headerOptimizationRW32(in: self)
-        }
-        if let oldObjcOptimization {
-            return oldObjcOptimization.headerOptimizationRW32(in: self)
+        if let _oldObjcOptimization {
+            return _oldObjcOptimization.value.headerOptimizationRO32(in: self)
         }
         return nil
     }
 }
 
 extension DyldCache {
-    func machO(at index: Int) -> MachOFile? {
-        guard let mainCache else { return nil }
-        if let ro = mainCache.headerOptimizationRO64,
+    var _headerOptimizationRO64: LocatedValue<ObjCHeaderOptimizationRO64>? {
+        locateValue(\.headerOptimizationRO64)
+    }
+
+    var _headerOptimizationRO32: LocatedValue<ObjCHeaderOptimizationRO32>? {
+        locateValue(\.headerOptimizationRO32)
+    }
+}
+
+extension DyldCache {
+    func _machO(at index: Int) -> LocatedValue<MachOFile>? {
+        if let ro = _headerOptimizationRO64?.value,
            ro.contains(index: index) {
-            guard let header = ro.headerInfos(in: mainCache)?.first(
+            let headers = locateValue({ ro.headerInfos(in: $0) })?.value
+            guard let header = headers?.first(
                 where: {
                     $0.index == index
                 }
             ) else {
                 return nil
             }
-            return header._machO(mainCache: mainCache)
+            return locateValue { header.machO(in: $0) }
         }
-        if let ro = mainCache.headerOptimizationRO32,
+        if let ro = _headerOptimizationRO32?.value,
            ro.contains(index: index) {
-            guard let header = ro.headerInfos(in: mainCache)?.first(
+            let headers = locateValue({ ro.headerInfos(in: $0) })?.value
+            guard let header = headers?.first(
                 where: {
                     $0.index == index
                 }
             ) else {
                 return nil
             }
-            return header._machO(mainCache: mainCache)
+            return locateValue { header.machO(in: $0) }
         }
         return nil
     }
 }
 
+// MARK: - mach-o
 extension DyldCache {
     func machO(containing unslidAddress: UInt64) -> MachOFile? {
         for machO in self.machOFiles() {

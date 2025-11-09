@@ -96,13 +96,3 @@ extension RelativeListListProtocol {
             }
     }
 }
-
-extension RelativeListListEntry {
-    public func machO(in cache: DyldCacheLoaded) -> MachOImage? {
-        cache.machO(at: imageIndex)
-    }
-
-    public func machO(in cache: DyldCache) -> MachOFile? {
-        cache.machO(at: imageIndex)
-    }
-}
