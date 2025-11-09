@@ -12,7 +12,7 @@ import ObjCDump
 
 extension MachOFile {
     // WORKAROUND: Due to a bug in MachOKit, the imagePath of a machO obtained from ObjCHeaderInfoRO may sometimes be an empty string.
-    var imagePath: String {
+    fileprivate var imagePath: String {
         loadCommands.info(of: LoadCommand.idDylib)?
             .dylib(in: self)
             .name ?? ""
