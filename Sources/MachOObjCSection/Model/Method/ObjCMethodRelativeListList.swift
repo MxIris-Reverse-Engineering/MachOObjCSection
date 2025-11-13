@@ -29,7 +29,7 @@ public struct ObjCMethodRelativeListList: RelativeListListProtocol {
 
 #if canImport(MachO)
         guard let cache: DyldCacheLoaded = .current else { return nil }
-        guard let machO = entry.machO(in: cache) else { return nil }
+        guard let machO = cache.machO(at: entry.imageIndex) else { return nil }
 
         let list = List(
             ptr: ptr,
@@ -52,7 +52,7 @@ extension ObjCMethodRelativeListList {
             return nil
         }
 
-        guard let machO = entry.machO(in: cache) else { return nil }
+        guard let machO = cache._machO(at: entry.imageIndex)?.value else { return nil }
 
         let data = try! cache.fileHandle.readData(
             offset: numericCast(resolvedOffset),
