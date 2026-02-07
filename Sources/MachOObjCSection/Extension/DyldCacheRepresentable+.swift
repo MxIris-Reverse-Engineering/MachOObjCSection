@@ -14,8 +14,9 @@ extension DyldCacheRepresentable {
         if let objcOpt = objcOptimization {
             return objcOpt.relativeMethodSelectorBaseAddressOffset
         }
-        if let oldOpt = oldObjcOptimization {
-            return numericCast(oldOpt.relativeMethodSelectorBaseAddressOffset) + numericCast(oldOpt.offset)
+        if let oldOpt = oldObjcOptimization,
+           case let .v16(oldObjCOptimization16) = oldOpt {
+            return numericCast(oldObjCOptimization16.relativeMethodSelectorBaseAddressOffset) + numericCast(oldOpt.offset)
         }
         return nil
     }
