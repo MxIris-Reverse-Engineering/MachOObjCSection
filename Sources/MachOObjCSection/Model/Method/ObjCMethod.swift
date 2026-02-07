@@ -102,12 +102,7 @@ extension ObjCMethod {
         guard let cache: DyldCacheLoaded = .current else {
             fatalError("Unsupported Platform")
         }
-        let base: UnsafeRawPointer
-        if let objcOptimization = cache.objcOptimization {
-            base = objcOptimization.relativeMethodSelectorBaseAddress(in: cache)
-        } else if let objcOptimization = cache.oldObjcOptimization {
-            base = objcOptimization.relativeMethodSelectorBaseAddress(in: cache)
-        } else {
+        guard let base = cache.relativeMethodSelectorBaseAddress else {
             fatalError("Unsupported Platform")
         }
 #else

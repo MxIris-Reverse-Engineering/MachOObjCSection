@@ -17,6 +17,16 @@ extension DyldCacheLoaded {
 }
 #endif
 
+extension DyldCacheLoaded {
+    var relativeMethodSelectorBaseAddress: UnsafeRawPointer? {
+        if let objcOptimization = objcOptimization {
+            return objcOptimization.relativeMethodSelectorBaseAddress(in: self)
+        } else if let objcOptimization = oldObjcOptimization {
+            return objcOptimization.relativeMethodSelectorBaseAddress(in: self)
+        }
+        return nil
+    }
+}
 
 extension DyldCacheLoaded {
     var headerOptimizationRO64: ObjCHeaderOptimizationRO64? {
