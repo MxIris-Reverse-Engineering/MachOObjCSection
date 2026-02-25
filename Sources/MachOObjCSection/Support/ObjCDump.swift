@@ -69,7 +69,8 @@ extension ObjCMethod {
         .init(
             name: name,
             typeEncoding: types,
-            isClassMethod: isClassMethod
+            isClassMethod: isClassMethod,
+            imp: imp,
         )
     }
 }
