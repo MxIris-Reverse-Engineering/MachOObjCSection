@@ -57,14 +57,14 @@ extension ObjCClass64 {
 extension ObjCClass64 {
     // https://github.com/apple-oss-distributions/objc4/blob/01edf1705fbc3ff78a423cd21e03dfc21eb4d780/runtime/objc-runtime-new.h#L2534
     public func hasRWPointer(in machO: MachOImage) -> Bool {
-        if FAST_IS_RW_POINTER_64 != 0 {
+//        if FAST_IS_RW_POINTER_64 != 0 {
             return numericCast(layout.dataVMAddrAndFastFlags) & FAST_IS_RW_POINTER_64 != 0
-        } else {
-            guard let data = _classROData(in: machO) else {
-                return false
-            }
-            return data.isRealized
-        }
+//        } else {
+//            guard let data = _classROData(in: machO) else {
+//                return false
+//            }
+//            return data.isRealized
+//        }
     }
 
     public func classROData(in machO: MachOImage) -> ClassROData? {
