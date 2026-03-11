@@ -57,22 +57,22 @@ let package = Package(
             local: .package(
                 path: "../MachOKit",
                 isRelative: true,
-                isEnabled: true
+                isEnabled: false
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/MachOKit.git",
-                branch: "main"
+                from: "0.46.100"
             )
         ),
         .package(
             local: .package(
                 path: "../swift-objc-dump",
                 isRelative: true,
-                isEnabled: true
+                isEnabled: false
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/swift-objc-dump.git",
-                branch: "main"
+                from: "0.8.100"
             )
         ),
         .package(

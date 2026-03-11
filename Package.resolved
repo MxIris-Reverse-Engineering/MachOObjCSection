@@ -5,8 +5,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Mx-Iris/FrameworkToolbox",
       "state" : {
-        "branch" : "main",
-        "revision" : "f2638e3d32693704c1f46465f924c8393f48cca3"
+        "revision" : "fdf527ec843ff56e19f807ff4675e48699227a7f",
+        "version" : "0.4.0"
       }
     },
     {
@@ -14,8 +14,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/MxIris-Reverse-Engineering/MachOKit.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "0ddc00a5688c99647a0078ab2aa469ed9ae076e5"
+        "revision" : "dba555d8d5787faef73a82cbefaacb3a40a4fa7d",
+        "version" : "0.46.100"
+      }
+    },
+    {
+      "identity" : "swift-binary-parse-support",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/p-x9/swift-binary-parse-support.git",
+      "state" : {
+        "revision" : "5fb96b503672ea4752eded6b4e301fd87214b03b",
+        "version" : "0.2.1"
       }
     },
     {
@@ -23,8 +32,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/p-x9/swift-fileio.git",
       "state" : {
-        "revision" : "76a4c719e796a1e5052e283788d8cd92408758fe",
-        "version" : "0.12.0"
+        "revision" : "d589ff3966f9f064574780f527449a946736b989",
+        "version" : "0.13.0"
+      }
+    },
+    {
+      "identity" : "swift-fileio-extra",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/p-x9/swift-fileio-extra.git",
+      "state" : {
+        "revision" : "8d83506dd4dff737807d90dbf2264096ed98c7a7",
+        "version" : "0.2.2"
       }
     },
     {
@@ -32,8 +50,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/MxIris-Reverse-Engineering/swift-objc-dump.git",
       "state" : {
-        "branch" : "main",
-        "revision" : "cab0d684eb13189d0221489ec196533a16997513"
+        "revision" : "4206040acd64db453c5c28c1539b98fa5befa8fc",
+        "version" : "0.8.100"
       }
     },
     {
