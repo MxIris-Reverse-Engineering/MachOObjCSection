@@ -326,8 +326,9 @@ extension MachOImage.ObjectiveC {
         )
         return offsets
             .compactMap {
-                let offset = Int64($0) - numericCast(UInt(bitPattern: machO.ptr))
-                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                let strippedAddress = UInt(machO.stripPointerTags(of: numericCast($0)))
+                let offset = Int64(strippedAddress) - numericCast(UInt(bitPattern: machO.ptr))
+                guard let ptr = UnsafeRawPointer(bitPattern: strippedAddress) else {
                     return nil
                 }
                 let layout = ptr
@@ -360,8 +361,9 @@ extension MachOImage.ObjectiveC {
         )
         return offsets
             .compactMap {
-                let offset = Int64($0) - numericCast(UInt(bitPattern: machO.ptr))
-                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                let strippedAddress = UInt(machO.stripPointerTags(of: numericCast($0)))
+                let offset = Int64(strippedAddress) - numericCast(UInt(bitPattern: machO.ptr))
+                guard let ptr = UnsafeRawPointer(bitPattern: strippedAddress) else {
                     return nil
                 }
                 let layout = ptr
@@ -391,8 +393,9 @@ extension MachOImage.ObjectiveC {
 
         return offsets
             .compactMap {
-                let offset = Int64($0) - numericCast(UInt(bitPattern: machO.ptr))
-                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                let strippedAddress = UInt(machO.stripPointerTags(of: numericCast($0)))
+                let offset = Int64(strippedAddress) - numericCast(UInt(bitPattern: machO.ptr))
+                guard let ptr = UnsafeRawPointer(bitPattern: strippedAddress) else {
                     return nil
                 }
                 let layout = ptr

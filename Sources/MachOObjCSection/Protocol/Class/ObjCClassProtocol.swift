@@ -92,7 +92,8 @@ extension ObjCClassProtocol {
 extension ObjCClassProtocol {
     public func metaClass(in machO: MachOImage) -> (MachOImage, Self)? {
         guard layout.isa > 0 else { return nil }
-        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.isa)) else {
+        let strippedISA = machO.stripPointerTags(of: numericCast(layout.isa))
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedISA)) else {
             return nil
         }
 
@@ -105,7 +106,7 @@ extension ObjCClassProtocol {
             targetMachO = _targetMachO
         }
 
-        let offset: Int = numericCast(layout.isa) - Int(bitPattern: targetMachO.ptr)
+        let offset: Int = Int(bitPattern: ptr) - Int(bitPattern: targetMachO.ptr)
 
         let layout = ptr.assumingMemoryBound(to: Layout.self).pointee
         let cls: Self = .init(layout: layout, offset: offset)
@@ -115,7 +116,8 @@ extension ObjCClassProtocol {
 
     public func superClass(in machO: MachOImage) -> (MachOImage, Self)? {
         guard layout.superclass > 0 else { return nil }
-        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.superclass)) else {
+        let strippedSuperclass = machO.stripPointerTags(of: numericCast(layout.superclass))
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedSuperclass)) else {
             return nil
         }
 
@@ -128,7 +130,7 @@ extension ObjCClassProtocol {
             targetMachO = _targetMachO
         }
 
-        let offset: Int = numericCast(layout.superclass) - Int(bitPattern: targetMachO.ptr)
+        let offset: Int = Int(bitPattern: ptr) - Int(bitPattern: targetMachO.ptr)
 
         let layout = ptr.assumingMemoryBound(to: Layout.self).pointee
         let cls: Self = .init(layout: layout, offset: offset)

@@ -50,7 +50,8 @@ extension ObjCProtocolListProtocol {
 
         return sequnece
             .compactMap {
-                guard let ptr = UnsafeRawPointer(bitPattern: UInt($0)) else {
+                let strippedAddress = UInt(machO.stripPointerTags(of: numericCast($0)))
+                guard let ptr = UnsafeRawPointer(bitPattern: strippedAddress) else {
                     return nil
                 }
                 let layout = ptr

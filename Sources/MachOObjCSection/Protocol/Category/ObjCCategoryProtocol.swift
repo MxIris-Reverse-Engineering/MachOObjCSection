@@ -149,7 +149,8 @@ extension ObjCCategoryProtocol {
 extension ObjCCategoryProtocol {
     public func name(in machO: MachOImage) -> String? {
         guard layout.name > 0 else { return nil }
-        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.name)) else {
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.name))
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedAddress)) else {
             return nil
         }
         return .init(
@@ -160,7 +161,8 @@ extension ObjCCategoryProtocol {
 
     public func `class`(in machO: MachOImage) -> (MachOImage, ObjCClass)? {
         guard layout.cls > 0 else { return nil }
-        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.cls)) else {
+        let strippedCls = machO.stripPointerTags(of: numericCast(layout.cls))
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedCls)) else {
             return nil
         }
 
@@ -173,7 +175,7 @@ extension ObjCCategoryProtocol {
             targetMachO = _targetMachO
         }
 
-        let offset: Int = numericCast(layout.cls) - Int(bitPattern: targetMachO.ptr)
+        let offset: Int = Int(bitPattern: ptr) - Int(bitPattern: targetMachO.ptr)
 
         let layout = ptr.assumingMemoryBound(to: ObjCClass.Layout.self).pointee
         let cls: ObjCClass = .init(layout: layout, offset: offset)
@@ -185,7 +187,8 @@ extension ObjCCategoryProtocol {
 
     public func stubClass(in machO: MachOImage) -> (MachOImage, ObjCStubClass)? {
         guard layout.cls > 0 else { return nil }
-        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.cls)) else {
+        let strippedCls = machO.stripPointerTags(of: numericCast(layout.cls))
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedCls)) else {
             return nil
         }
 
@@ -198,7 +201,7 @@ extension ObjCCategoryProtocol {
             targetMachO = _targetMachO
         }
 
-        let offset: Int = numericCast(layout.cls) - Int(bitPattern: targetMachO.ptr)
+        let offset: Int = Int(bitPattern: ptr) - Int(bitPattern: targetMachO.ptr)
 
         let layout = ptr.assumingMemoryBound(to: ObjCStubClass.Layout.self).pointee
         let cls: ObjCStubClass = .init(layout: layout, offset: offset)
@@ -506,8 +509,9 @@ extension ObjCCategoryProtocol {
         guard offset > 0 else { return nil }
         guard offset & 1 == 0 else { return nil }
 
+        let strippedAddress = UInt(machO.stripPointerTags(of: offset))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(offset)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }
@@ -533,8 +537,9 @@ extension ObjCCategoryProtocol {
         guard offset > 0 else { return nil }
         guard offset & 1 == 0 else { return nil }
 
+        let strippedAddress = UInt(machO.stripPointerTags(of: offset))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(offset)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }
@@ -559,8 +564,9 @@ extension ObjCCategoryProtocol {
         guard offset > 0 else { return nil }
         guard offset & 1 == 0 else { return nil }
 
+        let strippedAddress = UInt(machO.stripPointerTags(of: offset))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(offset)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }

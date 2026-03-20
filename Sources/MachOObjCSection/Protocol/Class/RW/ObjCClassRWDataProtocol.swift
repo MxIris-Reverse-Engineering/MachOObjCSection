@@ -46,7 +46,8 @@ extension ObjCClassRWDataProtocol {
     public func classROData(in machO: MachOImage) -> ObjCClassROData? {
         guard hasRO else { return nil }
 
-        let address: Int = numericCast(layout.ro_or_rw_ext)
+        let rawAddress: UInt64 = numericCast(layout.ro_or_rw_ext)
+        let address: Int = numericCast(machO.stripPointerTags(of: rawAddress))
         guard let ptr = UnsafeRawPointer(bitPattern: address) else {
             return nil
         }
@@ -64,7 +65,8 @@ extension ObjCClassRWDataProtocol {
     public func ext(in machO: MachOImage) -> ObjCClassRWDataExt? {
         guard hasExt else { return nil }
 
-        let address: Int = numericCast(layout.ro_or_rw_ext)
+        let rawAddress: UInt64 = numericCast(layout.ro_or_rw_ext)
+        let address: Int = numericCast(machO.stripPointerTags(of: rawAddress))
         guard let ptr = UnsafeRawPointer(bitPattern: address & ~1) else {
             return nil
         }

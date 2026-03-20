@@ -225,16 +225,19 @@ extension ObjCClassRODataProtocol {
 extension ObjCClassRODataProtocol {
     public func ivarLayout(in machO: MachOImage) -> [UInt8]? {
         if flags.contains(.meta) { return nil }
-        return _ivarLayout(in: machO, at: numericCast(layout.ivarLayout))
+        let strippedAddress: Int = numericCast(machO.stripPointerTags(of: numericCast(layout.ivarLayout)))
+        return _ivarLayout(in: machO, at: strippedAddress)
     }
 
     public func weakIvarLayout(in machO: MachOImage) -> [UInt8]? {
-        _ivarLayout(in: machO, at: numericCast(layout.weakIvarLayout))
+        let strippedAddress: Int = numericCast(machO.stripPointerTags(of: numericCast(layout.weakIvarLayout)))
+        return _ivarLayout(in: machO, at: strippedAddress)
     }
 
     public func name(in machO: MachOImage) -> String? {
         guard layout.name > 0 else { return nil }
-        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.name)) else {
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.name))
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedAddress)) else {
             return nil
         }
         return .init(
@@ -247,8 +250,9 @@ extension ObjCClassRODataProtocol {
         guard layout.baseMethods > 0 else { return nil }
         guard layout.baseMethods & 1 == 0 else { return nil }
 
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.baseMethods))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.baseMethods)
+            bitPattern: UInt(strippedAddress)
         ) else {
             return nil
         }
@@ -271,8 +275,9 @@ extension ObjCClassRODataProtocol {
         guard layout.baseProperties > 0 else { return nil }
         guard layout.baseProperties & 1 == 0 else { return nil }
 
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.baseProperties))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.baseProperties)
+            bitPattern: UInt(strippedAddress)
         ) else {
             return nil
         }
@@ -292,7 +297,8 @@ extension ObjCClassRODataProtocol {
 
     public func ivarList(in machO: MachOImage) -> ObjCIvarList? {
         guard layout.ivars > 0 else { return nil }
-        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.ivars)) else {
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.ivars))
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedAddress)) else {
             return nil
         }
         let list = ObjCIvarList(
@@ -313,8 +319,9 @@ extension ObjCClassRODataProtocol {
         guard layout.baseProtocols > 0 else { return nil }
         guard layout.baseProtocols & 1 == 0 else { return nil }
 
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.baseProtocols))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.baseProtocols)
+            bitPattern: UInt(strippedAddress)
         ) else {
             return nil
         }
@@ -429,8 +436,9 @@ extension ObjCClassRODataProtocol {
         guard layout.baseMethods > 0 else { return nil }
         guard layout.baseMethods & 1 == 1 else { return nil }
 
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.baseMethods))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.baseMethods & ~1)
+            bitPattern: UInt(strippedAddress) & ~1
         ) else {
             return nil
         }
@@ -447,8 +455,9 @@ extension ObjCClassRODataProtocol {
         guard layout.baseProperties > 0 else { return nil }
         guard layout.baseProperties & 1 == 1 else { return nil }
 
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.baseProperties))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.baseProperties & ~1)
+            bitPattern: UInt(strippedAddress) & ~1
         ) else {
             return nil
         }
@@ -465,8 +474,9 @@ extension ObjCClassRODataProtocol {
         guard layout.baseProtocols > 0 else { return nil }
         guard layout.baseProtocols & 1 == 1 else { return nil }
 
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.baseProtocols))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.baseProtocols & ~1)
+            bitPattern: UInt(strippedAddress) & ~1
         ) else {
             return nil
         }

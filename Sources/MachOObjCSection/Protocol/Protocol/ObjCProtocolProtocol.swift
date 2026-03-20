@@ -54,15 +54,17 @@ extension ObjCProtocolProtocol {
 
 extension ObjCProtocolProtocol {
     public func mangledName(in machO: MachOImage) -> String {
+        let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.mangledName)))
         let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.mangledName)
+            bitPattern: strippedAddress
         )
         return .init(cString: ptr!.assumingMemoryBound(to: CChar.self))
     }
 
     public func protocolList(in machO: MachOImage) -> ObjCProtocolList? {
+        let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.protocols)))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.protocols)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }
@@ -73,8 +75,9 @@ extension ObjCProtocolProtocol {
     }
 
     public func instanceMethodList(in machO: MachOImage) -> ObjCMethodList? {
+        let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.instanceMethods)))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.instanceMethods)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }
@@ -86,8 +89,9 @@ extension ObjCProtocolProtocol {
     }
 
     public func classMethodList(in machO: MachOImage) -> ObjCMethodList? {
+        let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.classMethods)))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.classMethods)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }
@@ -99,8 +103,9 @@ extension ObjCProtocolProtocol {
     }
 
     public func optionalInstanceMethodList(in machO: MachOImage) -> ObjCMethodList? {
+        let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.optionalInstanceMethods)))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.optionalInstanceMethods)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }
@@ -112,8 +117,9 @@ extension ObjCProtocolProtocol {
     }
 
     public func optionalClassMethodList(in machO: MachOImage) -> ObjCMethodList? {
+        let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.optionalClassMethods)))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.optionalClassMethods)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }
@@ -125,8 +131,9 @@ extension ObjCProtocolProtocol {
     }
 
     public func instancePropertyList(in machO: MachOImage) -> ObjCPropertyList? {
+        let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.instanceProperties)))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.instanceProperties)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }
@@ -142,8 +149,9 @@ extension ObjCProtocolProtocol {
         guard size >= offset + MemoryLayout<Layout.Pointer>.size else {
             return nil
         }
+        let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout._extendedMethodTypes)))
         guard let _extendedMethodTypes = UnsafeRawPointer(
-            bitPattern: UInt(layout._extendedMethodTypes)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }
@@ -159,8 +167,9 @@ extension ObjCProtocolProtocol {
         guard size >= offset + MemoryLayout<Layout.Pointer>.size else {
             return nil
         }
+        let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout._demangledName)))
         guard let _demangledName = UnsafeRawPointer(
-            bitPattern: UInt(layout._demangledName)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }
@@ -175,8 +184,9 @@ extension ObjCProtocolProtocol {
         guard size >= offset + MemoryLayout<Layout.Pointer>.size else {
             return nil
         }
+        let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout._classProperties)))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout._classProperties)
+            bitPattern: strippedAddress
         ) else {
             return nil
         }

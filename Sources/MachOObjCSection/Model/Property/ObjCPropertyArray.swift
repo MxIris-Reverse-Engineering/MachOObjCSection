@@ -46,7 +46,8 @@ extension ObjCPropertyArray {
                     .advanced(by: currentOffset)
                     .assumingMemoryBound(to: UInt.self)
                     .pointee
-                guard let ptr = UnsafeRawPointer(bitPattern: address) else {
+                let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(address)))
+                guard let ptr = UnsafeRawPointer(bitPattern: strippedAddress) else {
                     currentOffset += MemoryLayout<UInt>.size
                     continue
                 }
