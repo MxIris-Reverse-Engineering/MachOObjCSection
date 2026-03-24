@@ -168,8 +168,7 @@ extension ObjCCategoryProtocol {
 
         var targetMachO = machO
         if !targetMachO.contains(ptr: ptr) {
-            guard let cache = DyldCacheLoaded.current,
-                  let _targetMachO = cache.machO(containing: ptr) else {
+            guard let _targetMachO = machO.resolveImage(containing: ptr) else {
                 return nil
             }
             targetMachO = _targetMachO
@@ -194,8 +193,7 @@ extension ObjCCategoryProtocol {
 
         var targetMachO = machO
         if !targetMachO.contains(ptr: ptr) {
-            guard let cache = DyldCacheLoaded.current,
-                  let _targetMachO = cache.machO(containing: ptr) else {
+            guard let _targetMachO = machO.resolveImage(containing: ptr) else {
                 return nil
             }
             targetMachO = _targetMachO

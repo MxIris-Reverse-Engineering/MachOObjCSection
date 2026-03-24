@@ -50,4 +50,26 @@ extension MachOImage {
         }
         return nil
     }
+
+    /// Resolve the MachOImage that contains the specified pointer.
+    ///
+    /// `DyldCacheLoaded` only covers images in the dyld shared cache (system frameworks).
+    /// App-bundled frameworks (e.g., iWork private frameworks injected into Numbers)
+    /// are NOT in the shared cache, so lookups via `DyldCacheLoaded` alone will fail
+    /// for classes whose superclass, metaclass, or protocol resides in another
+    /// non-cached framework loaded in the same process.
+    ///
+    /// This method first tries the fast dyld-cache path, then falls back to
+    /// `dyld_image_header_containing_address()` which searches ALL loaded images.
+    func resolveImage(containing ptr: UnsafeRawPointer) -> MachOImage? {
+        if let cache = DyldCacheLoaded.current,
+           let machO = cache.machO(containing: ptr) {
+            return machO
+        }
+        #if canImport(Darwin)
+        return MachOImage.image(for: ptr)
+        #else
+        return nil
+        #endif
+    }
 }
