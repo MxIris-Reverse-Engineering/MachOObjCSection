@@ -49,7 +49,7 @@ where LayoutField == ObjCCategoryLayoutField,
 extension ObjCCategoryProtocol {
     public func name(in machO: MachOFile) -> String? {
         let unresolved = unresolvedValue(of: .name)
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
@@ -325,7 +325,7 @@ extension ObjCCategoryProtocol {
 
         if isBind(field, in: machO) { return nil }
 
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
@@ -355,7 +355,7 @@ extension ObjCCategoryProtocol {
 
         if isBind(field, in: machO) { return nil }
 
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
@@ -407,7 +407,7 @@ extension ObjCCategoryProtocol {
         guard unresolved.value > 0 else { return nil }
         guard unresolved.value & 1 == 0 else { return nil }
 
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
@@ -440,7 +440,7 @@ extension ObjCCategoryProtocol {
         guard unresolved.value > 0 else { return nil }
         guard unresolved.value & 1 == 0 else { return nil }
 
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
@@ -475,7 +475,7 @@ extension ObjCCategoryProtocol {
         guard unresolved.value > 0 else { return nil }
         guard unresolved.value & 1 == 0 else { return nil }
 
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil

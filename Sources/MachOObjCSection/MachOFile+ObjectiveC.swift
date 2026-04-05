@@ -303,7 +303,7 @@ extension MachOFile.ObjectiveC {
                 )
             }
             .compactMap { unresolved in
-                let resolved = machO.resolveRebase(unresolved)
+                guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
                 guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
                     return nil
@@ -356,7 +356,7 @@ extension MachOFile.ObjectiveC {
                 )
             }
             .compactMap { unresolved in
-                let resolved = machO.resolveRebase(unresolved)
+                guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
                 guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
                     return nil
@@ -408,7 +408,7 @@ extension MachOFile.ObjectiveC {
                 )
             }
             .compactMap { unresolved in
-                let resolved = machO.resolveRebase(unresolved)
+                guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
                 guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
                     return nil

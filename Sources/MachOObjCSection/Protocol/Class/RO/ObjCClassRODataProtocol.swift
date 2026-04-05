@@ -88,7 +88,7 @@ extension ObjCClassRODataProtocol {
 
     public func name(in machO: MachOFile) -> String? {
         let unresolved = unresolvedValue(of: .name)
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
@@ -104,7 +104,7 @@ extension ObjCClassRODataProtocol {
         guard layout.baseMethods & 1 == 0 else { return nil }
 
         let unresolved = unresolvedValue(of: .baseMethods)
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
@@ -134,7 +134,7 @@ extension ObjCClassRODataProtocol {
         guard layout.baseProperties & 1 == 0 else { return nil }
 
         let unresolved = unresolvedValue(of: .baseProperties)
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
@@ -165,7 +165,7 @@ extension ObjCClassRODataProtocol {
         guard layout.ivars > 0 else { return nil }
 
         let unresolved = unresolvedValue(of: .ivars)
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
@@ -198,7 +198,7 @@ extension ObjCClassRODataProtocol {
         guard layout.baseProtocols & 1 == 0 else { return nil }
 
         let unresolved = unresolvedValue(of: .baseProtocols)
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
@@ -341,7 +341,7 @@ extension ObjCClassRODataProtocol {
 
         var unresolved = unresolvedValue(of: .baseMethods)
         unresolved.value &= ~1
-        var resolved = machO.resolveRebase(unresolved)
+        guard var resolved = machO.resolveRebase(unresolved) else { return nil }
         resolved.address &= ~1
         resolved.offset &= ~1
 
@@ -372,7 +372,7 @@ extension ObjCClassRODataProtocol {
 
         var unresolved = unresolvedValue(of: .baseProperties)
         unresolved.value &= ~1
-        var resolved = machO.resolveRebase(unresolved)
+        guard var resolved = machO.resolveRebase(unresolved) else { return nil }
         resolved.address &= ~1
         resolved.offset &= ~1
 
@@ -403,7 +403,7 @@ extension ObjCClassRODataProtocol {
 
         var unresolved = unresolvedValue(of: .baseProtocols)
         unresolved.value &= ~1
-        var resolved = machO.resolveRebase(unresolved)
+        guard var resolved = machO.resolveRebase(unresolved) else { return nil }
         resolved.address &= ~1
         resolved.offset &= ~1
 
@@ -494,7 +494,7 @@ extension ObjCClassRODataProtocol {
         in machO: MachOFile
     ) -> [UInt8]? {
         let unresolved = unresolvedValue(of: field)
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil

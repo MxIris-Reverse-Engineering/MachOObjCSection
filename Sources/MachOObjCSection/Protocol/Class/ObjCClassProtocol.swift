@@ -206,7 +206,7 @@ extension ObjCClassProtocol {
 
         if isBind(field, in: machO) { return nil }
 
-        let resolved = machO.resolveRebase(unresolved)
+        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil

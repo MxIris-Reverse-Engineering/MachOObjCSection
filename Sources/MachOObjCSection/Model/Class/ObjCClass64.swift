@@ -157,17 +157,20 @@ extension ObjCClass64 {
 
         var unresolved = unresolvedValue(of: .dataVMAddrAndFastFlags)
         unresolved.value &= FAST_DATA_MASK
-        var resolved = machO.resolveRebase(unresolved)
+        guard var resolved = machO.resolveRebase(unresolved) else { return nil }
         resolved.address &= FAST_DATA_MASK
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
             return nil
         }
 
-        let offset: Int = if let cache = machO.cache {
-            numericCast(resolved.address - cache.mainCacheHeader.sharedRegionStart)
+        let offset: Int
+        if let cache = machO.cache {
+            offset = numericCast(resolved.address - cache.mainCacheHeader.sharedRegionStart)
+        } else if let resolvedAddressFileOffset = machO.fileOffset(of: resolved.address) {
+            offset = numericCast(resolvedAddressFileOffset)
         } else {
-            numericCast(machO.fileOffset(of: resolved.address)!)
+            return nil
         }
 
         let layout: ClassROData.Layout = fileHandle.read(offset: fileOffset)

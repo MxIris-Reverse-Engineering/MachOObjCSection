@@ -139,7 +139,7 @@ extension MachOFile {
     /// - Returns: resolved value and offset
     func resolveRebase(
         _ unresolvedValue: UnresolvedValue
-    ) -> ResolvedValue {
+    ) -> ResolvedValue? {
         let offset: UInt64 = numericCast(unresolvedValue.fieldOffset)
 
         if let (cache, _offset) = cacheAndFileOffset(
@@ -155,15 +155,21 @@ extension MachOFile {
         if let resolved = resolveOptionalRebase(
             at: offset
         ) {
+            guard let resolvedFileOffset = fileOffset(of: resolved) else {
+                return nil
+            }
             return .init(
                 address: resolved,
-                offset: fileOffset(of: resolved)!
+                offset: resolvedFileOffset
             )
         }
 
+        guard let fallbackFileOffset = fileOffset(of: unresolvedValue.value) else {
+            return nil
+        }
         return .init(
             address: unresolvedValue.value,
-            offset: fileOffset(of: unresolvedValue.value)!
+            offset: fallbackFileOffset
         )
     }
 }

@@ -6,7 +6,7 @@ import XCTest
 final class MachOObjCSectionTests: XCTestCase {
     private var machOImage: MachOImage!
     private var machOFile: MachOFile!
-    private var cache: DyldCache!
+    private var cache: FullDyldCache!
     private var machOFileInCache: MachOFile!
 
     override func setUp() {
@@ -14,7 +14,7 @@ final class MachOObjCSectionTests: XCTestCase {
         machOImage = MachOImage(name: "Foundation")!
 
         // File
-        let path = "/Volumes/RE/Xcode/26.1/SharedFrameworks/DVTStructuredLayoutKit.framework/Versions/A/DVTStructuredLayoutKit"
+        let path = "/Users/JH/Downloads/iOS18.5-SwiftUI"
         let url = URL(fileURLWithPath: path)
         guard let file = try? MachOKit.loadFromFile(url: url) else {
             XCTFail("Failed to load file")
@@ -31,7 +31,7 @@ final class MachOObjCSectionTests: XCTestCase {
         let arch = "arm64e"
         let cachePath = "/System/Volumes/Preboot/Cryptexes/OS/System/Library/dyld/dyld_shared_cache_\(arch)"
         let cacheUrl = URL(fileURLWithPath: cachePath)
-        cache = try! DyldCache(url: cacheUrl)
+        cache = try! FullDyldCache(url: cacheUrl)
         machOFileInCache = cache.machOFiles().first(where: {
             $0.imagePath.contains("/Foundation")
         })!

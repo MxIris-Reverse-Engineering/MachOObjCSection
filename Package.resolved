@@ -5,17 +5,17 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/Mx-Iris/FrameworkToolbox",
       "state" : {
-        "revision" : "fdf527ec843ff56e19f807ff4675e48699227a7f",
-        "version" : "0.4.0"
+        "revision" : "bfd7acae2fffd47b6dcd1836a212536abd4ccb38",
+        "version" : "0.5.0"
       }
     },
     {
-      "identity" : "machokit",
+      "identity" : "objectarchivekit",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/MxIris-Reverse-Engineering/MachOKit.git",
+      "location" : "https://github.com/p-x9/ObjectArchiveKit.git",
       "state" : {
-        "revision" : "dba555d8d5787faef73a82cbefaacb3a40a4fa7d",
-        "version" : "0.46.100"
+        "revision" : "96d782a576273b73b277b577943a2a25b00b919e",
+        "version" : "0.5.0"
       }
     },
     {
@@ -43,15 +43,6 @@
       "state" : {
         "revision" : "8d83506dd4dff737807d90dbf2264096ed98c7a7",
         "version" : "0.2.2"
-      }
-    },
-    {
-      "identity" : "swift-objc-dump",
-      "kind" : "remoteSourceControl",
-      "location" : "https://github.com/MxIris-Reverse-Engineering/swift-objc-dump.git",
-      "state" : {
-        "revision" : "4206040acd64db453c5c28c1539b98fa5befa8fc",
-        "version" : "0.8.100"
       }
     },
     {

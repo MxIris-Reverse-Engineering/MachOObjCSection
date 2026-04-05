@@ -101,7 +101,7 @@ extension ObjCPropertyList {
                         )
                     )
                 }
-                .map {
+                .compactMap {
                     machO.resolveRebase($0)
                 }
                 .compactMap {
@@ -146,7 +146,7 @@ extension ObjCPropertyList {
                         )
                     )
                 }
-                .map {
+                .compactMap {
                     machO.resolveRebase($0)
                 }
                 .map {
@@ -176,10 +176,14 @@ extension ObjCPropertyList {
 extension MachOFile {
     func resolveRebase(
         _ unresolvedValue: ObjCProperty.UnresolvedProperty
-    ) -> ObjCProperty.ResolvedProperty {
-        ObjCProperty.ResolvedProperty(
-            name: resolveRebase(unresolvedValue.name),
-            attributes: resolveRebase(unresolvedValue.attributes)
+    ) -> ObjCProperty.ResolvedProperty? {
+        guard let name = resolveRebase(unresolvedValue.name),
+              let attributes = resolveRebase(unresolvedValue.attributes) else {
+            return nil
+        }
+        return ObjCProperty.ResolvedProperty(
+            name: name,
+            attributes: attributes
         )
     }
 }
