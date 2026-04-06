@@ -1,7 +1,46 @@
-// swift-tools-version: 5.9
+// swift-tools-version: 6.2
 
-import PackageDescription
+@preconcurrency import PackageDescription
 import Foundation
+
+let localEnvironment: [String: String] = {
+    let localEnvironmentFilePath = URL(fileURLWithPath: #filePath)
+        .deletingLastPathComponent()
+        .appendingPathComponent(".package.env")
+        .path
+    guard FileManager.default.fileExists(atPath: localEnvironmentFilePath),
+          let contents = try? String(contentsOfFile: localEnvironmentFilePath, encoding: .utf8)
+    else {
+        return [:]
+    }
+    var environment: [String: String] = [:]
+    for line in contents.components(separatedBy: .newlines) {
+        let trimmedLine = line.trimmingCharacters(in: .whitespaces)
+        if trimmedLine.isEmpty || trimmedLine.hasPrefix("#") {
+            continue
+        }
+        let parts = trimmedLine.split(separator: "=", maxSplits: 1)
+        guard parts.count == 2 else { continue }
+        let key = parts[0].trimmingCharacters(in: .whitespaces)
+        let value = parts[1].trimmingCharacters(in: .whitespaces)
+        environment[key] = value
+    }
+    return environment
+}()
+
+func envEnable(_ key: String, default defaultValue: Bool = false) -> Bool {
+    let value = localEnvironment[key] ?? Context.environment[key]
+    guard let value else {
+        return defaultValue
+    }
+    if value == "1" {
+        return true
+    } else if value == "0" {
+        return false
+    } else {
+        return defaultValue
+    }
+}
 
 extension Package.Dependency {
     enum LocalSearchPath {
@@ -38,6 +77,8 @@ extension Package.Dependency {
     }
 }
 
+let useLocalMachOKit = envEnable("USE_LOCAL_MACHOKIT", default: false)
+
 let package = Package(
     name: "MachOObjCSection",
     platforms: [
@@ -57,7 +98,7 @@ let package = Package(
             local: .package(
                 path: "../MachOKit",
                 isRelative: true,
-                isEnabled: true
+                isEnabled: useLocalMachOKit
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/MachOKit.git",
@@ -68,7 +109,7 @@ let package = Package(
             local: .package(
                 path: "../swift-objc-dump",
                 isRelative: true,
-                isEnabled: true
+                isEnabled: false
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/swift-objc-dump.git",
