@@ -47,9 +47,18 @@ extension ObjCMethodList {
 
     public var listKind: ObjCMethod.Kind {
         if usesRelativeOffsets {
-            return usesOffsetsFromSelectorBuffer ? .relativeDirect : .relativeIndirect
+            if usesOffsetsFromTypeBuffer {
+                return .relativeDirectSelectorsAndTypes
+            } else if usesOffsetsFromSelectorBuffer {
+                return .relativeDirectSelectors
+            }
+            return .relativeIndirect
         }
         return .pointer
+    }
+
+    public var usesOffsetsFromTypeBuffer: Bool {
+        header.entsizeAndFlags & Mask.usesTypeOffsets != 0
     }
 
     public var usesOffsetsFromSelectorBuffer: Bool {
@@ -68,7 +77,9 @@ extension ObjCMethodList {
             MemoryLayout<ObjCMethod.Pointer64>.size == entrySize
         case .pointer:
             MemoryLayout<ObjCMethod.Pointer32>.size == entrySize
-        case .relativeDirect:
+        case .relativeDirectSelectors:
+            MemoryLayout<ObjCMethod.RelativeDirect>.size == entrySize
+        case .relativeDirectSelectorsAndTypes:
             MemoryLayout<ObjCMethod.RelativeDirect>.size == entrySize
         case .relativeIndirect:
             MemoryLayout<ObjCMethod.RelativeInDirect>.size == entrySize
@@ -97,18 +108,40 @@ extension ObjCMethodList {
             return sequence
                 .map { ObjCMethod($0) }
 
-        case .relativeDirect:
+        case .relativeDirectSelectors:
             let sequence = MemorySequence(
                 basePointer: start.assumingMemoryBound(
                     to: ObjCMethod.RelativeDirect.self
                 ),
                 numberOfElements: count
             )
-            let size = MemoryLayout<ObjCMethod.RelativeInDirect>.size
+            let size = MemoryLayout<ObjCMethod.RelativeDirect>.size
             return sequence
                 .enumerated()
                 .map {
-                    ObjCMethod($1, at: start.advanced(by: size * $0))
+                    ObjCMethod(
+                        $1,
+                        at: start.advanced(by: size * $0),
+                        isRelativeDirectType: false
+                    )
+                }
+
+        case .relativeDirectSelectorsAndTypes:
+            let sequence = MemorySequence(
+                basePointer: start.assumingMemoryBound(
+                    to: ObjCMethod.RelativeDirect.self
+                ),
+                numberOfElements: count
+            )
+            let size = MemoryLayout<ObjCMethod.RelativeDirect>.size
+            return sequence
+                .enumerated()
+                .map {
+                    ObjCMethod(
+                        $1,
+                        at: start.advanced(by: size * $0),
+                        isRelativeDirectType: true
+                    )
                 }
 
         case .relativeIndirect:
@@ -244,7 +277,7 @@ extension ObjCMethodList {
                     )
                 }
 
-        case .relativeDirect:
+        case .relativeDirectSelectors:
             let sequence: DataSequence<ObjCMethod.RelativeDirect> = fileHandle.readDataSequence(
                 offset: fileOffset,
                 numberOfElements: count,
@@ -270,6 +303,47 @@ extension ObjCMethodList {
 
                     var types = ""
                     if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast(_types)) {
+                        types = fileHandle.readString(
+                            offset: fileOffset
+                        ) ?? ""
+                    }
+
+                    return ObjCMethod(
+                        name: name,
+                        types: types,
+                        imp: imp
+                    )
+                }
+
+        case .relativeDirectSelectorsAndTypes:
+            let sequence: DataSequence<ObjCMethod.RelativeDirect> = fileHandle.readDataSequence(
+                offset: fileOffset,
+                numberOfElements: count,
+                swapHandler: nil
+            )
+
+            let size = MemoryLayout<ObjCMethod.RelativeDirect>.size
+            let nameOffsetInCache = machO.relativeMethodSelectorBaseAddressOffset ?? 0
+            let typeOffsetInCache = nameOffsetInCache
+
+            return sequence.enumerated()
+                .map {
+                    let offset = numericCast(offset) + $0 * size
+                    let _name: Int64 = numericCast($1.name.offset)
+                    let _types: UInt64 = numericCast(
+                        offset + numericCast(UInt32(bitPattern: $1.types.offset))
+                    ) + 4
+                    let imp: UInt64 = numericCast(offset + numericCast($1.imp.offset)) + 8
+
+                    var name = ""
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: nameOffsetInCache + numericCast(_name)) {
+                        name = fileHandle.readString(
+                            offset: fileOffset
+                        ) ?? ""
+                    }
+
+                    var types = ""
+                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: typeOffsetInCache + numericCast(_types)) {
                         types = fileHandle.readString(
                             offset: fileOffset
                         ) ?? ""
