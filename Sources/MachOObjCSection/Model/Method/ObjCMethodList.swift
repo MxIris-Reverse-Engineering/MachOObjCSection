@@ -280,27 +280,15 @@ extension ObjCMethodList {
 
             let size = MemoryLayout<ObjCMethod.RelativeDirect>.size
             let nameOffsetInCache = machO.relativeMethodSelectorBaseAddressOffset ?? 0
-
             return sequence.enumerated()
                 .map {
                     let offset = numericCast(offset) + $0 * size
-                    let _name = resolvedOffset(
-                        base: nameOffsetInCache,
-                        relative: $1.name.offset
-                    ) ?? 0
-                    let _types: UInt64 = numericCast(offset + numericCast($1.types.offset)) + 4
-                    let imp: UInt64 = numericCast(offset + numericCast($1.imp.offset)) + 8
-
-                    return ObjCMethod(
-                        name: resolveString(
-                            in: machO,
-                            forOffset: _name
-                        ),
-                        types: resolveString(
-                            in: machO,
-                            forOffset: _types
-                        ),
-                        imp: imp
+                    return directMethod(
+                        $1,
+                        in: machO,
+                        entryOffset: numericCast(offset),
+                        nameBaseOffset: nameOffsetInCache,
+                        typeBaseOffset: nil
                     )
                 }
 
@@ -313,32 +301,15 @@ extension ObjCMethodList {
 
             let size = MemoryLayout<ObjCMethod.RelativeDirect>.size
             let nameOffsetInCache = machO.relativeMethodSelectorBaseAddressOffset ?? 0
-            let typeOffsetInCache = nameOffsetInCache
-
             return sequence.enumerated()
                 .map {
                     let offset = numericCast(offset) + $0 * size
-                    let _name = resolvedOffset(
-                        base: nameOffsetInCache,
-                        relative: $1.name.offset
-                    ) ?? 0
-                    let _types = resolvedOffset(
-                        base: numericCast(offset),
-                        relative: $1.types.offset,
-                        adjustment: 4
-                    ) ?? 0
-                    let imp: UInt64 = numericCast(offset + numericCast($1.imp.offset)) + 8
-
-                    return ObjCMethod(
-                        name: resolveString(
-                            in: machO,
-                            forOffset: _name
-                        ),
-                        types: resolveString(
-                            in: machO,
-                            forOffset: typeOffsetInCache + _types
-                        ),
-                        imp: imp
+                    return directMethod(
+                        $1,
+                        in: machO,
+                        entryOffset: numericCast(offset),
+                        nameBaseOffset: nameOffsetInCache,
+                        typeBaseOffset: nameOffsetInCache // NOTE: offset from selector
                     )
                 }
         }
@@ -346,6 +317,51 @@ extension ObjCMethodList {
 }
 
 extension ObjCMethodList {
+    private func directMethod(
+        _ relativeDirect: ObjCMethod.RelativeDirect,
+        in machO: MachOFile,
+        entryOffset: UInt64,
+        nameBaseOffset: UInt64,
+        typeBaseOffset: UInt64?
+    ) -> ObjCMethod {
+        let nameOffset = resolvedOffset(
+            base: nameBaseOffset,
+            relative: relativeDirect.name.offset
+        ) ?? 0
+
+        let typesOffset: UInt64
+        if let typeBaseOffset {
+            typesOffset = resolvedOffset(
+                base: typeBaseOffset,
+                relative: relativeDirect.types.offset
+            ) ?? 0
+        } else {
+            typesOffset = resolvedOffset(
+                base: entryOffset,
+                relative: relativeDirect.types.offset,
+                adjustment: 4
+            ) ?? 0
+        }
+
+        let imp = resolvedOffset(
+            base: entryOffset,
+            relative: relativeDirect.imp.offset,
+            adjustment: 8
+        ) ?? 0
+
+        return ObjCMethod(
+            name: resolveString(
+                in: machO,
+                forOffset: nameOffset
+            ),
+            types: resolveString(
+                in: machO,
+                forOffset: typesOffset
+            ),
+            imp: imp
+        )
+    }
+
     private func resolvedOffset<Offset: BinaryInteger>(
         base: UInt64,
         relative: Offset,
