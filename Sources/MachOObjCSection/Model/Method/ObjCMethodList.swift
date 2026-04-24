@@ -386,7 +386,9 @@ extension ObjCMethodList {
             imp: imp
         )
     }
+}
 
+extension ObjCMethodList {
     private func resolvedOffset<Offset: BinaryInteger>(
         base: UInt64,
         relative: Offset,
