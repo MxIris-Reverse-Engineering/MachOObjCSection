@@ -239,23 +239,31 @@ extension ObjCMethodList {
                     let offset = numericCast(offset) + $0 * size
                     let fileOffset = numericCast(fileOffset) + $0 * size
 
-                    var name = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(
-                        forAddress: try! fileHandle.read(
-                            offset: numericCast(fileOffset) + numericCast($1.name.offset)
-                        )
-                    ) {
-                        name = fileHandle.readString(
-                            offset: fileOffset
-                        ) ?? ""
-                    }
+                    let namePointerOffset = resolvedOffset(
+                        base: numericCast(fileOffset),
+                        relative: $1.name.offset
+                    ) ?? 0
+                    let nameAddress: UInt64 = (try? fileHandle.read(
+                        offset: numericCast(namePointerOffset),
+                        as: UInt64.self
+                    )) ?? 0
+                    let types = resolvedOffset(
+                        base: numericCast(fileOffset),
+                        relative: $1.types.offset,
+                        adjustment: 4
+                    ) ?? 0
 
-                    let types: Int64 = numericCast(fileOffset) + numericCast($1.types.offset) + 4
-
-                    let imp: UInt64 = numericCast(offset + numericCast($1.imp.offset)) + 8
+                    let imp = resolvedOffset(
+                        base: numericCast(offset),
+                        relative: $1.imp.offset,
+                        adjustment: 8
+                    ) ?? 0
 
                     return ObjCMethod(
-                        name: name,
+                        name: resolveString(
+                            in: machO,
+                            forAddress: nameAddress
+                        ),
                         types: fileHandle.readString(
                             offset: numericCast(types)
                         ) ?? "",
@@ -315,8 +323,9 @@ extension ObjCMethodList {
                         relative: $1.name.offset
                     ) ?? 0
                     let _types = resolvedOffset(
-                        base: typeOffsetInCache,
-                        relative: offset + numericCast(UInt32(bitPattern: $1.types.offset)) + 4
+                        base: numericCast(offset),
+                        relative: $1.types.offset,
+                        adjustment: 4
                     ) ?? 0
                     let imp: UInt64 = numericCast(offset + numericCast($1.imp.offset)) + 8
 
@@ -327,7 +336,7 @@ extension ObjCMethodList {
                         ),
                         types: resolveString(
                             in: machO,
-                            forOffset: _types
+                            forOffset: typeOffsetInCache + _types
                         ),
                         imp: imp
                     )
