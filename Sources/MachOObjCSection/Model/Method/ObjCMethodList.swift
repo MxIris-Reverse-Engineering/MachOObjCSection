@@ -182,19 +182,6 @@ extension ObjCMethodList {
             )
             return sequence
                 .map {
-                    var name = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.name) {
-                        name = fileHandle.readString(
-                            offset: fileOffset
-                        ) ?? ""
-                    }
-                    var types = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: $0.types) {
-                        types = fileHandle.readString(
-                            offset: fileOffset
-                        ) ?? ""
-                    }
-
                     let imp: UInt64 = if let cache = machO.cache, $0.imp > 0 {
                         numericCast($0.imp) - cache.mainCacheHeader.sharedRegionStart
                     } else {
@@ -202,8 +189,14 @@ extension ObjCMethodList {
                     }
 
                     return ObjCMethod(
-                        name: name,
-                        types: types,
+                        name: resolveString(
+                            in: machO,
+                            forAddress: $0.name
+                        ),
+                        types: resolveString(
+                            in: machO,
+                            forAddress: $0.types
+                        ),
                         imp: imp
                     )
                 }
@@ -215,19 +208,6 @@ extension ObjCMethodList {
             )
             return sequence
                 .map {
-                    var name = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast($0.name)) {
-                        name = fileHandle.readString(
-                            offset: fileOffset
-                        ) ?? ""
-                    }
-                    var types = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: numericCast($0.types)) {
-                        types = fileHandle.readString(
-                            offset: fileOffset
-                        ) ?? ""
-                    }
-
                     let imp: UInt64 = if let cache = machO.cache, $0.imp > 0 {
                         numericCast($0.imp) - cache.mainCacheHeader.sharedRegionStart
                     } else {
@@ -235,8 +215,14 @@ extension ObjCMethodList {
                     }
 
                     return ObjCMethod(
-                        name: name,
-                        types: types,
+                        name: resolveString(
+                            in: machO,
+                            forAddress: numericCast($0.name)
+                        ),
+                        types: resolveString(
+                            in: machO,
+                            forAddress: numericCast($0.types)
+                        ),
                         imp: imp
                     )
                 }
@@ -290,27 +276,22 @@ extension ObjCMethodList {
             return sequence.enumerated()
                 .map {
                     let offset = numericCast(offset) + $0 * size
-                    let _name: Int64 = numericCast($1.name.offset)
+                    let _name = resolvedOffset(
+                        base: nameOffsetInCache,
+                        relative: $1.name.offset
+                    ) ?? 0
                     let _types: UInt64 = numericCast(offset + numericCast($1.types.offset)) + 4
                     let imp: UInt64 = numericCast(offset + numericCast($1.imp.offset)) + 8
 
-                    var name = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: nameOffsetInCache + numericCast(_name)) {
-                        name = fileHandle.readString(
-                            offset: fileOffset
-                        ) ?? ""
-                    }
-
-                    var types = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast(_types)) {
-                        types = fileHandle.readString(
-                            offset: fileOffset
-                        ) ?? ""
-                    }
-
                     return ObjCMethod(
-                        name: name,
-                        types: types,
+                        name: resolveString(
+                            in: machO,
+                            forOffset: _name
+                        ),
+                        types: resolveString(
+                            in: machO,
+                            forOffset: _types
+                        ),
                         imp: imp
                     )
                 }
@@ -329,32 +310,67 @@ extension ObjCMethodList {
             return sequence.enumerated()
                 .map {
                     let offset = numericCast(offset) + $0 * size
-                    let _name: Int64 = numericCast($1.name.offset)
-                    let _types: UInt64 = numericCast(
-                        offset + numericCast(UInt32(bitPattern: $1.types.offset))
-                    ) + 4
+                    let _name = resolvedOffset(
+                        base: nameOffsetInCache,
+                        relative: $1.name.offset
+                    ) ?? 0
+                    let _types = resolvedOffset(
+                        base: typeOffsetInCache,
+                        relative: offset + numericCast(UInt32(bitPattern: $1.types.offset)) + 4
+                    ) ?? 0
                     let imp: UInt64 = numericCast(offset + numericCast($1.imp.offset)) + 8
 
-                    var name = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: nameOffsetInCache + numericCast(_name)) {
-                        name = fileHandle.readString(
-                            offset: fileOffset
-                        ) ?? ""
-                    }
-
-                    var types = ""
-                    if let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: typeOffsetInCache + numericCast(_types)) {
-                        types = fileHandle.readString(
-                            offset: fileOffset
-                        ) ?? ""
-                    }
-
                     return ObjCMethod(
-                        name: name,
-                        types: types,
+                        name: resolveString(
+                            in: machO,
+                            forOffset: _name
+                        ),
+                        types: resolveString(
+                            in: machO,
+                            forOffset: _types
+                        ),
                         imp: imp
                     )
                 }
         }
+    }
+}
+
+extension ObjCMethodList {
+    private func resolvedOffset<Offset: BinaryInteger>(
+        base: UInt64,
+        relative: Offset,
+        adjustment: UInt64 = 0
+    ) -> UInt64? {
+        guard let base = Int64(exactly: base),
+              let relative = Int64(exactly: relative),
+              let adjustment = Int64(exactly: adjustment) else {
+            return nil
+        }
+        let resolved = base + relative + adjustment
+        guard resolved >= 0 else {
+            return nil
+        }
+        return UInt64(resolved)
+    }
+
+    private func resolveString(
+        in machO: MachOFile,
+        forAddress address: UInt64
+    ) -> String {
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: address) else {
+            return ""
+        }
+        return fileHandle.readString(offset: fileOffset) ?? ""
+    }
+
+    private func resolveString(
+        in machO: MachOFile,
+        forOffset offset: UInt64
+    ) -> String {
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: offset) else {
+            return ""
+        }
+        return fileHandle.readString(offset: fileOffset) ?? ""
     }
 }
