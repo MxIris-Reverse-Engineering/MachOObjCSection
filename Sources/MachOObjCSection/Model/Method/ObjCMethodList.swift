@@ -181,25 +181,7 @@ extension ObjCMethodList {
                 swapHandler: nil
             )
             return sequence
-                .map {
-                    let imp: UInt64 = if let cache = machO.cache, $0.imp > 0 {
-                        numericCast($0.imp) - cache.mainCacheHeader.sharedRegionStart
-                    } else {
-                        machO.fileOffset(of: numericCast($0.imp)) ?? 0
-                    }
-
-                    return ObjCMethod(
-                        name: resolveString(
-                            in: machO,
-                            forAddress: $0.name
-                        ),
-                        types: resolveString(
-                            in: machO,
-                            forAddress: $0.types
-                        ),
-                        imp: imp
-                    )
-                }
+                .map { pointerMethod($0, in: machO) }
         case .pointer:
             let sequence: DataSequence<ObjCMethod.Pointer32> = fileHandle.readDataSequence(
                 offset: fileOffset,
@@ -207,25 +189,7 @@ extension ObjCMethodList {
                 swapHandler: nil
             )
             return sequence
-                .map {
-                    let imp: UInt64 = if let cache = machO.cache, $0.imp > 0 {
-                        numericCast($0.imp) - cache.mainCacheHeader.sharedRegionStart
-                    } else {
-                        machO.fileOffset(of: numericCast($0.imp)) ?? 0
-                    }
-
-                    return ObjCMethod(
-                        name: resolveString(
-                            in: machO,
-                            forAddress: numericCast($0.name)
-                        ),
-                        types: resolveString(
-                            in: machO,
-                            forAddress: numericCast($0.types)
-                        ),
-                        imp: imp
-                    )
-                }
+                .map { pointerMethod($0, in: machO) }
 
         case .relativeIndirect:
             let sequence: DataSequence<ObjCMethod.RelativeInDirect> = fileHandle.readDataSequence(
@@ -238,36 +202,12 @@ extension ObjCMethodList {
                 .map {
                     let offset = numericCast(offset) + $0 * size
                     let fileOffset = numericCast(fileOffset) + $0 * size
-
-                    let namePointerOffset = resolvedOffset(
-                        base: numericCast(fileOffset),
-                        relative: $1.name.offset
-                    ) ?? 0
-                    let nameAddress: UInt64 = (try? fileHandle.read(
-                        offset: numericCast(namePointerOffset),
-                        as: UInt64.self
-                    )) ?? 0
-                    let types = resolvedOffset(
-                        base: numericCast(fileOffset),
-                        relative: $1.types.offset,
-                        adjustment: 4
-                    ) ?? 0
-
-                    let imp = resolvedOffset(
-                        base: numericCast(offset),
-                        relative: $1.imp.offset,
-                        adjustment: 8
-                    ) ?? 0
-
-                    return ObjCMethod(
-                        name: resolveString(
-                            in: machO,
-                            forAddress: nameAddress
-                        ),
-                        types: fileHandle.readString(
-                            offset: numericCast(types)
-                        ) ?? "",
-                        imp: imp
+                    return indirectMethod(
+                        $1,
+                        in: machO,
+                        fileHandle: fileHandle,
+                        entryOffset: numericCast(offset),
+                        fileOffset: numericCast(fileOffset)
                     )
                 }
 
@@ -317,6 +257,91 @@ extension ObjCMethodList {
 }
 
 extension ObjCMethodList {
+    private func pointerMethod(
+        _ pointer: ObjCMethod.Pointer64,
+        in machO: MachOFile
+    ) -> ObjCMethod {
+        let imp: UInt64 = if let cache = machO.cache, pointer.imp > 0 {
+            numericCast(pointer.imp) - cache.mainCacheHeader.sharedRegionStart
+        } else {
+            machO.fileOffset(of: numericCast(pointer.imp)) ?? 0
+        }
+
+        return ObjCMethod(
+            name: resolveString(
+                in: machO,
+                forAddress: pointer.name
+            ),
+            types: resolveString(
+                in: machO,
+                forAddress: pointer.types
+            ),
+            imp: imp
+        )
+    }
+
+    private func pointerMethod(
+        _ pointer: ObjCMethod.Pointer32,
+        in machO: MachOFile
+    ) -> ObjCMethod {
+        let imp: UInt64 = if let cache = machO.cache, pointer.imp > 0 {
+            numericCast(pointer.imp) - cache.mainCacheHeader.sharedRegionStart
+        } else {
+            machO.fileOffset(of: numericCast(pointer.imp)) ?? 0
+        }
+
+        return ObjCMethod(
+            name: resolveString(
+                in: machO,
+                forAddress: numericCast(pointer.name)
+            ),
+            types: resolveString(
+                in: machO,
+                forAddress: numericCast(pointer.types)
+            ),
+            imp: imp
+        )
+    }
+
+    private func indirectMethod(
+        _ relativeIndirect: ObjCMethod.RelativeInDirect,
+        in machO: MachOFile,
+        fileHandle: MachOFile.File,
+        entryOffset: UInt64,
+        fileOffset: UInt64
+    ) -> ObjCMethod {
+        let namePointerOffset = resolvedOffset(
+            base: fileOffset,
+            relative: relativeIndirect.name.offset
+        ) ?? 0
+        let nameAddress: UInt64 = (try? fileHandle.read(
+            offset: numericCast(namePointerOffset),
+            as: UInt64.self
+        )) ?? 0
+        let types = resolvedOffset(
+            base: fileOffset,
+            relative: relativeIndirect.types.offset,
+            adjustment: 4
+        ) ?? 0
+
+        let imp = resolvedOffset(
+            base: entryOffset,
+            relative: relativeIndirect.imp.offset,
+            adjustment: 8
+        ) ?? 0
+
+        return ObjCMethod(
+            name: resolveString(
+                in: machO,
+                forAddress: nameAddress
+            ),
+            types: fileHandle.readString(
+                offset: numericCast(types)
+            ) ?? "",
+            imp: imp
+        )
+    }
+
     private func directMethod(
         _ relativeDirect: ObjCMethod.RelativeDirect,
         in machO: MachOFile,
