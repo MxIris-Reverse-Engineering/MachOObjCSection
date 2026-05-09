@@ -29,13 +29,13 @@ public protocol ObjCClassRWDataExtProtocol {
 }
 
 extension ObjCClassRWDataExtProtocol {
-    // class_rw_ext_t is runtime-allocated by the ObjC runtime.
-    // All pointer fields are heap addresses that do NOT carry PAC tags —
-    // do not apply stripPointerTags to any of them.
+    // class_rw_ext_t pointer fields (`ro`, `methods`, `properties`, `protocols`,
+    // `demangledName`) are PAC-signed on arm64e at runtime — strip the PAC bits
+    // before dereferencing.
 
     public func classROData(in machO: MachOImage) -> ObjCClassROData? {
-        let address: Int = numericCast(layout.ro)
-        guard let ptr = UnsafeRawPointer(bitPattern: address) else {
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.ro))
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedAddress)) else {
             return nil
         }
         let layout = ptr
@@ -51,8 +51,9 @@ extension ObjCClassRWDataExtProtocol {
 
     public func methodList(in machO: MachOImage) -> ObjCMethodArray? {
         guard layout.methods > 0 else { return nil }
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.methods))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.methods)
+            bitPattern: UInt(strippedAddress)
         ) else {
             return nil
         }
@@ -67,8 +68,9 @@ extension ObjCClassRWDataExtProtocol {
 
     public func propertyList(in machO: MachOImage) -> ObjCPropertyArray? {
         guard layout.properties > 0 else { return nil }
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.properties))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.properties)
+            bitPattern: UInt(strippedAddress)
         ) else {
             return nil
         }
@@ -81,8 +83,9 @@ extension ObjCClassRWDataExtProtocol {
 
     public func protocolList(in machO: MachOImage) -> ObjCProtocolArray? {
         guard layout.protocols > 0 else { return nil }
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.protocols))
         guard let ptr = UnsafeRawPointer(
-            bitPattern: UInt(layout.protocols)
+            bitPattern: UInt(strippedAddress)
         ) else {
             return nil
         }
@@ -96,7 +99,8 @@ extension ObjCClassRWDataExtProtocol {
 
     public func demangledName(in machO: MachOImage) -> String? {
         guard layout.demangledName > 0 else { return nil }
-        guard let ptr = UnsafeRawPointer(bitPattern: UInt(layout.demangledName)) else {
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.demangledName))
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedAddress)) else {
             return nil
         }
         return .init(

@@ -46,10 +46,10 @@ extension ObjCClassRWDataProtocol {
     public func classROData(in machO: MachOImage) -> ObjCClassROData? {
         guard hasRO else { return nil }
 
-        // class_rw_t is runtime-allocated; ro_or_rw_ext is a heap pointer
-        // that does NOT carry PAC tags — do not strip.
-        let address: Int = numericCast(layout.ro_or_rw_ext)
-        guard let ptr = UnsafeRawPointer(bitPattern: address) else {
+        // ro_or_rw_ext is PAC-signed on arm64e (objc4 stores it as a
+        // PtrauthAuthAndStrip pointer). Strip the PAC bits before dereferencing.
+        let strippedAddress = machO.stripPointerTags(of: numericCast(layout.ro_or_rw_ext))
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedAddress)) else {
             return nil
         }
         let layout = ptr
@@ -66,10 +66,11 @@ extension ObjCClassRWDataProtocol {
     public func ext(in machO: MachOImage) -> ObjCClassRWDataExt? {
         guard hasExt else { return nil }
 
-        // class_rw_t is runtime-allocated; ro_or_rw_ext is a heap pointer
-        // that does NOT carry PAC tags — do not strip.
-        let address: Int = numericCast(layout.ro_or_rw_ext)
-        guard let ptr = UnsafeRawPointer(bitPattern: address & ~1) else {
+        // The low bit is the hasExt flag — clear it before stripping PAC bits
+        // from the upper portion of the pointer.
+        let rawAddress = numericCast(layout.ro_or_rw_ext) & ~UInt64(1)
+        let strippedAddress = machO.stripPointerTags(of: rawAddress)
+        guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedAddress)) else {
             return nil
         }
         let layout = ptr
