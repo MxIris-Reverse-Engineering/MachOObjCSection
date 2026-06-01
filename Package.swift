@@ -42,9 +42,11 @@ func envEnable(_ key: String, default defaultValue: Bool = false) -> Bool {
     }
 }
 
+let usingLocalDependencies = envEnable("USING_LOCAL_DEPENDENCIES")
+
 extension Package.Dependency {
     enum LocalSearchPath {
-        case package(path: String, isRelative: Bool, isEnabled: Bool)
+        case package(path: String, isRelative: Bool, isEnabled: Bool = usingLocalDependencies, traits: Set<PackageDescription.Package.Dependency.Trait> = [.defaults])
     }
 
     static func package(local localSearchPaths: LocalSearchPath..., remote: Package.Dependency) -> Package.Dependency {
@@ -57,10 +59,10 @@ extension Package.Dependency {
         if isClonedDependency {
             return remote
         }
-        
+
         for local in localSearchPaths {
             switch local {
-            case .package(let path, let isRelative, let isEnabled):
+            case .package(let path, let isRelative, let isEnabled, let traits):
                 guard isEnabled else { continue }
                 let url = if isRelative {
                     URL(fileURLWithPath: path, relativeTo: URL(fileURLWithPath: currentFilePath))
@@ -69,15 +71,13 @@ extension Package.Dependency {
                 }
 
                 if FileManager.default.fileExists(atPath: url.path) {
-                    return .package(path: url.path)
+                    return .package(path: url.path, traits: traits)
                 }
             }
         }
         return remote
     }
 }
-
-let useLocalMachOKit = envEnable("USE_LOCAL_MACHOKIT", default: false)
 
 let package = Package(
     name: "MachOObjCSection",
@@ -97,8 +97,7 @@ let package = Package(
         .package(
             local: .package(
                 path: "../MachOKit",
-                isRelative: true,
-                isEnabled: useLocalMachOKit
+                isRelative: true
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/MachOKit.git",
