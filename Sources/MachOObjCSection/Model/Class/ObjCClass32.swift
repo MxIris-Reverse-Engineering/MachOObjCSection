@@ -82,6 +82,9 @@ extension ObjCClass32 {
         guard let ptr = UnsafeRawPointer(bitPattern: address) else {
             return nil
         }
+        guard isPointerSafelyReadable(ptr, length: MemoryLayout<ClassRWData.Layout>.size) else {
+            return nil
+        }
 
         let layout = ptr
             .assumingMemoryBound(to: ClassRWData.Layout.self)
@@ -120,6 +123,9 @@ extension ObjCClass32 {
     private func _classROData(in machO: MachOImage) -> ClassROData? {
         let address: UInt = numericCast(layout.dataVMAddrAndFastFlags) & numericCast(FAST_DATA_MASK_32)
         guard let ptr = UnsafeRawPointer(bitPattern: address) else {
+            return nil
+        }
+        guard isPointerSafelyReadable(ptr, length: MemoryLayout<ClassROData.Layout>.size) else {
             return nil
         }
         let layout = ptr

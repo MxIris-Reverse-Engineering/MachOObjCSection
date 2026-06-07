@@ -87,6 +87,9 @@ extension ObjCClass64 {
         guard let ptr = UnsafeRawPointer(bitPattern: address) else {
             return nil
         }
+        guard isPointerSafelyReadable(ptr, length: MemoryLayout<ClassRWData.Layout>.size) else {
+            return nil
+        }
 
         let layout = ptr
             .assumingMemoryBound(to: ClassRWData.Layout.self)
@@ -133,6 +136,9 @@ extension ObjCClass64 {
         let address: UInt = numericCast(layout.dataVMAddrAndFastFlags) & FAST_DATA_MASK
 
         guard let ptr = UnsafeRawPointer(bitPattern: address) else {
+            return nil
+        }
+        guard isPointerSafelyReadable(ptr, length: MemoryLayout<ClassROData.Layout>.size) else {
             return nil
         }
 

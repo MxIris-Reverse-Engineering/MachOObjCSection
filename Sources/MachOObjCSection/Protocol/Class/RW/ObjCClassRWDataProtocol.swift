@@ -52,6 +52,13 @@ extension ObjCClassRWDataProtocol {
         guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedAddress)) else {
             return nil
         }
+        // Foreign-platform binaries loaded standalone (e.g. an iOS simulator
+        // framework `dlopen`'d on macOS) may carry stale preopt offsets here
+        // that point to unmapped memory; probe before the load to avoid a
+        // segfault inside the implicit memcpy of `.pointee`.
+        guard isPointerSafelyReadable(ptr, length: MemoryLayout<ObjCClassROData.Layout>.size) else {
+            return nil
+        }
         let layout = ptr
             .assumingMemoryBound(to: ObjCClassROData.Layout.self)
             .pointee
@@ -71,6 +78,13 @@ extension ObjCClassRWDataProtocol {
         let rawAddress = numericCast(layout.ro_or_rw_ext) & ~UInt64(1)
         let strippedAddress = machO.stripPointerTags(of: rawAddress)
         guard let ptr = UnsafeRawPointer(bitPattern: UInt(strippedAddress)) else {
+            return nil
+        }
+        // Foreign-platform binaries loaded standalone (e.g. an iOS simulator
+        // framework `dlopen`'d on macOS) may carry stale preopt offsets here
+        // that point to unmapped memory; probe before the load to avoid a
+        // segfault inside the implicit memcpy of `.pointee`.
+        guard isPointerSafelyReadable(ptr, length: MemoryLayout<ObjCClassRWDataExt.Layout>.size) else {
             return nil
         }
         let layout = ptr
