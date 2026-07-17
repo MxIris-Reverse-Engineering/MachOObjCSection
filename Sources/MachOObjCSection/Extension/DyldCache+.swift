@@ -152,9 +152,9 @@ extension DyldCache {
 
 extension DyldCache {
     func _machO(at index: Int) -> LocatedValue<MachOFile>? {
-        if let ro = _headerOptimizationRO64?.value,
+        if let (cache, ro) = _headerOptimizationRO64,
            ro.contains(index: index) {
-            let headers = locateValue({ ro.headerInfos(in: $0) })?.value
+            let headers = ro.headerInfos(in: cache)
             guard let header = headers?.first(
                 where: {
                     $0.index == index
@@ -164,9 +164,9 @@ extension DyldCache {
             }
             return locateValue { header.machO(in: $0) }
         }
-        if let ro = _headerOptimizationRO32?.value,
+        if let (cache, ro) = _headerOptimizationRO32,
            ro.contains(index: index) {
-            let headers = locateValue({ ro.headerInfos(in: $0) })?.value
+            let headers = ro.headerInfos(in: cache)
             guard let header = headers?.first(
                 where: {
                     $0.index == index
