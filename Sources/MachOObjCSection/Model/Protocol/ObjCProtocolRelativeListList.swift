@@ -97,17 +97,7 @@ extension ObjCProtocolRelativeListList32 {
 
 #if canImport(MachO)
         guard let cache: DyldCacheLoaded = .current else { return nil }
-        guard let objcOptimization = cache.objcOptimization,
-              let ro = objcOptimization.headerOptimizationRO64(in: cache) else {
-            return nil
-        }
-
-        guard let header = ro.headerInfos(in: cache).first(
-            where: { $0.index == entry.imageIndex }
-        ),
-              let machO = header.machO(in: cache) else {
-            return nil
-        }
+        guard let machO = cache.machO(at: entry.imageIndex) else { return nil }
 
         let list = List(
             ptr: ptr,
