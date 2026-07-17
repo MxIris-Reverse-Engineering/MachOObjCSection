@@ -48,19 +48,17 @@ extension ObjCPropertyRelativeListList {
     public func list(in machO: MachOFile, for entry: Entry) -> (MachOFile, List)? {
         let offset: UInt64 = numericCast(entry.offset + entry.listOffset)
 
-        guard let (cache, resolvedOffset) = machO.cacheAndFileOffset(fromStart: offset) else {
+        guard let location = machO.relativeListLocation(for: entry) else {
             return nil
         }
 
-        guard let machO = cache._machO(at: entry.imageIndex)?.value else { return nil }
-
-        let header: List.Header = cache.fileHandle.read(offset: resolvedOffset)
+        let header: List.Header = location.cache.fileHandle.read(offset: location.fileOffset)
         let list = List(
             offset: numericCast(offset),
             header: header,
-            is64Bit: machO.is64Bit
+            is64Bit: location.image.is64Bit
         )
 
-        return (machO, list)
+        return (location.image, list)
     }
 }

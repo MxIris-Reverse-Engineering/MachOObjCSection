@@ -100,6 +100,24 @@ extension MachOFile {
         // Mach-O file offset for ordinary files, main-cache-start offset for dyld cache images.
         fileHandleAndOffset(forOffset: resolved.offset)
     }
+
+    func relativeListLocation(
+        for entry: RelativeListListEntry
+    ) -> (image: MachOFile, cache: DyldCache, fileOffset: UInt64)? {
+        let offset: UInt64 = numericCast(entry.offset + entry.listOffset)
+
+        guard let cache,
+              let located = cache._machO(at: entry.imageIndex) else {
+            return nil
+        }
+
+        let address = cache.mainCacheHeader.sharedRegionStart + offset
+        guard let fileOffset = located.cache.fileOffset(of: address) else {
+            return nil
+        }
+
+        return (located.value, located.cache, fileOffset)
+    }
 }
 
 // MARK: - rebase / bind
