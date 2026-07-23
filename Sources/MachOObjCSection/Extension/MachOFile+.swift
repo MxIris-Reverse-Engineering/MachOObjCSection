@@ -7,23 +7,19 @@
 //
 
 import Foundation
-import MachOKit
+@_spi(Support) import MachOKit
 #if compiler(>=6.0) || (compiler(>=5.10) && hasFeature(AccessLevelOnImport))
 internal import FileIO
 #else
 @_implementationOnly import FileIO
 #endif
 
-extension FileHandleHolder<MachOFile, MachOFile.File> {
-    fileprivate static let shared: FileHandleHolder<Owner, File> = .init()
-}
-
 extension MachOFile {
     internal typealias File = MemoryMappedFile
 
     var fileHandle: File {
         FileHandleHolder.shared.fileHandle(
-            for: self,
+            for: fileHandleIdentity,
             initialize: {
                 try! .open(url: url, isWritable: false)
             }

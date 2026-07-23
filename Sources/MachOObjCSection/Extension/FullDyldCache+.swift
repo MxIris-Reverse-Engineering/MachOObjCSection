@@ -7,14 +7,14 @@
 //
 
 import Foundation
-import MachOKit
+@_spi(Support) import MachOKit
 #if compiler(>=6.0) || (compiler(>=5.10) && hasFeature(AccessLevelOnImport))
 internal import FileIO
 #else
 @_implementationOnly import FileIO
 #endif
 
-extension FileHandleHolder<FullDyldCache, FullDyldCache.File> {
+extension FileHandleHolder<any FileHandleIdentity & AnyObject, FullDyldCache.File> {
     fileprivate static let shared: FileHandleHolder<Owner, File> = .init()
 }
 
@@ -23,19 +23,9 @@ extension FullDyldCache {
 
     var fileHandle: File {
         FileHandleHolder.shared.fileHandle(
-            for: self,
+            for: fileHandleIdentity,
             initialize: {
-                let mainCache = try! DyldCache(url: url)
-
-                let subCacheSuffixes = mainCache.subCaches?.map {
-                    $0.fileSuffix
-                } ?? []
-                var urls = [url]
-                urls += subCacheSuffixes.map {
-                    URL(fileURLWithPath: url.path + $0)
-                }
-
-                return try! .open(
+                try! .open(
                     urls: urls,
                     isWritable: false
                 )

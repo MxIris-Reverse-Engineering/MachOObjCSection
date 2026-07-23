@@ -7,15 +7,15 @@
 //
 
 import Foundation
-import MachOKit
+@_spi(Support) import MachOKit
 #if compiler(>=6.0) || (compiler(>=5.10) && hasFeature(AccessLevelOnImport))
 internal import FileIO
 #else
 @_implementationOnly import FileIO
 #endif
 
-extension FileHandleHolder<DyldCache, DyldCache.File> {
-    fileprivate static let shared: FileHandleHolder<Owner, File> = .init()
+extension FileHandleHolder<any FileHandleIdentity & AnyObject, DyldCache.File> {
+    static let shared: FileHandleHolder<Owner, File> = .init()
 }
 
 extension DyldCache {
@@ -23,7 +23,7 @@ extension DyldCache {
 
     var fileHandle: File {
         FileHandleHolder.shared.fileHandle(
-            for: self,
+            for: fileHandleIdentity,
             initialize: {
                 try! .open(url: url, isWritable: false)
             }
