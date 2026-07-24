@@ -30,7 +30,11 @@ extension MachOFile {
 // MARK: - dyld cache
 extension MachOFile {
     func cache(for address: UInt64) -> DyldCache? {
-        cacheAndFileOffset(for: address)?.0
+        guard let cache else { return nil }
+        if let fullCache = cache._cachedFullCache {
+            return fullCache.cache(for: address)
+        }
+        return cache.locateValue({ $0.fileOffset(of: address) })?.cache
     }
 
     /// Convert an address that is not slided into the actual cache it contains and the file offset in it.
@@ -38,6 +42,9 @@ extension MachOFile {
     /// - Returns: cache and file offset
     func cacheAndFileOffset(for address: UInt64) -> (DyldCache, UInt64)? {
         guard let cache else { return nil }
+        if let fullCache = cache._cachedFullCache {
+            return fullCache.cacheAndFileOffset(for: address)
+        }
         return cache.locateValue { $0.fileOffset(of: address) }
     }
 
@@ -180,14 +187,11 @@ extension MachOFile {
 // MARK: - Objective-C
 extension MachOFile {
     var relativeMethodSelectorBaseAddressOffset: UInt64? {
-        if let cache,
-           let located = cache.locateValue(\.relativeMethodSelectorBaseAddressOffset) {
-            return located.value
-        }
-
-        if let fullCache,
-           let offset = fullCache.relativeMethodSelectorBaseAddressOffset {
-            return offset
+        if let cache {
+            if let fullCache = cache._cachedFullCache {
+                return fullCache.relativeMethodSelectorBaseAddressOffset
+            }
+            return cache.locateValue(\.relativeMethodSelectorBaseAddressOffset)?.value
         }
 
         return nil
