@@ -79,6 +79,13 @@ extension DyldCache {
             return (self, value)
         }
 
+        if let fullCache = _cachedFullCache {
+            return try fullCache.locateValue(
+                resolver,
+                excluding: self
+            )
+        }
+
         guard let mainCache else { return nil }
         let uuid = header.layout.uuid
 
