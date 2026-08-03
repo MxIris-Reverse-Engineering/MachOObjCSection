@@ -30,6 +30,8 @@ extension ObjCStubClassProtocol {
     }
 }
 
+#if canImport(ObjectiveC)
+
 extension ObjCStubClassProtocol {
     // https://github.com/apple-oss-distributions/objc4/blob/89543e2c0f67d38ca5211cea33f42c51500287d5/runtime/runtime.h#L1821
     public typealias ObjCSwiftMetadataInitializer = @convention(c) (_ cls: UnsafeRawPointer, _ arg: UnsafeMutableRawPointer?) -> AnyClass?
@@ -56,3 +58,5 @@ extension ObjCStubClassProtocol {
         return initializer(classPtr, arg)
     }
 }
+
+#endif
