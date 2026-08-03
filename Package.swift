@@ -101,7 +101,7 @@ let package = Package(
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/MachOKit",
-                from: "0.46.100"
+                from: "0.52.100"
             )
         ),
         .package(
@@ -116,7 +116,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/p-x9/swift-fileio.git",
-            from: "0.9.0"
+            from: "0.14.0"
         ),
     ],
     targets: [

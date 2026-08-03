@@ -94,7 +94,7 @@ extension DyldCacheLoaded {
     }
 
     var headerOptimizationRO32: ObjCHeaderOptimizationRO32? {
-        guard cpu.is64Bit else {
+        guard !cpu.is64Bit else {
             return nil
         }
         if let objcOptimization {
@@ -120,7 +120,7 @@ extension DyldCacheLoaded {
     }
 
     var headerOptimizationRW32: ObjCHeaderOptimizationRW32? {
-        guard cpu.is64Bit else {
+        guard !cpu.is64Bit else {
             return nil
         }
         if let objcOptimization {

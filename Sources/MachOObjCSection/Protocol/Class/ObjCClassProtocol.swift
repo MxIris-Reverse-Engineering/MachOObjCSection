@@ -41,6 +41,12 @@ where LayoutField == ObjCClassLayoutField,
 }
 
 extension ObjCClassProtocol {
+    public func version(for data: ClassROData) -> Int32 {
+        data.isMetaClass ? 7 : 0
+    }
+}
+
+extension ObjCClassProtocol {
     // https://github.com/apple-oss-distributions/objc4/blob/89543e2c0f67d38ca5211cea33f42c51500287d5/runtime/objc-runtime-new.h#L2998C10-L2998C21
     // https://github.com/swiftlang/swift/blob/main/docs/ObjCInterop.md
     // https://github.com/swiftlang/swift/blob/643cbd15e637ece615b911cce1e1bf96a28297e3/lib/IRGen/GenClass.cpp#L2613
@@ -197,6 +203,31 @@ extension ObjCClassProtocol {
 }
 
 extension ObjCClassProtocol {
+    static func _readClassName(
+        resolved: ResolvedValue,
+        in machO: MachOFile,
+        allowsStubClass: Bool = true
+    ) -> String? {
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forResolvedValue: resolved) else {
+            return nil
+        }
+
+        let layout: Layout = fileHandle.read(offset: fileOffset)
+        let cls: Self = .init(
+            layout: layout,
+            offset: numericCast(resolved.offset)
+        )
+        if !allowsStubClass, cls.isStubClass {
+            return nil
+        }
+        // NOTE: In practice, you need to resolve the machO file to which the class belongs.
+        // However, since the correct cache file handle is used internally, this is not a problem.
+        guard let data = cls.classROData(in: machO) else {
+            return nil
+        }
+        return data.name(in: machO)
+    }
+
     private func _readClass(
         field: LayoutField,
         in machO: MachOFile
@@ -208,7 +239,7 @@ extension ObjCClassProtocol {
 
         guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
-        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: resolved.address) else {
+        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forResolvedValue: resolved) else {
             return nil
         }
 
@@ -234,11 +265,14 @@ extension ObjCClassProtocol {
         let unresolved = unresolvedValue(of: field)
         guard unresolved.value > 0 else { return nil }
 
-        if let (targetMachO, cls) = _readClass(
-            field: field,
-            in: machO
-        ), let data = cls.classROData(in: targetMachO) {
-            return data.name(in: targetMachO)
+        if !isBind(field, in: machO),
+           let resolved = machO.resolveRebase(unresolved) {
+            if let name = Self._readClassName(
+                resolved: resolved,
+                in: machO
+            ) {
+                return name
+            }
         }
 
         if let bindSymbolName = resolveBind(field, in: machO) {

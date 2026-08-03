@@ -16,6 +16,14 @@ public struct ObjCProtocolRelativeListList64: ObjCProtocolRelativeListListProtoc
     public let header: Header
 
     @_spi(Core)
+    public init(offset: Int, header: Header) {
+        self.offset = offset
+        self.header = header
+    }
+}
+
+extension ObjCProtocolRelativeListList64 {
+    @_spi(Core)
     public init(
         ptr: UnsafeRawPointer,
         offset: Int
@@ -46,29 +54,17 @@ public struct ObjCProtocolRelativeListList64: ObjCProtocolRelativeListListProtoc
     public func list(in machO: MachOFile, for entry: Entry) -> (MachOFile, List)? {
         let offset: UInt64 = numericCast(entry.offset + entry.listOffset)
 
-        guard let (cache, resolvedOffset) = machO.cacheAndFileOffset(fromStart: offset) else {
+        guard let location = machO.relativeListLocation(for: entry) else {
             return nil
         }
 
-        guard let machO = cache._machO(at: entry.imageIndex)?.value else { return nil }
-
-        let data = try! cache.fileHandle.readData(
-            offset: numericCast(resolvedOffset),
-            length: MemoryLayout<List.Header>.size
+        let header: List.Header = location.cache.fileHandle.read(offset: location.fileOffset)
+        let list = List(
+            offset: numericCast(offset),
+            header: header
         )
-        let list: List? = data.withUnsafeBytes {
-            guard let ptr = $0.baseAddress else {
-                return nil
-            }
-            return .init(
-                ptr: ptr,
-                offset: numericCast(offset)
-            )
-        }
 
-        guard let list else { return nil }
-
-        return (machO, list)
+        return (location.image, list)
     }
 }
 
@@ -78,6 +74,14 @@ public struct ObjCProtocolRelativeListList32: ObjCProtocolRelativeListListProtoc
     public let offset: Int
     public let header: Header
 
+    @_spi(Core)
+    public init(offset: Int, header: Header) {
+        self.offset = offset
+        self.header = header
+    }
+}
+
+extension ObjCProtocolRelativeListList32 {
     @_spi(Core)
     public init(
         ptr: UnsafeRawPointer,
@@ -93,17 +97,7 @@ public struct ObjCProtocolRelativeListList32: ObjCProtocolRelativeListListProtoc
 
 #if canImport(MachO)
         guard let cache: DyldCacheLoaded = .current else { return nil }
-        guard let objcOptimization = cache.objcOptimization,
-              let ro = objcOptimization.headerOptimizationRO64(in: cache) else {
-            return nil
-        }
-
-        guard let header = ro.headerInfos(in: cache).first(
-            where: { $0.index == entry.imageIndex }
-        ),
-              let machO = header.machO(in: cache) else {
-            return nil
-        }
+        guard let machO = cache.machO(at: entry.imageIndex) else { return nil }
 
         let list = List(
             ptr: ptr,
@@ -119,30 +113,16 @@ public struct ObjCProtocolRelativeListList32: ObjCProtocolRelativeListListProtoc
     public func list(in machO: MachOFile, for entry: Entry) -> (MachOFile, List)? {
         let offset: UInt64 = numericCast(entry.offset + entry.listOffset)
 
-        guard let (cache, resolvedOffset) = machO.cacheAndFileOffset(fromStart: offset) else {
+        guard let location = machO.relativeListLocation(for: entry) else {
             return nil
         }
 
-        guard let listMachO = cache._machO(at: entry.imageIndex)?.value else {
-            return nil
-        }
-
-        let data = try! cache.fileHandle.readData(
-            offset: numericCast(resolvedOffset),
-            length: MemoryLayout<List.Header>.size
+        let header: List.Header = location.cache.fileHandle.read(offset: location.fileOffset)
+        let list = List(
+            offset: numericCast(offset),
+            header: header
         )
-        let list: List? = data.withUnsafeBytes {
-            guard let ptr = $0.baseAddress else {
-                return nil
-            }
-            return .init(
-                ptr: ptr,
-                offset: numericCast(offset)
-            )
-        }
 
-        guard let list else { return nil }
-
-        return (listMachO, list)
+        return (location.image, list)
     }
 }

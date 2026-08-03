@@ -7,23 +7,19 @@
 //
 
 import Foundation
-import MachOKit
+@_spi(Support) import MachOKit
 #if compiler(>=6.0) || (compiler(>=5.10) && hasFeature(AccessLevelOnImport))
 internal import FileIO
 #else
 @_implementationOnly import FileIO
 #endif
 
-extension FileHandleHolder<MachOFile, MachOFile.File> {
-    fileprivate static let shared: FileHandleHolder<Owner, File> = .init()
-}
-
 extension MachOFile {
     internal typealias File = MemoryMappedFile
 
     var fileHandle: File {
         FileHandleHolder.shared.fileHandle(
-            for: self,
+            for: fileHandleIdentity,
             initialize: {
                 try! .open(url: url, isWritable: false)
             }
@@ -34,7 +30,11 @@ extension MachOFile {
 // MARK: - dyld cache
 extension MachOFile {
     func cache(for address: UInt64) -> DyldCache? {
-        cacheAndFileOffset(for: address)?.0
+        guard let cache else { return nil }
+        if let fullCache = cache._cachedFullCache {
+            return fullCache.cache(for: address)
+        }
+        return cache.locateValue({ $0.fileOffset(of: address) })?.cache
     }
 
     /// Convert an address that is not slided into the actual cache it contains and the file offset in it.
@@ -42,29 +42,10 @@ extension MachOFile {
     /// - Returns: cache and file offset
     func cacheAndFileOffset(for address: UInt64) -> (DyldCache, UInt64)? {
         guard let cache else { return nil }
-        if let offset = cache.fileOffset(of: address) {
-            return (cache, offset)
+        if let fullCache = cache._cachedFullCache {
+            return fullCache.cacheAndFileOffset(for: address)
         }
-        guard let mainCache = cache.mainCache else {
-            return nil
-        }
-
-        if let offset = mainCache.fileOffset(of: address) {
-            return (mainCache, offset)
-        }
-
-        guard let subCaches = mainCache.subCaches else {
-            return nil
-        }
-        for subCache in subCaches {
-            guard let cache = try? subCache.subcache(for: mainCache) else {
-                continue
-            }
-            if let offset = cache.fileOffset(of: address) {
-                return (cache, offset)
-            }
-        }
-        return nil
+        return cache.locateValue { $0.fileOffset(of: address) }
     }
 
     /// Converts the offset from the start of the main cache to the actual cache
@@ -113,6 +94,32 @@ extension MachOFile {
         }
 
         return nil
+    }
+
+    func fileHandleAndOffset(
+        forResolvedValue resolved: ResolvedValue
+    ) -> (File, UInt64)? {
+        // ResolvedValue.offset follows fileHandleAndOffset(forOffset:)'s convention:
+        // Mach-O file offset for ordinary files, main-cache-start offset for dyld cache images.
+        fileHandleAndOffset(forOffset: resolved.offset)
+    }
+
+    func relativeListLocation(
+        for entry: RelativeListListEntry
+    ) -> (image: MachOFile, cache: DyldCache, fileOffset: UInt64)? {
+        let offset: UInt64 = numericCast(entry.offset + entry.listOffset)
+
+        guard let cache,
+              let located = cache._machO(at: entry.imageIndex) else {
+            return nil
+        }
+
+        let address = cache.mainCacheHeader.sharedRegionStart + offset
+        guard let fileOffset = located.cache.fileOffset(of: address) else {
+            return nil
+        }
+
+        return (located.value, located.cache, fileOffset)
     }
 }
 
@@ -186,14 +193,11 @@ extension MachOFile {
 // MARK: - Objective-C
 extension MachOFile {
     var relativeMethodSelectorBaseAddressOffset: UInt64? {
-        if let cache,
-           let offset = cache.relativeMethodSelectorBaseAddressOffset {
-            return offset
-        }
-
-        if let fullCache,
-           let offset = fullCache.relativeMethodSelectorBaseAddressOffset {
-            return offset
+        if let cache {
+            if let fullCache = cache._cachedFullCache {
+                return fullCache.relativeMethodSelectorBaseAddressOffset
+            }
+            return cache.locateValue(\.relativeMethodSelectorBaseAddressOffset)?.value
         }
 
         return nil
@@ -236,6 +240,22 @@ extension MachOFile {
             if let section = segment._section(for: name, in: self) {
                 return section
             }
+        }
+        return nil
+    }
+}
+
+extension MachOFile {
+    var objcImageIndex: Int? {
+        guard isLoadedFromDyldCache else { return nil }
+        guard let cache else { return nil }
+        if let (cache, headerOptimizationRO) = cache._headerOptimizationRO64,
+           let info = headerOptimizationRO.headerInfo(in: cache, for: self) {
+            return info.index
+        }
+        if let (cache, headerOptimizationRO) = cache._headerOptimizationRO32,
+           let info = headerOptimizationRO.headerInfo(in: cache, for: self) {
+            return info.index
         }
         return nil
     }
