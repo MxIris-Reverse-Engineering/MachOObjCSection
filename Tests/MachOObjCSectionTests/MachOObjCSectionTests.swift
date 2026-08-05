@@ -124,6 +124,36 @@ extension MachOObjCSectionTests {
             print(info.headerString)
         }
     }
+
+    func testClassInfoIncludesAllRelativeMethodLists() throws {
+        let imagePath = "/System/Library/Frameworks/UniformTypeIdentifiers.framework/Versions/A/UniformTypeIdentifiers"
+        let machO = try XCTUnwrap(
+            cache.machOFiles().first(where: { $0.imagePath == imagePath })
+        )
+        let cls = try XCTUnwrap(
+            machO.objc.classes64?.first(where: { cls in
+                cls.classROData(in: machO)?.name(in: machO) == "_UTCoreType"
+            })
+        )
+        let data = try XCTUnwrap(cls.classROData(in: machO))
+        let relative = try XCTUnwrap(data.methodRelativeListList(in: machO))
+        let lists = relative.lists(
+            in: machO,
+            forImageIndex: machO.objcImageIndex
+        )
+
+        XCTAssertEqual(lists.count, 2)
+
+        let expectedNames = lists.flatMap { machO, list in
+            list.methods(in: machO)?.map(\.name) ?? []
+        }
+        let info = try XCTUnwrap(cls.info(in: machO, options: .headerDump))
+
+        XCTAssertEqual(
+            info.methods.map(\.name),
+            expectedNames
+        )
+    }
 }
 
 // MARK: - ObjC Non Lazy Classes

@@ -78,12 +78,20 @@ extension RelativeListListProtocol {
         in machO: MachOImage,
         forImageIndex imageIndex: Int?
     ) -> (MachOImage, List)? {
-        guard let imageIndex else { return nil }
+        lists(in: machO, forImageIndex: imageIndex).first
+    }
+
+    public func lists(
+        in machO: MachOImage,
+        forImageIndex imageIndex: Int?
+    ) -> [(MachOImage, List)] {
+        guard let imageIndex else { return [] }
         let _entries = _entries(in: machO)
-        guard let (index, layout) = _entries.enumerated().first(
-            where: { _, layout in layout.imageIndex == imageIndex }
-        ) else { return nil }
-        return list(in: machO, for: _entry(layout: layout, at: index))
+        return _entries.enumerated()
+            .filter { _, layout in layout.imageIndex == imageIndex }
+            .compactMap { index, layout in
+                list(in: machO, for: _entry(layout: layout, at: index))
+            }
     }
 }
 
@@ -122,13 +130,21 @@ extension RelativeListListProtocol {
         in machO: MachOFile,
         forImageIndex imageIndex: Int?
     ) -> (MachOFile, List)? {
+        lists(in: machO, forImageIndex: imageIndex).first
+    }
+
+    public func lists(
+        in machO: MachOFile,
+        forImageIndex imageIndex: Int?
+    ) -> [(MachOFile, List)] {
         guard let imageIndex,
               let _entries = _entries(in: machO) else {
-            return nil
+            return []
         }
-        guard let (index, layout) = _entries.enumerated().first(
-            where: { _, layout in layout.imageIndex == imageIndex }
-        ) else { return nil }
-        return list(in: machO, for: _entry(layout: layout, at: index))
+        return _entries.enumerated()
+            .filter { _, layout in layout.imageIndex == imageIndex }
+            .compactMap { index, layout in
+                list(in: machO, for: _entry(layout: layout, at: index))
+            }
     }
 }
