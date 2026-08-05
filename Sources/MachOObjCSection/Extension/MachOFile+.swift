@@ -110,16 +110,15 @@ extension MachOFile {
         let offset: UInt64 = numericCast(entry.offset + entry.listOffset)
 
         guard let cache,
-              let located = cache._machO(at: entry.imageIndex) else {
+              let (_, machO) = cache._machO(at: entry.imageIndex) else {
             return nil
         }
 
-        let address = cache.mainCacheHeader.sharedRegionStart + offset
-        guard let fileOffset = located.cache.fileOffset(of: address) else {
+        guard let (cache, fileOffset) = machO.cacheAndFileOffset(fromStart: offset) else {
             return nil
         }
 
-        return (located.value, located.cache, fileOffset)
+        return (machO, cache, fileOffset)
     }
 }
 
