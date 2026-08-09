@@ -1,0 +1,31 @@
+# Evolution 提案
+
+- **项目类型**: 库（源码分发）
+
+本目录记录 MachOObjCSection 的所有实质性变更提案。一次改动一份文件，从前期调研到最终落地
+都在同一份里原地更新，不另起 design / plan / report。
+
+被否决的提案保留不删 —— 它是「当初为什么没这么做」的唯一记录。
+
+## 状态说明
+
+| 状态 | 含义 |
+|---|---|
+| `Draft` | 撰写中，尚未提交评审 |
+| `In Review` | 开放讨论中 |
+| `Accepted` | 已批准，可以开始实现 |
+| `In Progress` | 实现进行中 |
+| `Implemented` | 实现完成并已合并 |
+| `Rejected` | 已否决（保留存档） |
+| `Deferred` | 方向成立但延后 |
+| `Withdrawn` | 作者撤回 |
+
+## 提案列表
+
+| # | 标题 | 状态 |
+|---|------|------|
+| [0001](0001-objc-rendering-and-indexing-downstreaming.md) | ObjC 渲染层与索引层下沉，并抽出两库共用的公共底座 | Draft |
+| [0002](0002-objc-machofile-genericization-and-cli.md) | ObjC 索引层泛型化到 MachOFile，并提供 objc-section CLI | Draft |
+
+0002 以 0001 为前置，两者共同构成「让 MachOObjCSection 具备与 MachOSwiftSection 对等的
+渲染 / 索引 / 命令行能力」这一条完整路线。
