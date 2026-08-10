@@ -26,6 +26,10 @@
 |---|------|------|
 | [0001](0001-objc-rendering-and-indexing-downstreaming.md) | ObjC 渲染层与索引层下沉，并抽出两库共用的公共底座 | Implemented |
 | [0002](0002-objc-machofile-genericization-and-cli.md) | ObjC 索引层泛型化到 MachOFile，并提供 objc-section CLI | Draft |
+| [0003](0003-objc-relationship-tables-return-to-application.md) | ObjC 关系反向表移出索引层，归还应用 | Implemented |
 
 0002 以 0001 为前置，两者共同构成「让 MachOObjCSection 具备与 MachOSwiftSection 对等的
 渲染 / 索引 / 命令行能力」这一条完整路线。
+
+0003 修订 0001 的范围判断（0001 保持原貌不改），并应先于 0002 落地 —— 它删掉的正是泛型化里
+最麻烦的那部分，先删能让 0002 的面积小一圈。当前落地顺序为 **0001 → 0003 → 0002**。

@@ -3,9 +3,11 @@
 - **状态**: Draft
 - **作者**: JH
 - **创建日期**: 2026-08-09
-- **最后更新**: 2026-08-09
+- **最后更新**: 2026-08-10
 - **所属愿景**: 无
-- **关联提案**: [0001](0001-objc-rendering-and-indexing-downstreaming.md)（前置，必须先落地）
+- **关联提案**:
+  - [0001](0001-objc-rendering-and-indexing-downstreaming.md)（前置，必须先落地）
+  - [0003](0003-objc-relationship-tables-return-to-application.md)（**前置，应先于本提案落地**，见「二、泛型化」末段）
 - **实现分支 / PR**: 待定
 - **配套文档**: 待定 —— 落地时登记实现说明 / 使用指南的链接
 
@@ -220,6 +222,13 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource>: Sendable {
 `MachOFile.superClass(in:)` 只能在同一个 cache 内跨镜像走，独立文件里的超类若来自
 别的二进制就解析不到，此时超类链在该处截断。这是文件模式的固有限制，
 `stripOverrides` 在这种情况下会少剥一些成员——需在文档里写明，不做隐藏。
+
+**关系反向表不在本提案范围内。** 本节写作时 `ObjCInterfaceIndexer` 还带着继承 / 协议遵守
+反向表，它们是泛型化里最麻烦的部分之一 —— `ObjCClassReference` 的 `imagePath` 在文件模式下
+语义要重新定义，`indexCategory` 里的 `objcCategory.class(in: machO)` 也正是上面「现有的双重载
+分布」点名的双重载之一。[0003](0003-objc-relationship-tables-return-to-application.md) 已决定
+把这两张表连同聚合机制一并移出本库、归还应用，并应先于本提案落地。因此本提案不必为一段
+马上要删的代码设计 shim，泛型化面积相应缩小。
 
 ### 三、`objc-section` CLI
 

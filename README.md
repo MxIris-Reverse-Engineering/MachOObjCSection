@@ -488,7 +488,7 @@ MachOObjCSection          parsing only
         ↑
 ObjCDeclarationRendering  ObjCClassInfo & co. → SemanticString
         ↑
-ObjCIndexing              per-image index + inheritance / conformance reverse tables
+ObjCIndexing              per-image index; broadcasts inheritance / conformance
         ↑
 ObjCInterface             strip filtering + rendering entry point
 ```
@@ -545,32 +545,47 @@ and `unionInterface(named:)` round out the API.
 ### ObjCIndexing
 
 Use it directly when you want the index itself rather than rendered text — the class,
-protocol, category, struct and union names an image defines, plus the reverse tables:
+protocol, category, struct and union names an image defines:
 
 ```swift
 indexer.classNames
-indexer.subclasses(of: "NSString")
-indexer.conformingClasses(toProtocol: "NSCopying")
+indexer.protocolNames
+indexer.classGroup(forName: "NSMutableString")
 ```
 
-Register per-image indexers on one aggregate to query across images:
+Inheritance and protocol adoption are **not** stored. The indexer reports them as it walks,
+through the same `eventHandler` that carries progress, and folding them into whatever shape
+you need is yours to do. Keeping those reverse tables eagerly cost time and memory
+proportional to an image's class and category count — a bill every caller paid, including
+the ones that only ever rendered a single declaration:
 
 ```swift
-let aggregate = ObjCInterfaceIndexer(machO: machO, imagePath: machO.imagePath)
-aggregate.addSubIndexer(foundationIndexer)
-aggregate.addSubIndexer(appKitIndexer)
-```
+var subclassesByClassName: [String: [String]] = [:]
 
-Pass an `eventHandler` to `init` to follow a long index build — one channel carries both
-progress and the discovered relationships:
-
-```swift
 let indexer = ObjCInterfaceIndexer(machO: machO, imagePath: machO.imagePath) { event in
-    if case .progress(let phase, _, let current, let total) = event {
+    switch event {
+    case .subclassIndexed(let className, let superclass, _, _):
+        subclassesByClassName[superclass, default: []].append(className)
+    case .progress(let phase, _, let current, let total):
         print("\(phase) \(current)/\(total)")
+    default:
+        break
     }
 }
+
+try await indexer.prepare()
 ```
+
+Two properties of that stream are worth knowing before you rely on it:
+
+- **Relationship data travels only through the handler.** An indexer built without one keeps
+  no record of inheritance or adoption in any form. Omitting it while expecting relationships
+  fails silently — the code compiles, the walk runs, the relationships are simply gone.
+- **Emission order is deterministic.** Every class-phase event precedes every category-phase
+  event, classes follow the `__objc_classlist` walk, and each class reports its superclass
+  before its adopted protocols. Accumulating in arrival order therefore reproduces the
+  binary's declaration order. Changing that order would be a breaking change; the execution
+  context the handler runs on, by contrast, is deliberately not promised.
 
 ### ObjCDeclarationRendering
 

@@ -165,7 +165,6 @@ let package = Package(
                 "MachOKit",
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
-                .product(name: "OrderedCollections", package: "swift-collections"),
             ]
         ),
         .testTarget(

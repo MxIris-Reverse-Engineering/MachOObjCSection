@@ -13,7 +13,7 @@ MachOObjCSection          纯解析，未改动
         ↑
 ObjCDeclarationRendering  ObjC*Info → SemanticString；ObjCGenerationOptions 也在这一层
         ↑
-ObjCIndexing              索引 + 继承/遵守反向表
+ObjCIndexing              索引；继承/遵守关系只经事件广播（见 0003）
         ↑
 ObjCInterface             strip 过滤 + 渲染编排入口
 ```
@@ -149,8 +149,17 @@ RuntimeViewer 原来有两条并行通道：`AsyncThrowingStream` 的进度 cont
 现在统一为 `ObjCIndexingEvent` 一条：`.progress` 加三个关系 case。
 
 RuntimeViewer 侧在 `RuntimeObjCSection.makeEventHandler(forwardingTo:)` 里把 `.progress`
-适配回 `RuntimeObjectsLoadingEvent`；**关系事件不需要转发** —— 它们的结果已经落在索引器自己的
-反向表里，`RuntimeRelationshipsResolver` 直接查表。
+适配回 `RuntimeObjectsLoadingEvent`。
+
+> **本节关于关系事件的结论已被 [0003](../Evolutions/0003-objc-relationship-tables-return-to-application.md) 推翻。**
+> 这里原本写的是「关系事件不需要转发 —— 它们的结果已经落在索引器自己的反向表里，
+> `RuntimeRelationshipsResolver` 直接查表」。0003 把反向表移出了本库：索引器不再存任何关系，
+> 三个关系事件成了关系数据**唯一**的出口，消费者必须转发并自行建表。没装 handler 的索引器
+> 不保留任何继承 / 遵守信息，且完全静默。
+>
+> 连带的另一处反转：当时的合并把两条通道并成一条是为了让调用方少接一个东西；0003 之后
+> handler 从「可选的观察者」变成了「必需的数据通道」，`eventHandler` 传 `nil` 不再是
+> 「不关心进度」，而是「放弃关系数据」。
 
 phase 名去掉了 `ObjC` 前缀（`.indexingObjCSubclasses` → `.indexingSubclasses`）：库只索引 ObjC，
 不必再限定；而 RuntimeViewer 的 `RuntimeObjectsLoadingProgress.Phase` 横跨 ObjC 与 Swift 两半，

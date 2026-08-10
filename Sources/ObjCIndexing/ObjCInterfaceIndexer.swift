@@ -4,42 +4,22 @@ import MachOObjCSection
 import ObjCDeclarationRendering
 import ObjCDump
 import ObjCTypeDecodeKit
-import OrderedCollections
 import Semantic
-
-/// A reference to an Objective-C class (or a Swift class that surfaces a
-/// `class_t` record through `__objc_classlist`) that was found to subclass
-/// another class or to adopt a protocol.
-///
-/// `isSwiftStable` carries the structural signal that lets a caller decide
-/// whether to present the reference as a Swift class or an Objective-C one —
-/// a Swift class compiled with stable ABI still shows up in the Objective-C
-/// class list, and usually wants to be labelled as Swift.
-public struct ObjCClassReference: Hashable, Sendable, Codable {
-    public let className: String
-    public let imagePath: String
-    public let isSwiftStable: Bool
-
-    public init(className: String, imagePath: String, isSwiftStable: Bool) {
-        self.className = className
-        self.imagePath = imagePath
-        self.isSwiftStable = isSwiftStable
-    }
-}
 
 /// Per-image Objective-C interface index: the parsed data store for one
 /// Mach-O image's classes, protocols, categories and C struct/union
-/// definitions, plus the class-inheritance and protocol-adoption reverse
-/// tables.
+/// definitions.
 ///
 /// Construct it with an image, call ``prepare()`` once, then query. All the
 /// raw `MachOObjCSection` / `ObjCDump` extraction happens inside `prepare()`,
 /// so callers deal only in names and the grouped info types.
 ///
-/// Aggregation: keep one empty aggregate instance and register every
-/// per-image indexer on it via ``addSubIndexer(_:)``, so relationship queries
-/// (``subclasses(of:)``, ``conformingClasses(toProtocol:)``) fan out across
-/// every indexed image rather than stopping at one.
+/// This index answers "what is in this image". It deliberately does not
+/// answer "what subclasses what" — inheritance and protocol adoption are
+/// broadcast through ``ObjCIndexingEvent`` as the walk discovers them, and
+/// accumulating them is the caller's business. Building those reverse tables
+/// eagerly costs time and memory proportional to the image's class and
+/// category count, which every caller paid whether or not it wanted them.
 ///
 /// `@unchecked Sendable`: the `MachOImage` supplied at `init` and the stored
 /// `ObjCDump` / `MachOObjCSection` values are not themselves `Sendable`, but
@@ -101,7 +81,7 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
     /// reassigned; `prepare()` reads it to populate the data store below.
     private let machO: MachOImage
 
-    /// The image path recorded into every `ObjCClassReference`. Passed
+    /// The image path recorded into every emitted event. Passed
     /// explicitly rather than derived from `machO.imagePath`: an indexer may
     /// be constructed from a path that differs from the resolved image own
     /// path — e.g. in Debug builds a main-executable stub path resolves to a
@@ -145,28 +125,34 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
         set { _unions.withLock { $0 = newValue } }
     }
 
-    // MARK: - Relationship Reverse Tables
-
-    private let _subclassesByClassName = Mutex<[String: OrderedSet<ObjCClassReference>]>([:])
-    private var subclassesByClassName: [String: OrderedSet<ObjCClassReference>] {
-        get { _subclassesByClassName.withLock { $0 } }
-        set { _subclassesByClassName.withLock { $0 = newValue } }
-    }
-
-    private let _conformingClassesByProtocolName = Mutex<[String: OrderedSet<ObjCClassReference>]>([:])
-    private var conformingClassesByProtocolName: [String: OrderedSet<ObjCClassReference>] {
-        get { _conformingClassesByProtocolName.withLock { $0 } }
-        set { _conformingClassesByProtocolName.withLock { $0 = newValue } }
-    }
-
-    private let _subIndexers = Mutex<[ObjCInterfaceIndexer]>([])
-    private var subIndexers: [ObjCInterfaceIndexer] {
-        get { _subIndexers.withLock { $0 } }
-        set { _subIndexers.withLock { $0 = newValue } }
-    }
-
     private let eventHandler: (@Sendable (ObjCIndexingEvent) -> Void)?
 
+    /// Creates an indexer over `machO`, recording `imagePath` into every event
+    /// it emits.
+    ///
+    /// - Parameters:
+    ///   - machO: The image to parse. Read during ``prepare()``, never after.
+    ///   - imagePath: The path recorded into emitted events. Passed explicitly
+    ///     rather than derived from the image, because the two can legitimately
+    ///     differ — see the `imagePath` stored property.
+    ///   - eventHandler: Receives progress and relationship events during
+    ///     ``prepare()``.
+    ///
+    ///     **Relationship data is delivered only through this handler.** An
+    ///     indexer built without one keeps no record of inheritance or protocol
+    ///     adoption in any form — that is this library's boundary, not a
+    ///     degraded mode. A caller that needs relationships must install the
+    ///     handler here, at construction; there is no way to attach one after
+    ///     ``prepare()`` and recover what was discovered. Passing `nil` while
+    ///     expecting relationship data fails silently: the code compiles, the
+    ///     walk runs, and the relationships are simply gone.
+    ///
+    ///     The handler must tolerate being called from any execution context.
+    ///     Today the walk is single-threaded and the handler runs synchronously
+    ///     on `prepare()`'s own context, but that is the current implementation
+    ///     rather than a promise — the parameter is `@Sendable` precisely so the
+    ///     walk can be parallelised later. Synchronise your own state; do not
+    ///     drop a lock because today's walk happens not to need it.
     public init(
         machO: MachOImage,
         imagePath: String,
@@ -180,17 +166,38 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
     // MARK: - Preparation
 
     /// Parse this indexer's Mach-O image (`machO`, bound at `init`) into the
-    /// data store: every class / protocol / category, the C struct / union
-    /// definitions harvested from their type encodings, and — inline as the
-    /// `__objc_classlist` walk proceeds — the class-inheritance and
-    /// protocol-adoption reverse tables.
+    /// data store: every class / protocol / category, plus the C struct /
+    /// union definitions harvested from their type encodings.
     ///
-    /// Call once after construction, after which the store is immutable. An
-    /// aggregate indexer — one that only collects sub-indexers via
-    /// ``addSubIndexer(_:)`` — never needs this.
+    /// Call once after construction, after which the store is immutable.
     ///
     /// Progress and relationship events are delivered to the `eventHandler`
-    /// supplied at `init`.
+    /// supplied at `init`, as the walk discovers them. Three properties of
+    /// that stream are worth relying on — and one is worth not relying on:
+    ///
+    /// - **Emission order is deterministic.** For one image and one version of
+    ///   this library, two runs emit exactly the same sequence. Every
+    ///   class-phase event precedes every category-phase event; within the
+    ///   class phase classes follow the `__objc_classlist` walk, each emitting
+    ///   its `subclassIndexed` before its `conformanceIndexed` events in
+    ///   declaration order; the category phase walks its list the same way.
+    ///   Accumulating the stream in arrival order therefore reproduces the
+    ///   binary's declaration order, which is what this library's own reverse
+    ///   tables used to guarantee. Changing this order is a breaking change.
+    ///
+    /// - **There is no idempotence guard.** Calling this twice walks the image
+    ///   twice and replays the whole event stream. The parsed store is
+    ///   overwritten wholesale so it survives that, but a consumer accumulating
+    ///   events will see every relationship a second time. Deduplicate, or
+    ///   call this once per indexer.
+    ///
+    /// - **Relationship data only exists while this runs.** Nothing is retained
+    ///   afterwards, so a consumer's tables are being filled *during* this
+    ///   call, not sitting ready before it. Queries against them belong after
+    ///   this returns.
+    ///
+    /// - **The handler's execution context is not promised.** See the
+    ///   `eventHandler` parameter of ``init(machO:imagePath:eventHandler:)``.
     public func prepare() async throws {
         var classByName: [String: ObjCClassGroup] = [:]
         var protocolByName: [String: ObjCProtocolGroup] = [:]
@@ -259,9 +266,9 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
         // One-shot progress marker so the loading indicator can surface
         // "Indexing Objective-C subclasses…" before the per-class loop
         // starts pushing `.loadingObjCClasses` updates. Inheritance and
-        // protocol-adoption indexing happens inline below — every class in
+        // protocol-adoption events are emitted inline below — every class in
         // `__objc_classlist` (including Swift-derived ones via the same
-        // record format) is fed to the reverse tables as we walk the list.
+        // record format) is reported as we walk the list.
         eventHandler?(ObjCIndexingEvent.progress(
             phase: .indexingSubclasses,
             itemDescription: "",
@@ -280,18 +287,37 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
                 totalCount: objcClasses.count
             ))
 
-            // Feed the reverse tables. We pass the already-extracted class
-            // info — `superClassName` is resolved through MachO's bind/rebase
-            // walking by `infoWithSuperclasses`, so we don't redo that work
-            // here. `isSwiftStable` comes off the raw class_t record itself,
-            // so callers can label bridged classes as Swift.
-            indexClass(
-                className: objcClassInfo.name,
-                superClassName: objcClassInfo.superClassName,
-                adoptedProtocolNames: objcClassInfo.protocols.map(\.name),
-                imagePath: imagePath,
-                isSwiftStable: objcClass.isSwiftStable
-            )
+            // Report the relationships this record carries. The class info is
+            // already extracted — `superClassName` was resolved through
+            // MachO's bind/rebase walking by `infoWithSuperclasses`, so we
+            // don't redo that work here. `isSwiftStable` comes off the raw
+            // class_t record itself, so consumers can label bridged classes as
+            // Swift without any string-name bridging.
+            //
+            // Superclass first, then adopted protocols in declaration order:
+            // consumers accumulating in arrival order depend on this, see
+            // `prepare()`'s ordering guarantee.
+            if let superClassName = objcClassInfo.superClassName, !superClassName.isEmpty {
+                eventHandler?(
+                    ObjCIndexingEvent.subclassIndexed(
+                        className: objcClassInfo.name,
+                        superclass: superClassName,
+                        imagePath: imagePath,
+                        isSwiftStable: objcClass.isSwiftStable
+                    )
+                )
+            }
+
+            for adoptedProtocol in objcClassInfo.protocols {
+                eventHandler?(
+                    ObjCIndexingEvent.conformanceIndexed(
+                        className: objcClassInfo.name,
+                        protocolName: adoptedProtocol.name,
+                        imagePath: imagePath,
+                        isSwiftStable: objcClass.isSwiftStable
+                    )
+                )
+            }
 
             for ivar in objcClassInfo.ivars {
                 if let type = ivar.type {
@@ -359,24 +385,40 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
             setObjCTypeFromProperties(objcCategoryInfo.properties + objcCategoryInfo.classProperties)
             setObjCTypeFromMethods(objcCategoryInfo.methods + objcCategoryInfo.classMethods)
 
-            // Feed category data to the reverse tables. The target class'
-            // Swift stable flag is read from the already-resolved class
-            // record so category adoptions on bridged classes (e.g. NSError
-            // extending Swift error protocols) carry `isSwiftStable == true`
-            // and can be surfaced as Swift at query time.
-            let targetClassName = objcCategoryInfo.className
+            // Report the conformances this category contributes. Categories
+            // extend the conformer set of their target class: every protocol
+            // the category adopts makes the target a conformer.
+            //
+            // The target's Swift stable flag is read from the resolved class
+            // record — that resolution crosses image boundaries, since a
+            // category's target usually lives in another binary — so category
+            // adoptions on bridged classes (e.g. NSError extending Swift error
+            // protocols) carry `targetIsSwiftStable == true` and can be
+            // surfaced as Swift. An unresolvable target reports `false`,
+            // indistinguishable from a resolved non-Swift class.
+            //
+            // `imagePath` here is *this* image, the one declaring the
+            // category — not the image declaring the target class. The two
+            // differ for the common case of extending another framework's
+            // class. Consumers have always seen it this way; changing it would
+            // be a behaviour change, not a fix.
             let targetIsSwiftStable: Bool
             if let (_, targetClass) = objcCategory.class(in: machO) {
                 targetIsSwiftStable = targetClass.isSwiftStable
             } else {
                 targetIsSwiftStable = false
             }
-            indexCategory(
-                targetClassName: targetClassName,
-                targetIsSwiftStable: targetIsSwiftStable,
-                adoptedProtocolNames: objcCategoryInfo.protocols.map(\.name),
-                imagePath: imagePath
-            )
+
+            for adoptedProtocol in objcCategoryInfo.protocols {
+                eventHandler?(
+                    ObjCIndexingEvent.categoryConformanceIndexed(
+                        targetClassName: objcCategoryInfo.className,
+                        protocolName: adoptedProtocol.name,
+                        imagePath: imagePath,
+                        targetIsSwiftStable: targetIsSwiftStable
+                    )
+                )
+            }
         }
 
         classes = classByName
@@ -431,91 +473,6 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
         }
 
         return resultInfos
-    }
-
-    // MARK: - Reverse-table Feed
-
-    /// Records one Objective-C class record from `__objc_classlist`:
-    ///   - its superclass name -> add this class as a subclass entry
-    ///   - each protocol it adopts inline -> add this class as a conformer
-    ///
-    /// `__objc_classlist` automatically contains a `class_t` record for every
-    /// Swift class with an Objective-C ancestor (`class Foo: NSObject`,
-    /// whether or not annotated `@objc`). Pass `isSwiftStable: true` for those
-    /// so callers can materialize the reference as a Swift class at query
-    /// time without doing any string-name bridging.
-    private func indexClass(
-        className: String,
-        superClassName: String?,
-        adoptedProtocolNames: [String],
-        imagePath: String,
-        isSwiftStable: Bool
-    ) {
-        let reference = ObjCClassReference(
-            className: className,
-            imagePath: imagePath,
-            isSwiftStable: isSwiftStable
-        )
-
-        if let superClassName, !superClassName.isEmpty {
-            // `_ =` drops `OrderedSet.append`'s `(inserted:index:)` tuple so
-            // the `withLock` closure stays `Void`-returning; a repeated
-            // reference being deduped by `OrderedSet` is the intended behavior.
-            _subclassesByClassName.withLock { dictionary in
-                _ = dictionary[superClassName, default: []].append(reference)
-            }
-            eventHandler?(
-                ObjCIndexingEvent.subclassIndexed(
-                    className: className,
-                    superclass: superClassName,
-                    imagePath: imagePath
-                )
-            )
-        }
-
-        for protocolName in adoptedProtocolNames {
-            _conformingClassesByProtocolName.withLock { dictionary in
-                _ = dictionary[protocolName, default: []].append(reference)
-            }
-            eventHandler?(
-                ObjCIndexingEvent.conformanceIndexed(
-                    className: className,
-                    protocolName: protocolName,
-                    imagePath: imagePath
-                )
-            )
-        }
-    }
-
-    /// Records one Objective-C category. Categories extend the conformance
-    /// set of the target class: every protocol the category adopts gets the
-    /// target class added as a conformer (with the target's `isSwiftStable`
-    /// flag carried through, so a category on a bridged class still surfaces
-    /// the class as Swift).
-    private func indexCategory(
-        targetClassName: String,
-        targetIsSwiftStable: Bool,
-        adoptedProtocolNames: [String],
-        imagePath: String
-    ) {
-        let reference = ObjCClassReference(
-            className: targetClassName,
-            imagePath: imagePath,
-            isSwiftStable: targetIsSwiftStable
-        )
-
-        for protocolName in adoptedProtocolNames {
-            _conformingClassesByProtocolName.withLock { dictionary in
-                _ = dictionary[protocolName, default: []].append(reference)
-            }
-            eventHandler?(
-                ObjCIndexingEvent.categoryConformanceIndexed(
-                    targetClassName: targetClassName,
-                    protocolName: protocolName,
-                    imagePath: imagePath
-                )
-            )
-        }
     }
 
     // MARK: - Interface Query
@@ -581,41 +538,4 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
         unions[name]?.semanticString(isStruct: false, context: context)
     }
 
-    // MARK: - Relationship Query
-
-    /// All directly subclassing references for the given Objective-C class
-    /// name, gathered from this indexer's own per-image data plus every
-    /// sub-indexer registered via `addSubIndexer`. Insertion order is
-    /// preserved across a single image; cross-image order follows
-    /// `subIndexers` registration order.
-    public func subclasses(of className: String) -> [ObjCClassReference] {
-        var result: OrderedSet<ObjCClassReference> = subclassesByClassName[className] ?? []
-        for subIndexer in subIndexers {
-            for reference in subIndexer.subclasses(of: className) {
-                result.append(reference)
-            }
-        }
-        return Array(result)
-    }
-
-    /// All classes (across all sub-indexers) that adopt the given protocol
-    /// either inline (`@interface … <P>`) or via a category that adopts the
-    /// protocol on the class.
-    public func conformingClasses(toProtocol protocolName: String) -> [ObjCClassReference] {
-        var result: OrderedSet<ObjCClassReference> = conformingClassesByProtocolName[protocolName] ?? []
-        for subIndexer in subIndexers {
-            for reference in subIndexer.conformingClasses(toProtocol: protocolName) {
-                result.append(reference)
-            }
-        }
-        return Array(result)
-    }
-
-    // MARK: - Aggregation
-
-    /// Registers a per-image indexer with this aggregate, so that relationship
-    /// queries on the aggregate also search that image.
-    public func addSubIndexer(_ subIndexer: ObjCInterfaceIndexer) {
-        _subIndexers.withLock { $0.append(subIndexer) }
-    }
 }
