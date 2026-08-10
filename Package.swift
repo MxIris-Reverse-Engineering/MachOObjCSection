@@ -3,33 +3,8 @@
 @preconcurrency import PackageDescription
 import Foundation
 
-let localEnvironment: [String: String] = {
-    let localEnvironmentFilePath = URL(fileURLWithPath: #filePath)
-        .deletingLastPathComponent()
-        .appendingPathComponent(".package.env")
-        .path
-    guard FileManager.default.fileExists(atPath: localEnvironmentFilePath),
-          let contents = try? String(contentsOfFile: localEnvironmentFilePath, encoding: .utf8)
-    else {
-        return [:]
-    }
-    var environment: [String: String] = [:]
-    for line in contents.components(separatedBy: .newlines) {
-        let trimmedLine = line.trimmingCharacters(in: .whitespaces)
-        if trimmedLine.isEmpty || trimmedLine.hasPrefix("#") {
-            continue
-        }
-        let parts = trimmedLine.split(separator: "=", maxSplits: 1)
-        guard parts.count == 2 else { continue }
-        let key = parts[0].trimmingCharacters(in: .whitespaces)
-        let value = parts[1].trimmingCharacters(in: .whitespaces)
-        environment[key] = value
-    }
-    return environment
-}()
-
 func envEnable(_ key: String, default defaultValue: Bool = false) -> Bool {
-    let value = localEnvironment[key] ?? Context.environment[key]
+    let value = Context.environment[key]
     guard let value else {
         return defaultValue
     }
@@ -92,6 +67,18 @@ let package = Package(
             name: "MachOObjCSection",
             targets: ["MachOObjCSection"]
         ),
+        .library(
+            name: "ObjCDeclarationRendering",
+            targets: ["ObjCDeclarationRendering"]
+        ),
+        .library(
+            name: "ObjCIndexing",
+            targets: ["ObjCIndexing"]
+        ),
+        .library(
+            name: "ObjCInterface",
+            targets: ["ObjCInterface"]
+        ),
     ],
     dependencies: [
         .package(
@@ -118,6 +105,30 @@ let package = Package(
             url: "https://github.com/p-x9/swift-fileio.git",
             from: "0.14.0"
         ),
+        .package(
+            local: .package(
+                path: "../swift-semantic-string",
+                isRelative: true
+            ),
+            remote: .package(
+                url: "https://github.com/MxIris-Reverse-Engineering/swift-semantic-string",
+                from: "0.3.0"
+            )
+        ),
+        .package(
+            local: .package(
+                path: "../MachOExtensions",
+                isRelative: true
+            ),
+            remote: .package(
+                url: "https://github.com/MxIris-Reverse-Engineering/MachOExtensions",
+                from: "0.1.0"
+            )
+        ),
+        .package(
+            url: "https://github.com/apple/swift-collections",
+            from: "1.2.0"
+        ),
     ],
     targets: [
         .target(
@@ -132,9 +143,68 @@ let package = Package(
         .target(
             name: "MachOObjCSectionC"
         ),
+        .target(
+            name: "ObjCDeclarationRendering",
+            dependencies: [
+                "MachOObjCSection",
+                "MachOKit",
+                .product(name: "MachOExtensions", package: "MachOExtensions"),
+                .product(name: "Semantic", package: "swift-semantic-string"),
+                .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
+        ),
+        .target(
+            name: "ObjCIndexing",
+            dependencies: [
+                "MachOObjCSection",
+                "ObjCDeclarationRendering",
+                "MachOKit",
+                .product(name: "Semantic", package: "swift-semantic-string"),
+                .product(name: "ObjCDump", package: "swift-objc-dump"),
+                .product(name: "OrderedCollections", package: "swift-collections"),
+            ]
+        ),
         .testTarget(
             name: "MachOObjCSectionTests",
             dependencies: ["MachOObjCSection"]
+        ),
+        .target(
+            name: "ObjCInterface",
+            dependencies: [
+                "MachOObjCSection",
+                "ObjCDeclarationRendering",
+                "ObjCIndexing",
+                "MachOKit",
+                .product(name: "Semantic", package: "swift-semantic-string"),
+                .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
+        ),
+        .testTarget(
+            name: "ObjCInterfaceTests",
+            dependencies: [
+                "ObjCInterface",
+                "ObjCIndexing",
+                "ObjCDeclarationRendering",
+                .product(name: "Semantic", package: "swift-semantic-string"),
+                .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
+        ),
+        .testTarget(
+            name: "ObjCIndexingTests",
+            dependencies: [
+                "ObjCIndexing",
+                "ObjCDeclarationRendering",
+                .product(name: "Semantic", package: "swift-semantic-string"),
+                .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
+        ),
+        .testTarget(
+            name: "ObjCDeclarationRenderingTests",
+            dependencies: [
+                "ObjCDeclarationRendering",
+                .product(name: "Semantic", package: "swift-semantic-string"),
+                .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
         ),
     ]
 )
