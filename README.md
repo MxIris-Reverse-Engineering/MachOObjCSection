@@ -477,6 +477,113 @@ let header = categoryInfo.headerString
 
 </details>
 
+## Rendering and Indexing
+
+The `MachOObjCSection` library above parses metadata. Three further products turn that
+metadata into readable declarations. They layer on top of each other, so depend on the
+highest one you need:
+
+```
+MachOObjCSection          parsing only
+        ↑
+ObjCDeclarationRendering  ObjCClassInfo & co. → SemanticString
+        ↑
+ObjCIndexing              per-image index + inheritance / conformance reverse tables
+        ↑
+ObjCInterface             strip filtering + rendering entry point
+```
+
+Unlike `ObjCDump`'s plain-text `headerString`, the rendered output is a `SemanticString`
+from [swift-semantic-string](https://github.com/MxIris-Reverse-Engineering/swift-semantic-string):
+every token keeps its kind, so it can be syntax-coloured, rewritten token-by-token, or
+annotated with offsets and IMP addresses.
+
+### ObjCInterface
+
+The usual entry point. Index an image once, then ask for declarations:
+
+```swift
+import MachOKit
+import ObjCIndexing
+import ObjCInterface
+
+let machO = MachOImage(name: "Foundation")!
+
+let indexer = ObjCInterfaceIndexer(machO: machO, imagePath: machO.imagePath)
+try await indexer.prepare()
+
+let builder = ObjCInterfaceBuilder(indexer: indexer, machO: machO)
+print(builder.classInterface(named: "NSString")?.string ?? "")
+```
+
+`ObjCGenerationOptions` carries ten switches — six that strip members, four that add
+explanatory comments:
+
+```swift
+var options = ObjCGenerationOptions.default
+options.stripSynthesizedMethods = true   // drop @property-synthesized accessors
+options.addIvarOffsetComments = true     // append `// offset: …` to each ivar
+options.addMethodIMPAddressComments = true
+
+let declaration = builder.classInterface(named: "NSError", options: options)
+```
+
+C primitive types can be substituted, and the ivar-offset comment reworded:
+
+```swift
+let declaration = builder.classInterface(
+    named: "NSError",
+    options: options,
+    cTypeReplacements: [.ulongLong: "NSUInteger", .double: "CGFloat"],
+    ivarOffsetCommentBuilder: { "at 0x\(String($0, radix: 16, uppercase: true))" }
+)
+```
+
+`protocolInterface(named:)`, `categoryInterface(uniqueName:)`, `structInterface(named:)`
+and `unionInterface(named:)` round out the API.
+
+### ObjCIndexing
+
+Use it directly when you want the index itself rather than rendered text — the class,
+protocol, category, struct and union names an image defines, plus the reverse tables:
+
+```swift
+indexer.classNames
+indexer.subclasses(of: "NSString")
+indexer.conformingClasses(toProtocol: "NSCopying")
+```
+
+Register per-image indexers on one aggregate to query across images:
+
+```swift
+let aggregate = ObjCInterfaceIndexer(machO: machO, imagePath: machO.imagePath)
+aggregate.addSubIndexer(foundationIndexer)
+aggregate.addSubIndexer(appKitIndexer)
+```
+
+Pass an `eventHandler` to `init` to follow a long index build — one channel carries both
+progress and the discovered relationships:
+
+```swift
+let indexer = ObjCInterfaceIndexer(machO: machO, imagePath: machO.imagePath) { event in
+    if case .progress(let phase, _, let current, let total) = event {
+        print("\(phase) \(current)/\(total)")
+    }
+}
+```
+
+### ObjCDeclarationRendering
+
+The bottom layer, for callers that already hold `ObjCClassInfo` / `ObjCProtocolInfo` /
+`ObjCCategoryInfo` values and only want them rendered:
+
+```swift
+import ObjCDeclarationRendering
+
+let context = ObjCRenderingContext(machO: machO, options: options)
+let declaration = classInfo.semanticString(using: context)
+```
+
 ## License
 
 MachOObjCSection is released under the MIT License. See [LICENSE](./LICENSE)

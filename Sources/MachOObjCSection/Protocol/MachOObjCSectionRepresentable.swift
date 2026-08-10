@@ -13,7 +13,7 @@ import MachOKit
 ///
 /// The supertype is `MachORepresentable` rather than the stronger
 /// `MachORepresentableWithCache` (which lives in MachOSwiftSection's
-/// MachOExtensions module). Pulling MachOExtensions in here would create
+/// MachOKitExtensions module). Pulling MachOKitExtensions in here would create
 /// a package-level cycle (MachOSwiftSection already depends on
 /// MachOObjCSection's higher-level products), so we trade the `cache` /
 /// `identifier` requirements for cycle-freedom. UI consumers that need
