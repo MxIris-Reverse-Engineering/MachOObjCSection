@@ -79,6 +79,10 @@ let package = Package(
             name: "ObjCInterface",
             targets: ["ObjCInterface"]
         ),
+        .library(
+            name: "ObjCOutputTransformer",
+            targets: ["ObjCOutputTransformer"]
+        ),
     ],
     dependencies: [
         .package(
@@ -168,6 +172,17 @@ let package = Package(
             name: "MachOObjCSectionTests",
             dependencies: ["MachOObjCSection"]
         ),
+        // The ObjC-specific transformer modules. They extend the shared
+        // `Transformer` namespace from swift-semantic-string, but their
+        // vocabulary is Objective-C (C primitive spellings, ivar offsets), so
+        // they ship here rather than in a general-purpose string package.
+        .target(
+            name: "ObjCOutputTransformer",
+            dependencies: [
+                .product(name: "OutputTransformer", package: "swift-semantic-string"),
+                .product(name: "Semantic", package: "swift-semantic-string"),
+            ]
+        ),
         .target(
             name: "ObjCInterface",
             dependencies: [
@@ -177,6 +192,14 @@ let package = Package(
                 "MachOKit",
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
+        ),
+        .testTarget(
+            name: "ObjCOutputTransformerTests",
+            dependencies: [
+                "ObjCOutputTransformer",
+                .product(name: "OutputTransformer", package: "swift-semantic-string"),
+                .product(name: "Semantic", package: "swift-semantic-string"),
             ]
         ),
         .testTarget(

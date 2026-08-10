@@ -30,6 +30,28 @@ ObjCInterface             strip 过滤 + 渲染编排入口
 因此 `ObjCGenerationOptions` 落在 `ObjCDeclarationRendering`。`ObjCInterface` 仍然是唯一
 **执行** strip 那六个开关的地方 —— 类型的归属和职责的归属在这里是分开的。
 
+### 具体 transformer 最终不在 `swift-semantic-string` 里
+
+提案的方案是把整个 `OutputTransformer` 并进 `swift-semantic-string`。落地后调整为：
+**那个包只留 `Transformer` 命名空间和 `Module` 协议，具体模块跟着各自的领域走。**
+
+| 模块 | 归属 |
+|---|---|
+| `SwiftFieldOffset` / `SwiftVTableOffset` / `SwiftMemberAddress` / `SwiftTypeLayout` / `SwiftEnumLayout` / `SwiftConfiguration` | MachOSwiftSection 的 `SwiftOutputTransformer` |
+| `CType` / `ObjCIvarOffset` / `ObjCConfiguration` | MachOObjCSection 的 `ObjCOutputTransformer` |
+| 聚合 `Configuration` | RuntimeViewerCore |
+
+理由正是提案自己用来否决「并进 `Semantic` target」的那一条：`bitsNeededForTag`、
+`payloadRegionBytesHex` 这些 token 名字带着强烈的领域语义。提案当时只把它推到「不进
+`Semantic`，但仍在同一个仓库」，现在推到底 —— 一个通用字符串包不该携带任何一方的词汇表。
+
+**为什么命名空间还留在通用包里**：如果两边各自定义 `public enum Transformer`，RuntimeViewer
+同时 import 两侧时 `Transformer.CType` 就会歧义，必须写成 `ObjCOutputTransformer.Transformer.CType`。
+留一个 51 行的共享骨架，两边都 `extension Transformer`，调用点一个字都不用改。
+
+聚合 `Configuration` 落在 RuntimeViewerCore，是因为它是唯一横跨两半的类型，而查证下来
+它的使用者（settings 持久化、导出元数据、`ContentTextViewModel`）**全部**在 RuntimeViewer。
+
 ### 为什么渲染层不直接依赖 `OutputTransformer`
 
 `ObjCRenderingContext` 接的是两个「纯数据」而不是两个 transformer 对象：
@@ -165,6 +187,7 @@ let setterName = customSetter ?? "set\(name.uppercasedFirst):"                  
 | `ObjCGenerationOptions` 放 `ObjCInterface` | 放 `ObjCDeclarationRendering` | 否则依赖倒挂 |
 | 新仓库位于 `/Volumes/Repositories/Private/Org/MxIris-Reverse-Engineering/` | 位于 `/Volumes/Code/Personal/` | 提案写的路径在本机不存在，与其余仓库同放一处 |
 | 新仓库定名 `MachOExtensions` | 定名 `MachOKitExtensions` | `MachOExtensions` 读起来像是给「MachO」模块写的扩展，而它扩展的是 `MachOKit` 这个库。提案正文保留原名作为决策快照，以决策日志末条为准 |
+| 整个 `OutputTransformer` 并入 `swift-semantic-string` | 只并入命名空间与 `Module` 协议；具体模块分别落到 `SwiftOutputTransformer`（MachOSwiftSection）与 `ObjCOutputTransformer`（MachOObjCSection），聚合 `Configuration` 落到 RuntimeViewerCore | 通用字符串包不该携带任一方的领域词汇表。命名空间留在通用包是硬需求，否则两边同名 `Transformer` 在 RuntimeViewer 里歧义 |
 
 ## 验证边界
 
