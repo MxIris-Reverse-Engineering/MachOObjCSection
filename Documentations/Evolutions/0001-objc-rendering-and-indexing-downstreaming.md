@@ -547,3 +547,4 @@ MachOSwiftSection 有意义，塞进通用的 `Semantic` 会让它携带不属�
 | 2026-08-10 | 保留 setter 选择器缺冒号的既有行为 | strip 用 `"set" + name.uppercasedFirst`（无冒号）而真实选择器是 `setFoo:`，`stripSynthesizedMethods` 实际剥不掉 setter。这是迁移前就存在的行为，改掉属于行为变更，应单独提案并配回归测试 |
 | 2026-08-10 | 决定写实现说明，不建术语表 | 实现说明：本轮有六处「代码看不出来」的决策（依赖倒挂、Linux 归因、锁的选型、两条事件通道合并、渲染层为何不依赖 `OutputTransformer`、setter 冒号遗留），达到单独成篇的判据。术语表：本轮引入的 `ObjCRenderingContext` / `ObjCPrimitiveTypePattern` 都是自解释的类型名，不是自造词或内部代号，硬建一份只会稀释，故不建 |
 | 2026-08-10 | 实现完成，状态转 Implemented | 新增 28 个测试全绿；MachOSwiftSection 206 个、swift-semantic-string 307 个、RuntimeViewerCore 378 个测试通过。Linux 与远程依赖模式未实测，边界记在实现说明里 |
+| 2026-08-10 | **新仓库定名改为 `MachOKitExtensions`** | 落地后发现 `MachOExtensions` 有歧义 —— 读起来像是给「MachO」这个模块写的扩展，而它实际扩展的是 `MachOKit` 这个库。本文其余部分保留 `MachOExtensions` 的原始表述作为决策快照，实际名称以本条为准 |

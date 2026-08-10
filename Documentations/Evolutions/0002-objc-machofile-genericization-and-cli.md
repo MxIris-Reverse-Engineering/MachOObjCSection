@@ -130,7 +130,7 @@ extension ObjCClassProtocol {
 ### 地址注释在文件模式下的语义
 
 0001 迁入的 `impAddressComment(label:rawValue:)` 用 `MachOImage.ptr` 作基址计算
-IMP 的虚拟地址。文件模式下没有 `ptr`，必须改用 `MachOExtensions` 的
+IMP 的虚拟地址。文件模式下没有 `ptr`，必须改用 `MachOKitExtensions` 的
 `address(forOffset:)`（`MachORepresentableWithCache.swift:118-127`），
 它已经分别处理了三种情形：
 
@@ -138,7 +138,7 @@ IMP 的虚拟地址。文件模式下没有 `ptr`，必须改用 `MachOExtension
 - 未加载但来自 cache —— 用 `sharedRegionStart + offset`；
 - 独立文件 —— 用 `__TEXT` 段的 `virtualMemoryAddress + offset`。
 
-这正是 0001 把 `MachOExtensions` 抽成独立包所换来的直接收益：泛型化时不必再为
+这正是 0001 把 `MachOKitExtensions` 抽成独立包所换来的直接收益：泛型化时不必再为
 文件模式重写一套地址计算。
 
 ### `swift-section` CLI 的结构（对标对象）
@@ -287,7 +287,7 @@ extension MachOFile: ObjCMetadataSource {
     }
 
     public func objcResolvedAddress(forOffset offset: Int) -> UInt64 {
-        address(forOffset: offset)   // 来自 MachOExtensions
+        address(forOffset: offset)   // 来自 MachOKitExtensions
     }
     // 其余同理
 }
@@ -322,7 +322,7 @@ mutating func run() async throws {
 `MachOFile.load(options:)` 需要在 `objc-section` 里重新实现一份——它现在是
 `swift-section` 的私有扩展（`Sources/swift-section/Utilities/Extensions.swift`），
 不在任何 product 里。约 40 行，照搬即可；若日后两个 CLI 的输入处理继续趋同，
-再考虑把它下沉到 `MachOExtensions`。
+再考虑把它下沉到 `MachOKitExtensions`。
 
 ## 替代方案考量
 

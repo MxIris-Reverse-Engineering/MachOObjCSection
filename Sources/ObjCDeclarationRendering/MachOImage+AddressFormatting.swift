@@ -1,5 +1,5 @@
 import MachOKit
-import MachOExtensions
+import MachOKitExtensions
 import Semantic
 
 extension MachOImage {

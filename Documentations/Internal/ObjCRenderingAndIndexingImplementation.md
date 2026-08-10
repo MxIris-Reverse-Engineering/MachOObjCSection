@@ -61,11 +61,11 @@ public var ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?
 - 它的 C 部分 `AssociatedObjectC` 只用 `__builtin_return_address(0)` 生成 key，
   带 GCC / MSVC / wasm 分支，平台无关。
 
-三处 `@AssociatedObject` 因此**原样保留**，`MachOExtensions` 的源码零改动。
+三处 `@AssociatedObject` 因此**原样保留**，`MachOKitExtensions` 的源码零改动。
 
 真正挡住 Linux 的是 **`FoundationToolbox`**（`Mx-Iris/FrameworkToolbox`）：它的 `platforms`
 只列 Apple 平台，且 `String.lastPathComponent` 之类是走 `NSString` 桥接实现的。
-`MachOExtensions` 只用到它三处小东西，全部改写成标准库调用：
+`MachOKitExtensions` 只用到它三处小东西，全部改写成标准库调用：
 
 | 原写法 | 改后 | 位置 |
 |---|---|---|
@@ -77,13 +77,13 @@ public var ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?
 （`Int.init(_:)`，溢出会 trap），`.box.bitPattern.int` 是**位模式转换**
 （`Int.init(bitPattern:)`）。上表全部属于后者。
 
-没有在**不加同名 public 扩展**上让步：曾考虑在 `MachOExtensions` 里补一套同形的
+没有在**不加同名 public 扩展**上让步：曾考虑在 `MachOKitExtensions` 里补一套同形的
 `String.lastPathComponent` / `UnsafeRawPointer.bitPattern`，让源码一行不改。放弃了 ——
-MachOSwiftSection 同时 import `MachOExtensions` 和 `FoundationToolbox`，同名 public 扩展会产生歧义。
+MachOSwiftSection 同时 import `MachOKitExtensions` 和 `FoundationToolbox`，同名 public 扩展会产生歧义。
 
 ### 抽包的连带代价
 
-`MachOExtensions` 从 MachOSwiftSection 的内部 target 变成外部包后，出现了两类新问题：
+`MachOKitExtensions` 从 MachOSwiftSection 的内部 target 变成外部包后，出现了两类新问题：
 
 1. **一处源码不再能隐式拿到 `FoundationToolbox`**。
    `MachOReading/Readable/UnsafeRawPointer+Readable.swift` 用了 `box.bitPattern.int`
@@ -164,13 +164,14 @@ let setterName = customSetter ?? "set\(name.uppercasedFirst):"                  
 | MachOSwiftSection 源码零改动 | 改了 1 个文件（补 1 行 import） | 抽包后传递可见性断掉 |
 | `ObjCGenerationOptions` 放 `ObjCInterface` | 放 `ObjCDeclarationRendering` | 否则依赖倒挂 |
 | 新仓库位于 `/Volumes/Repositories/Private/Org/MxIris-Reverse-Engineering/` | 位于 `/Volumes/Code/Personal/` | 提案写的路径在本机不存在，与其余仓库同放一处 |
+| 新仓库定名 `MachOExtensions` | 定名 `MachOKitExtensions` | `MachOExtensions` 读起来像是给「MachO」模块写的扩展，而它扩展的是 `MachOKit` 这个库。提案正文保留原名作为决策快照，以决策日志末条为准 |
 
 ## 验证边界
 
 - **Linux 未实测**：本机无 Docker，无法真正跑 Linux 构建。已做的是静态核对 ——
-  `MachOExtensions` 与三个新 target 的源码不含任何 Darwin-only API，
+  `MachOKitExtensions` 与三个新 target 的源码不含任何 Darwin-only API，
   依赖链（MachOKit / AssociatedObject / Semantic / OrderedCollections）均声明支持 Linux。
-- **远程依赖未验证**：`MachOExtensions` 尚未推送到 GitHub，`swift-semantic-string` 的
+- **远程依赖未验证**：`MachOKitExtensions` 尚未推送到 GitHub，`swift-semantic-string` 的
   `0.3.0` 尚未打 tag。所有构建均在 `USING_LOCAL_DEPENDENCIES=1` 下完成；
   远程模式要等仓库推送并打 tag 后才能验证。
 - **MachOSwiftSection 的 Xcode fixture 测试跑不了**：`XcodeMachOFileName.swift` 硬编码

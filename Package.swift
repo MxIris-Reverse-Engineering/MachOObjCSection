@@ -117,11 +117,11 @@ let package = Package(
         ),
         .package(
             local: .package(
-                path: "../MachOExtensions",
+                path: "../MachOKitExtensions",
                 isRelative: true
             ),
             remote: .package(
-                url: "https://github.com/MxIris-Reverse-Engineering/MachOExtensions",
+                url: "https://github.com/MxIris-Reverse-Engineering/MachOKitExtensions",
                 from: "0.1.0"
             )
         ),
@@ -148,7 +148,7 @@ let package = Package(
             dependencies: [
                 "MachOObjCSection",
                 "MachOKit",
-                .product(name: "MachOExtensions", package: "MachOExtensions"),
+                .product(name: "MachOKitExtensions", package: "MachOKitExtensions"),
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
             ]
