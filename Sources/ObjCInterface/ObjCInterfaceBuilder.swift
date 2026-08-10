@@ -332,7 +332,14 @@ public struct ObjCInterfaceBuilder {
             methods.insert(getterName)
         }
 
-        let setterName = property.customSetter ?? "set" + propertyName.uppercasedFirst
+        // The trailing colon is not cosmetic: these names are matched against
+        // `ObjCMethodInfo.name`, which holds the full selector. A setter takes
+        // an argument, so its selector is `setFoo:` — building `setFoo` here
+        // both failed to strip the real accessor and risked stripping an
+        // unrelated zero-argument method that happened to be named that way.
+        // `customSetter` already carries its own colon, as it comes straight
+        // from the property's `S` attribute.
+        let setterName = property.customSetter ?? "set\(propertyName.uppercasedFirst):"
         if property.isClassProperty {
             classMethods.insert(setterName)
         } else {

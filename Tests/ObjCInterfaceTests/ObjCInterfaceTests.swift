@@ -197,6 +197,80 @@ struct ObjCInterfaceTests {
         #expect(stripped.count < plain.count)
     }
 
+    @Test("stripSynthesizedMethods removes the setter, not just the getter")
+    func stripSynthesizedMethodsRemovesSetters() async throws {
+        let (indexer, machO) = try await SharedFixture.shared.load()
+        let builder = ObjCInterfaceBuilder(indexer: indexer, machO: machO)
+
+        // A synthesized setter's selector takes an argument, so it ends in a
+        // colon: `setFoo:`, never `setFoo`. Find a class that really declares
+        // one, rather than assuming any particular class does.
+        var target: (className: String, setterSelector: String)?
+        for className in indexer.classNames {
+            guard let classInfo = indexer.classGroup(forName: className)?.info.first else { continue }
+            let methodNames = Set(classInfo.methods.map(\.name))
+
+            for property in classInfo.properties where property.customSetter == nil {
+                let setterSelector = "set" + property.name.uppercasedFirst + ":"
+                if methodNames.contains(setterSelector) {
+                    target = (className, setterSelector)
+                    break
+                }
+            }
+            if target != nil { break }
+        }
+
+        let found = try #require(target, "no class in Foundation declares a synthesized setter")
+
+        var options = ObjCGenerationOptions.default
+        options.stripSynthesizedMethods = true
+
+        let plain = try #require(builder.classInterface(named: found.className)).string
+        let stripped = try #require(builder.classInterface(named: found.className, options: options)).string
+
+        // Baseline: the setter really is in the unstripped output, so the
+        // assertion below is testing stripping rather than a typo.
+        #expect(plain.contains(found.setterSelector))
+        #expect(!stripped.contains(found.setterSelector))
+    }
+
+    @Test("stripSynthesizedMethods spares a no-argument method named like a setter")
+    func stripSynthesizedMethodsSparesColonlessLookalike() async throws {
+        let (indexer, machO) = try await SharedFixture.shared.load()
+        let builder = ObjCInterfaceBuilder(indexer: indexer, machO: machO)
+
+        // The mirror image of the bug above: a class declaring a property
+        // `foo` plus an unrelated zero-argument method `setFoo` must keep that
+        // method, because `setFoo` is not the property's accessor — `setFoo:`
+        // is. Matching without the colon would strip it.
+        var target: (className: String, lookalikeSelector: String)?
+        for className in indexer.classNames {
+            guard let classInfo = indexer.classGroup(forName: className)?.info.first else { continue }
+            let methodNames = Set(classInfo.methods.map(\.name))
+
+            for property in classInfo.properties where property.customSetter == nil {
+                let lookalikeSelector = "set" + property.name.uppercasedFirst
+                if methodNames.contains(lookalikeSelector) {
+                    target = (className, lookalikeSelector)
+                    break
+                }
+            }
+            if target != nil { break }
+        }
+
+        guard let found = target else {
+            // Nothing in Foundation exercises this shape today. Not a failure:
+            // the case is real, just unrepresented in this particular image.
+            return
+        }
+
+        var options = ObjCGenerationOptions.default
+        options.stripSynthesizedMethods = true
+        let stripped = try #require(builder.classInterface(named: found.className, options: options)).string
+
+        #expect(stripped.contains(found.lookalikeSelector))
+    }
+
     @Test("stripCtorMethod and stripDtorMethod remove .cxx_ methods")
     func stripCtorDtorSwitches() async throws {
         let (indexer, machO) = try await SharedFixture.shared.load()
