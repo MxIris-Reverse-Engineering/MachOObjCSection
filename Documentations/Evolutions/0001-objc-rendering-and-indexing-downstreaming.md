@@ -1,13 +1,14 @@
 # 0001 - ObjC 渲染层与索引层下沉，并抽出两库共用的公共底座
 
-- **状态**: Draft
+- **状态**: Implemented
 - **作者**: JH
 - **创建日期**: 2026-08-09
-- **最后更新**: 2026-08-09
+- **最后更新**: 2026-08-10
 - **所属愿景**: 无
 - **关联提案**: [0002](0002-objc-machofile-genericization-and-cli.md)（后续，承接本篇的非目标）
-- **实现分支 / PR**: 待定
-- **配套文档**: 待定 —— 落地时登记实现说明 / 使用指南的链接
+- **实现分支 / PR**: main（跨 4 个仓库，见「落地步骤」）
+- **配套文档**: [ObjC 渲染层与索引层的实现说明](../Internal/ObjCRenderingAndIndexingImplementation.md)
+  —— 记录落地中与本提案不一致之处及其原因
 
 ## 摘要
 
@@ -537,3 +538,12 @@ MachOSwiftSection 有意义，塞进通用的 `Semantic` 会让它携带不属�
 | 2026-08-09 | 新仓库定名 `MachOExtensions` | 仓库名与 target 名一致，沿用 MachO 系仓库的 PascalCase 惯例；起初拟名 `swift-macho-extensions`，与 `MachOKit` / `MachOObjCSection` / `MachOSwiftSection` 的既有命名不符，已改 |
 | 2026-08-09 | `ObjCTypeDecodeKit` 无需上游改动 | 起初误判为需要在 `swift-objc-dump` 补一个 product。查证后确认：依赖 `ObjCDump` product 即可直接 `import ObjCTypeDecodeKit`，`RuntimeViewerCore` 现成代码已在这么用。前置阻塞项撤销 |
 | 2026-08-09 | 去重降级为非目标 | 发现本仓库是 `p-x9/MachOObjCSection` 的 fork 且仍在合并上游 tag，改动 `Sources/MachOObjCSection/` 下的上游文件会让每次合并产生冲突。抽包仍做，因为它同时解开循环依赖并统一 MachOSwiftSection 侧的维护 |
+| 2026-08-10 | 开始实现，状态转 In Progress | 八个落地步骤按序执行 |
+| 2026-08-10 | **撤销「替换 3 处 `@AssociatedObject`」** | 前期调研的归因有误：`p-x9/AssociatedObject` 对 Linux 等平台条件依赖 `swift-object-association`，其 C 部分只用 `__builtin_return_address`，本身就支持 Linux。三处原样保留，`MachOExtensions` 源码零改动 |
+| 2026-08-10 | 改为去掉 `FoundationToolbox` 依赖 | 真正阻断 Linux 的是它（platforms 只列 Apple 平台，`lastPathComponent` 走 `NSString`）。`MachOExtensions` 只用到三处，全部改写为标准库调用。注意 `.box.int`（值转换）与 `.box.bitPattern.int`（位模式转换）语义不同，改写时已分辨 |
+| 2026-08-10 | `ObjCGenerationOptions` 落在 `ObjCDeclarationRendering` 而非 `ObjCInterface` | 四个「加注释」开关是渲染时读取的，放在上层会造成依赖倒挂。类型归属与职责归属分离：`ObjCInterface` 仍是唯一执行 strip 的地方 |
+| 2026-08-10 | MachOSwiftSection 并非「源码零改动」 | 抽包后同包 target 的传递可见性断掉，`MachOReading/Readable/UnsafeRawPointer+Readable.swift` 需补一行 `import FoundationToolbox`。仅此一处 |
+| 2026-08-10 | `ObjCIndexing` 的锁用 `NSLock` 自封 | `@Mutex` 宏建立在 `os_unfair_lock` 上（Apple-only），`Synchronization.Mutex` 需 macOS 15 而底线是 10.15。九处属性按宏原本的展开形式手工写开，因为索引器同时用计算属性和 `_x.withLock` 两种写法 |
+| 2026-08-10 | 保留 setter 选择器缺冒号的既有行为 | strip 用 `"set" + name.uppercasedFirst`（无冒号）而真实选择器是 `setFoo:`，`stripSynthesizedMethods` 实际剥不掉 setter。这是迁移前就存在的行为，改掉属于行为变更，应单独提案并配回归测试 |
+| 2026-08-10 | 决定写实现说明，不建术语表 | 实现说明：本轮有六处「代码看不出来」的决策（依赖倒挂、Linux 归因、锁的选型、两条事件通道合并、渲染层为何不依赖 `OutputTransformer`、setter 冒号遗留），达到单独成篇的判据。术语表：本轮引入的 `ObjCRenderingContext` / `ObjCPrimitiveTypePattern` 都是自解释的类型名，不是自造词或内部代号，硬建一份只会稀释，故不建 |
+| 2026-08-10 | 实现完成，状态转 Implemented | 新增 28 个测试全绿；MachOSwiftSection 206 个、swift-semantic-string 307 个、RuntimeViewerCore 378 个测试通过。Linux 与远程依赖模式未实测，边界记在实现说明里 |
