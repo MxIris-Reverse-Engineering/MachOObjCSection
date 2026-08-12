@@ -17,13 +17,13 @@ struct ObjCInterfaceTests {
     actor SharedFixture {
         static let shared = SharedFixture()
 
-        private var cached: (indexer: ObjCInterfaceIndexer, machO: MachOImage)?
+        private var cached: (indexer: ObjCInterfaceIndexer<MachOImage>, machO: MachOImage)?
 
         enum FixtureError: Swift.Error {
             case foundationImageUnavailable
         }
 
-        func load() async throws -> (indexer: ObjCInterfaceIndexer, machO: MachOImage) {
+        func load() async throws -> (indexer: ObjCInterfaceIndexer<MachOImage>, machO: MachOImage) {
             if let cached { return cached }
             guard let machO = MachOImage(name: "Foundation") else {
                 throw FixtureError.foundationImageUnavailable
@@ -36,7 +36,7 @@ struct ObjCInterfaceTests {
         }
     }
 
-    private static func makeBuilder() async throws -> ObjCInterfaceBuilder {
+    private static func makeBuilder() async throws -> ObjCInterfaceBuilder<MachOImage> {
         let (indexer, machO) = try await SharedFixture.shared.load()
         return ObjCInterfaceBuilder(indexer: indexer, machO: machO)
     }

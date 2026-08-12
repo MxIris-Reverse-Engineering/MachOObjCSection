@@ -3,29 +3,43 @@ import MachOKit
 import MachOObjCSection
 import ObjCDeclarationRendering
 import ObjCDump
+import ObjCMetadataSource
 import ObjCTypeDecodeKit
 import Semantic
 
 /// Per-image Objective-C interface index: the parsed data store for one
-/// Mach-O image's classes, protocols, categories and C struct/union
+/// Mach-O binary's classes, protocols, categories and C struct/union
 /// definitions.
 ///
-/// Construct it with an image, call ``prepare()`` once, then query. All the
+/// Construct it with a Mach-O, call ``prepare()`` once, then query. All the
 /// raw `MachOObjCSection` / `ObjCDump` extraction happens inside `prepare()`,
 /// so callers deal only in names and the grouped info types.
 ///
-/// This index answers "what is in this image". It deliberately does not
+/// ## File mode and image mode
+///
+/// `MachO` is either a `MachOFile` — a binary read off disk, of any
+/// architecture or platform, inside a dyld shared cache or standalone — or a
+/// `MachOImage`, an image already mapped into this process. The parameter is
+/// inferred from the `machO` argument at `init`, so call sites written before
+/// this type was generic keep compiling unchanged.
+///
+/// The two modes are not perfectly interchangeable, and the difference shows
+/// up in superclass chains: file mode can only follow a superclass into
+/// another binary of the same dyld shared cache, so for a standalone file the
+/// chain stops at the first superclass defined elsewhere. See
+/// ``ObjCMetadataSource/objcSuperClass(of:)``.
+///
+/// This index answers "what is in this binary". It deliberately does not
 /// answer "what subclasses what" — inheritance and protocol adoption are
 /// broadcast through ``ObjCIndexingEvent`` as the walk discovers them, and
 /// accumulating them is the caller's business. Building those reverse tables
-/// eagerly costs time and memory proportional to the image's class and
+/// eagerly costs time and memory proportional to the binary's class and
 /// category count, which every caller paid whether or not it wanted them.
 ///
-/// `@unchecked Sendable`: the `MachOImage` supplied at `init` and the stored
-/// `ObjCDump` / `MachOObjCSection` values are not themselves `Sendable`, but
-/// `machO` is an immutable `let` and every dictionary is mutex-guarded and
-/// immutable once `prepare()` returns.
-public final class ObjCInterfaceIndexer: @unchecked Sendable {
+/// `@unchecked Sendable`: the stored `ObjCDump` / `MachOObjCSection` values are
+/// not themselves `Sendable`, but `machO` is an immutable `let` and every
+/// dictionary is mutex-guarded and immutable once `prepare()` returns.
+public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked Sendable {
 
     // MARK: - Group Types
 
@@ -56,7 +70,7 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
         }
 
         @SemanticStringBuilder
-        func semanticString(isStruct: Bool, context: ObjCRenderingContext) -> SemanticString {
+        func semanticString(isStruct: Bool, context: ObjCRenderingContext<MachO>) -> SemanticString {
             Keyword(isStruct ? "struct" : "union")
             Space()
             TypeName(kind: .other, name)
@@ -77,9 +91,9 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
 
     // MARK: - Indexed Image
 
-    /// The Mach-O image this indexer parses. Bound at `init` and never
+    /// The Mach-O this indexer parses. Bound at `init` and never
     /// reassigned; `prepare()` reads it to populate the data store below.
-    private let machO: MachOImage
+    private let machO: MachO
 
     /// The image path recorded into every emitted event. Passed
     /// explicitly rather than derived from `machO.imagePath`: an indexer may
@@ -131,7 +145,8 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
     /// it emits.
     ///
     /// - Parameters:
-    ///   - machO: The image to parse. Read during ``prepare()``, never after.
+    ///   - machO: The Mach-O to parse — a file on disk or a loaded image. Read
+    ///     during ``prepare()``, never after.
     ///   - imagePath: The path recorded into emitted events. Passed explicitly
     ///     rather than derived from the image, because the two can legitimately
     ///     differ — see the `imagePath` stored property.
@@ -154,7 +169,7 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
     ///     walk can be parallelised later. Synchronise your own state; do not
     ///     drop a lock because today's walk happens not to need it.
     public init(
-        machO: MachOImage,
+        machO: MachO,
         imagePath: String,
         eventHandler: (@Sendable (ObjCIndexingEvent) -> Void)? = nil
     ) {
@@ -342,7 +357,7 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
         let objcProtocols: [any ObjCProtocolProtocol] = machO.objc.protocols64.orEmpty + machO.objc.protocols32.orEmpty
 
         for objcProtocol in objcProtocols {
-            guard let objcProtocolInfo = objcProtocol.info(in: machO) else { continue }
+            guard let objcProtocolInfo = machO.objcProtocolInfo(of: objcProtocol) else { continue }
             protocolByName[objcProtocolInfo.name] = (objcProtocol, objcProtocolInfo)
             eventHandler?(ObjCIndexingEvent.progress(
                 phase: .loadingProtocols,
@@ -374,7 +389,7 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
         ))
 
         for objcCategory in objcCategories {
-            guard let objcCategoryInfo = objcCategory.info(in: machO) else { continue }
+            guard let objcCategoryInfo = machO.objcCategoryInfo(of: objcCategory) else { continue }
             categoryByName[objcCategoryInfo.uniqueName] = (objcCategory, objcCategoryInfo)
             eventHandler?(ObjCIndexingEvent.progress(
                 phase: .loadingCategories,
@@ -403,7 +418,7 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
             // class. Consumers have always seen it this way; changing it would
             // be a behaviour change, not a fix.
             let targetIsSwiftStable: Bool
-            if let (_, targetClass) = objcCategory.class(in: machO) {
+            if let (_, targetClass) = machO.objcCategoryTargetClass(of: objcCategory) {
                 targetIsSwiftStable = targetClass.isSwiftStable
             } else {
                 targetIsSwiftStable = false
@@ -429,18 +444,30 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
     }
 
     /// Resolve `cls` to its own `ObjCClassInfo` followed by the
-    /// `ObjCClassInfo` of every superclass, walking `superClass(in:)` across
-    /// image boundaries. `cache` memoizes `info(in:)` extraction so a deep
-    /// inheritance chain shared by many classes is decoded only once.
-    private func infoWithSuperclasses<Class: ObjCClassProtocol>(class cls: Class, in machO: MachOImage, cache: inout [String: ObjCClassInfo]) -> [ObjCClassInfo] {
-        guard let className = cls.name(in: machO) else { return [] }
+    /// `ObjCClassInfo` of every superclass, walking
+    /// ``ObjCMetadataSource/objcSuperClass(of:)`` across binary boundaries.
+    /// `cache` memoizes info extraction so a deep inheritance chain shared by
+    /// many classes is decoded only once.
+    ///
+    /// How far the walk gets depends on the mode. In image mode every
+    /// dependency is mapped into the process, so the chain runs to the root
+    /// class. In file mode it can only cross into another binary of the same
+    /// dyld shared cache, so a standalone file's chain stops at the first
+    /// superclass defined elsewhere — a shorter chain here, and consequently a
+    /// `stripOverrides` that strips less.
+    ///
+    /// The loop walks `MachO.ResolvedSource` rather than `MachO` because one
+    /// hop can land in a different binary; the protocol pins that type to
+    /// itself, so the type stays put no matter how long the chain runs.
+    private func infoWithSuperclasses<Class: ObjCClassProtocol>(class cls: Class, in machO: MachO, cache: inout [String: ObjCClassInfo]) -> [ObjCClassInfo] {
+        guard let className = machO.objcClassName(of: cls) else { return [] }
 
         var currentInfo: ObjCClassInfo?
 
         if let cacheInfo = cache[className] {
             currentInfo = cacheInfo
         } else {
-            let info = cls.info(in: machO)
+            let info = machO.objcClassInfo(of: cls)
             currentInfo = info
             cache[className] = info
         }
@@ -449,21 +476,21 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
 
         var resultInfos: [ObjCClassInfo] = [currentInfo]
 
-        var machOAndSuperclass = cls.superClass(in: machO)
+        var machOAndSuperclass: (MachO.ResolvedSource, Class)? = machO.objcSuperClass(of: cls)
 
         while let currentMachOAndSuperclass = machOAndSuperclass {
             let currentMachO = currentMachOAndSuperclass.0
             let currentSuperclass = currentMachOAndSuperclass.1
 
-            machOAndSuperclass = currentSuperclass.superClass(in: currentMachO)
+            machOAndSuperclass = currentMachO.objcSuperClass(of: currentSuperclass)
 
-            guard let superClassName = currentSuperclass.name(in: currentMachO) else { continue }
+            guard let superClassName = currentMachO.objcClassName(of: currentSuperclass) else { continue }
 
             var superclassInfo: ObjCClassInfo?
             if let cacheInfo = cache[superClassName] {
                 superclassInfo = cacheInfo
             } else {
-                let info = currentSuperclass.info(in: currentMachO)
+                let info = currentMachO.objcClassInfo(of: currentSuperclass)
                 superclassInfo = info
                 cache[superClassName] = info
             }
@@ -530,11 +557,11 @@ public final class ObjCInterfaceIndexer: @unchecked Sendable {
     /// The rendered interface of the C `struct` named `name`, or `nil` if
     /// absent. The `context` is supplied by the caller because it depends on
     /// per-request generation options.
-    public func structSemanticString(forName name: String, context: ObjCRenderingContext) -> SemanticString? {
+    public func structSemanticString(forName name: String, context: ObjCRenderingContext<MachO>) -> SemanticString? {
         structs[name]?.semanticString(isStruct: true, context: context)
     }
 
-    public func unionSemanticString(forName name: String, context: ObjCRenderingContext) -> SemanticString? {
+    public func unionSemanticString(forName name: String, context: ObjCRenderingContext<MachO>) -> SemanticString? {
         unions[name]?.semanticString(isStruct: false, context: context)
     }
 

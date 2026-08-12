@@ -25,7 +25,7 @@
 | # | 标题 | 状态 |
 |---|------|------|
 | [0001](0001-objc-rendering-and-indexing-downstreaming.md) | ObjC 渲染层与索引层下沉，并抽出两库共用的公共底座 | Implemented |
-| [0002](0002-objc-machofile-genericization-and-cli.md) | ObjC 索引层泛型化到 MachOFile，并提供 objc-section CLI | Draft |
+| [0002](0002-objc-machofile-genericization-and-cli.md) | ObjC 索引层泛型化到 MachOFile，并提供 objc-section CLI | Implemented |
 | [0003](0003-objc-relationship-tables-return-to-application.md) | ObjC 关系反向表移出索引层，归还应用 | Implemented |
 | [0004](0004-strip-synthesized-setter-selector-fix.md) | 修正 stripSynthesizedMethods 漏剥 setter 的选择器拼写 | Implemented |
 
@@ -33,4 +33,5 @@
 渲染 / 索引 / 命令行能力」这一条完整路线。
 
 0003 修订 0001 的范围判断（0001 保持原貌不改），并应先于 0002 落地 —— 它删掉的正是泛型化里
-最麻烦的那部分，先删能让 0002 的面积小一圈。当前落地顺序为 **0001 → 0003 → 0002**。
+最麻烦的那部分，先删能让 0002 的面积小一圈。实际落地顺序即 **0001 → 0003 → 0002**，
+这条路线到 0002 为止已经走完。

@@ -4,9 +4,10 @@ import MachOObjCSection
 import ObjCDeclarationRendering
 import ObjCDump
 import ObjCIndexing
+import ObjCMetadataSource
 import Semantic
 
-/// Turns an indexed image into rendered Objective-C declarations.
+/// Turns an indexed Mach-O into rendered Objective-C declarations.
 ///
 /// This is the layer where ``ObjCGenerationOptions`` actually bites: the strip
 /// switches are applied here, by building a filtered copy of the metadata
@@ -20,11 +21,18 @@ import Semantic
 /// let builder = ObjCInterfaceBuilder(indexer: indexer, machO: image)
 /// let declaration = builder.classInterface(named: "NSString", options: .default)
 /// ```
-public struct ObjCInterfaceBuilder {
-    private let indexer: ObjCInterfaceIndexer
-    private let machO: MachOImage
+///
+/// `MachO` follows the indexer's — a `MachOFile` read off disk or a
+/// `MachOImage` loaded in this process — and is inferred from the arguments.
+/// One switch behaves differently between the two: `stripOverrides` works off
+/// the superclass chain the indexer resolved, and in file mode that chain can
+/// be shorter, so fewer inherited members get stripped. See
+/// ``ObjCIndexing/ObjCInterfaceIndexer``.
+public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
+    private let indexer: ObjCInterfaceIndexer<MachO>
+    private let machO: MachO
 
-    public init(indexer: ObjCInterfaceIndexer, machO: MachOImage) {
+    public init(indexer: ObjCInterfaceIndexer<MachO>, machO: MachO) {
         self.indexer = indexer
         self.machO = machO
     }
@@ -39,7 +47,7 @@ public struct ObjCInterfaceBuilder {
         options: ObjCGenerationOptions,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String],
         ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?
-    ) -> ObjCRenderingContext {
+    ) -> ObjCRenderingContext<MachO> {
         let indexer = self.indexer
         return ObjCRenderingContext(
             machO: machO,

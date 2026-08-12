@@ -68,6 +68,10 @@ let package = Package(
             targets: ["MachOObjCSection"]
         ),
         .library(
+            name: "ObjCMetadataSource",
+            targets: ["ObjCMetadataSource"]
+        ),
+        .library(
             name: "ObjCDeclarationRendering",
             targets: ["ObjCDeclarationRendering"]
         ),
@@ -83,6 +87,10 @@ let package = Package(
             name: "ObjCOutputTransformer",
             targets: ["ObjCOutputTransformer"]
         ),
+        .executable(
+            name: "objc-section",
+            targets: ["objc-section"]
+        ),
     ],
     dependencies: [
         .package(
@@ -92,7 +100,7 @@ let package = Package(
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/MachOKit",
-                from: "0.52.100"
+                from: "0.52.101"
             )
         ),
         .package(
@@ -133,6 +141,15 @@ let package = Package(
             url: "https://github.com/apple/swift-collections",
             from: "1.2.0"
         ),
+        // Command-line only. The library targets stay free of both.
+        .package(
+            url: "https://github.com/apple/swift-argument-parser",
+            from: "1.5.1"
+        ),
+        .package(
+            url: "https://github.com/onevcat/Rainbow",
+            from: "4.0.0"
+        ),
     ],
     targets: [
         .target(
@@ -147,10 +164,25 @@ let package = Package(
         .target(
             name: "MachOObjCSectionC"
         ),
+        // The generic entry point onto Objective-C metadata. It restates
+        // MachOObjCSection's parallel `MachOFile` / `MachOImage` overloads as
+        // requirements taking `Self`, which is what lets everything above it be
+        // written once instead of twice. Kept out of the core target on
+        // purpose — see proposal 0002's "Alternatives considered".
+        .target(
+            name: "ObjCMetadataSource",
+            dependencies: [
+                "MachOObjCSection",
+                "MachOKit",
+                .product(name: "MachOKitExtensions", package: "MachOKitExtensions"),
+                .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
+        ),
         .target(
             name: "ObjCDeclarationRendering",
             dependencies: [
                 "MachOObjCSection",
+                "ObjCMetadataSource",
                 "MachOKit",
                 .product(name: "MachOKitExtensions", package: "MachOKitExtensions"),
                 .product(name: "Semantic", package: "swift-semantic-string"),
@@ -161,6 +193,7 @@ let package = Package(
             name: "ObjCIndexing",
             dependencies: [
                 "MachOObjCSection",
+                "ObjCMetadataSource",
                 "ObjCDeclarationRendering",
                 "MachOKit",
                 .product(name: "Semantic", package: "swift-semantic-string"),
@@ -186,11 +219,30 @@ let package = Package(
             name: "ObjCInterface",
             dependencies: [
                 "MachOObjCSection",
+                "ObjCMetadataSource",
                 "ObjCDeclarationRendering",
                 "ObjCIndexing",
                 "MachOKit",
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
+        ),
+        .executableTarget(
+            name: "objc-section",
+            dependencies: [
+                "MachOObjCSection",
+                "ObjCMetadataSource",
+                "ObjCDeclarationRendering",
+                "ObjCIndexing",
+                "ObjCInterface",
+                "ObjCOutputTransformer",
+                "MachOKit",
+                .product(name: "MachOKitExtensions", package: "MachOKitExtensions"),
+                .product(name: "Semantic", package: "swift-semantic-string"),
+                .product(name: "OutputTransformer", package: "swift-semantic-string"),
+                .product(name: "ObjCDump", package: "swift-objc-dump"),
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+                .product(name: "Rainbow", package: "Rainbow"),
             ]
         ),
         .testTarget(
@@ -218,6 +270,27 @@ let package = Package(
                 "ObjCDeclarationRendering",
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
+        ),
+        .testTarget(
+            name: "ObjCMetadataSourceTests",
+            dependencies: [
+                "ObjCMetadataSource",
+                "ObjCIndexing",
+                "ObjCInterface",
+                "ObjCDeclarationRendering",
+                .product(name: "MachOKitExtensions", package: "MachOKitExtensions"),
+                .product(name: "Semantic", package: "swift-semantic-string"),
+                .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
+        ),
+        .testTarget(
+            name: "ObjCSectionCommandTests",
+            dependencies: [
+                "objc-section",
+                "ObjCDeclarationRendering",
+                "ObjCOutputTransformer",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
             ]
         ),
         .testTarget(

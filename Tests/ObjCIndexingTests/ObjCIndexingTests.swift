@@ -51,7 +51,7 @@ struct ObjCIndexingTests {
     /// it emits along the way.
     private static func makeIndexer(
         collectingInto collector: EventCollector? = nil
-    ) async throws -> ObjCInterfaceIndexer {
+    ) async throws -> ObjCInterfaceIndexer<MachOImage> {
         let machO = try #require(MachOImage(name: "Foundation"))
         var handler: (@Sendable (ObjCIndexingEvent) -> Void)?
         if let collector {
