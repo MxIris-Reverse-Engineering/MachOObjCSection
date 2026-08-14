@@ -141,6 +141,21 @@ let package = Package(
             url: "https://github.com/apple/swift-collections",
             from: "1.2.0"
         ),
+        // Already in the graph before this line existed — `swift-objc-dump`'s
+        // `ObjCTypeDecodeKit` depends on `FoundationToolbox`. Declaring it
+        // directly costs nothing in resolution or build time and lets the
+        // targets below drop their hand-rolled copies of `Mutex` and
+        // `uppercasedFirst` — see proposal 0005.
+        .package(
+            local: .package(
+                path: "../FrameworkToolbox",
+                isRelative: true
+            ),
+            remote: .package(
+                url: "https://github.com/Mx-Iris/FrameworkToolbox",
+                from: "0.9.0"
+            )
+        ),
         // Command-line only. The library targets stay free of both.
         .package(
             url: "https://github.com/apple/swift-argument-parser",
@@ -187,6 +202,8 @@ let package = Package(
                 .product(name: "MachOKitExtensions", package: "MachOKitExtensions"),
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
+                // For `.box.uppercasedFirst()` / `.box.lowercasedFirst()`.
+                .product(name: "FoundationToolbox", package: "FrameworkToolbox"),
             ]
         ),
         .target(
@@ -198,6 +215,10 @@ let package = Package(
                 "MachOKit",
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
+                // For `@Mutex`. Deliberately `SwiftStdlibToolbox` rather than
+                // `OSToolbox`: the split that moves `Mutex` down a layer is not
+                // released yet, and once it is, this target re-exports it.
+                .product(name: "SwiftStdlibToolbox", package: "FrameworkToolbox"),
             ]
         ),
         .testTarget(
@@ -225,6 +246,8 @@ let package = Package(
                 "MachOKit",
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
+                // For `.box.uppercasedFirst()`.
+                .product(name: "FoundationToolbox", package: "FrameworkToolbox"),
             ]
         ),
         .executableTarget(
@@ -261,6 +284,7 @@ let package = Package(
                 "ObjCDeclarationRendering",
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
+                .product(name: "FoundationToolbox", package: "FrameworkToolbox"),
             ]
         ),
         .testTarget(

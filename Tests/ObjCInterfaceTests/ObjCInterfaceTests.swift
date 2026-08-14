@@ -1,5 +1,6 @@
 import Testing
 import Foundation
+import FoundationToolbox
 import MachOKit
 import MachOObjCSection
 import ObjCDeclarationRendering
@@ -211,7 +212,7 @@ struct ObjCInterfaceTests {
             let methodNames = Set(classInfo.methods.map(\.name))
 
             for property in classInfo.properties where property.customSetter == nil {
-                let setterSelector = "set" + property.name.uppercasedFirst + ":"
+                let setterSelector = "set" + property.name.box.uppercasedFirst() + ":"
                 if methodNames.contains(setterSelector) {
                     target = (className, setterSelector)
                     break
@@ -249,7 +250,7 @@ struct ObjCInterfaceTests {
             let methodNames = Set(classInfo.methods.map(\.name))
 
             for property in classInfo.properties where property.customSetter == nil {
-                let lookalikeSelector = "set" + property.name.uppercasedFirst
+                let lookalikeSelector = "set" + property.name.box.uppercasedFirst()
                 if methodNames.contains(lookalikeSelector) {
                     target = (className, lookalikeSelector)
                     break

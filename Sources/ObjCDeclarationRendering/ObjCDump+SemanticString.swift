@@ -1,4 +1,5 @@
 import Foundation
+import FoundationToolbox
 import MachOKit
 import MachOKitExtensions
 import ObjCMetadataSource
@@ -373,7 +374,7 @@ extension ObjCPropertyInfo {
         if context.options.addPropertyAccessorAddressComments {
             let imps = isClassProperty ? context.classMethodIMPs : context.methodIMPs
             let getterName = customGetter ?? name
-            let setterName = customSetter ?? "set\(name.uppercasedFirst):"
+            let setterName = customSetter ?? "set\(name.box.uppercasedFirst()):"
 
             Joined(separator: " ", prefix: " ") {
                 if let getterIMP = imps[getterName] {
@@ -941,11 +942,11 @@ private enum NamingIntelligent {
         if let end = lastMatchEnd {
             let afterPreposition = String(workingLabel[end...])
             if !afterPreposition.isEmpty {
-                return afterPreposition.lowercasedFirst
+                return afterPreposition.box.lowercasedFirst()
             }
         }
 
         // No preposition found, use the working label
-        return workingLabel.lowercasedFirst
+        return workingLabel.box.lowercasedFirst()
     }
 }

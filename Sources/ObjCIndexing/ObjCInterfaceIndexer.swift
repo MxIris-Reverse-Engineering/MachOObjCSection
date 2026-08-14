@@ -6,6 +6,7 @@ import ObjCDump
 import ObjCMetadataSource
 import ObjCTypeDecodeKit
 import Semantic
+import SwiftStdlibToolbox
 
 /// Per-image Objective-C interface index: the parsed data store for one
 /// Mach-O binary's classes, protocols, categories and C struct/union
@@ -104,40 +105,31 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
 
     // MARK: - Interface Data Store
 
-    // Each store below is spelled out as a `Mutex` box plus a computed
-    // property, which is exactly what FrameworkToolbox's `@Mutex` macro used
-    // to generate. The macro is Apple-platform only, and this package supports
-    // Linux — see `Internal/Mutex.swift`.
+    // `@Mutex` (FrameworkToolbox) expands each store below into an
+    // `os_unfair_lock`-backed box named `_classes` and so on, plus get / set /
+    // `_modify` accessors. `_modify` is why the macro is used rather than a
+    // hand-written box: it makes `classes[name] = group` one read-modify-write
+    // under a single lock acquisition, where a get/set-only property would
+    // release the lock in between.
+    //
+    // That lock is not reentrant, so a `_modify` on one of these must not
+    // reach back into the same property — every access here is a plain
+    // read or write of one key.
 
-    private let _classes = Mutex<[String: ObjCClassGroup]>([:])
-    private var classes: [String: ObjCClassGroup] {
-        get { _classes.withLock { $0 } }
-        set { _classes.withLock { $0 = newValue } }
-    }
+    @Mutex
+    private var classes: [String: ObjCClassGroup] = [:]
 
-    private let _protocols = Mutex<[String: ObjCProtocolGroup]>([:])
-    private var protocols: [String: ObjCProtocolGroup] {
-        get { _protocols.withLock { $0 } }
-        set { _protocols.withLock { $0 = newValue } }
-    }
+    @Mutex
+    private var protocols: [String: ObjCProtocolGroup] = [:]
 
-    private let _categories = Mutex<[String: ObjCCategoryGroup]>([:])
-    private var categories: [String: ObjCCategoryGroup] {
-        get { _categories.withLock { $0 } }
-        set { _categories.withLock { $0 = newValue } }
-    }
+    @Mutex
+    private var categories: [String: ObjCCategoryGroup] = [:]
 
-    private let _structs = Mutex<[String: CStructOrUnion]>([:])
-    private var structs: [String: CStructOrUnion] {
-        get { _structs.withLock { $0 } }
-        set { _structs.withLock { $0 = newValue } }
-    }
+    @Mutex
+    private var structs: [String: CStructOrUnion] = [:]
 
-    private let _unions = Mutex<[String: CStructOrUnion]>([:])
-    private var unions: [String: CStructOrUnion] {
-        get { _unions.withLock { $0 } }
-        set { _unions.withLock { $0 = newValue } }
-    }
+    @Mutex
+    private var unions: [String: CStructOrUnion] = [:]
 
     private let eventHandler: (@Sendable (ObjCIndexingEvent) -> Void)?
 

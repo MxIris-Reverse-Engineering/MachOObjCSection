@@ -1,4 +1,5 @@
 import Foundation
+import FoundationToolbox
 import MachOKit
 import MachOObjCSection
 import ObjCDeclarationRendering
@@ -347,7 +348,7 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         // unrelated zero-argument method that happened to be named that way.
         // `customSetter` already carries its own colon, as it comes straight
         // from the property's `S` attribute.
-        let setterName = property.customSetter ?? "set\(propertyName.uppercasedFirst):"
+        let setterName = property.customSetter ?? "set\(propertyName.box.uppercasedFirst()):"
         if property.isClassProperty {
             classMethods.insert(setterName)
         } else {
