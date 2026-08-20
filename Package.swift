@@ -87,6 +87,10 @@ let package = Package(
             name: "ObjCOutputTransformer",
             targets: ["ObjCOutputTransformer"]
         ),
+        .library(
+            name: "ObjCDiffing",
+            targets: ["ObjCDiffing"]
+        ),
         .executable(
             name: "objc-section",
             targets: ["objc-section"]
@@ -236,6 +240,18 @@ let package = Package(
                 .product(name: "Semantic", package: "swift-semantic-string"),
             ]
         ),
+        // The ObjC API diff engine (proposal 0006). Pure value computation
+        // over the ObjCDump info model — deliberately independent of the
+        // rendering and indexing layers, mirroring how MachOSwiftSection's
+        // SwiftDiffing sits on SwiftDeclaration alone. ObjCMetadataSource is
+        // here only for the model-derived accessors (`uniqueName` & co.).
+        .target(
+            name: "ObjCDiffing",
+            dependencies: [
+                "ObjCMetadataSource",
+                .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
+        ),
         .target(
             name: "ObjCInterface",
             dependencies: [
@@ -243,6 +259,7 @@ let package = Package(
                 "ObjCMetadataSource",
                 "ObjCDeclarationRendering",
                 "ObjCIndexing",
+                "ObjCDiffing",
                 "MachOKit",
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
@@ -259,6 +276,7 @@ let package = Package(
                 "ObjCIndexing",
                 "ObjCInterface",
                 "ObjCOutputTransformer",
+                "ObjCDiffing",
                 "MachOKit",
                 .product(name: "MachOKitExtensions", package: "MachOKitExtensions"),
                 .product(name: "Semantic", package: "swift-semantic-string"),
@@ -282,6 +300,7 @@ let package = Package(
                 "ObjCInterface",
                 "ObjCIndexing",
                 "ObjCDeclarationRendering",
+                "ObjCDiffing",
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
                 .product(name: "FoundationToolbox", package: "FrameworkToolbox"),
@@ -315,6 +334,13 @@ let package = Package(
                 "ObjCDeclarationRendering",
                 "ObjCOutputTransformer",
                 .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ]
+        ),
+        .testTarget(
+            name: "ObjCDiffingTests",
+            dependencies: [
+                "ObjCDiffing",
+                .product(name: "ObjCDump", package: "swift-objc-dump"),
             ]
         ),
         .testTarget(
