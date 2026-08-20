@@ -9,6 +9,9 @@ struct ObjCSectionCommand: AsyncParsableCommand {
         subcommands: [
             DumpCommand.self,
             InterfaceCommand.self,
+            SnapshotCommand.self,
+            DiffCommand.self,
+            EvolutionCommand.self,
         ],
         defaultSubcommand: DumpCommand.self
     )
