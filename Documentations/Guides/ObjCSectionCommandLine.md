@@ -1,7 +1,7 @@
 # objc-section 使用指南
 
-- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)
-- **最后更新**: 2026-08-12
+- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）
+- **最后更新**: 2026-08-20
 
 这份文档写给两类人：用 `objc-section` 命令行导出 ObjC 头的人，以及直接调用
 `ObjCInterfaceIndexer` / `ObjCInterfaceBuilder` 处理磁盘上二进制的人。
@@ -29,7 +29,7 @@ swift build -c release --product objc-section
 .build/release/objc-section --help
 ```
 
-## 两个子命令
+## 五个子命令
 
 ```bash
 # 导出整个二进制的所有 ObjC 声明
@@ -37,9 +37,46 @@ objc-section dump <file>
 
 # 只导出一个类 / 协议 / 分类 / struct / union
 objc-section interface <name> <file>
+
+# 把一个二进制的 ObjC API 冻结成 baseline 快照（JSON）
+objc-section snapshot <file> --label 26.0 -o baseline.json
+
+# 比对两个二进制（或快照）的 ObjC API
+objc-section diff <old> <new>
+
+# 跨 N ≥ 2 个版本追踪每个声明的生命线
+objc-section evolution <v1> <v2> <v3> --labels 17.0,18.0,26.0
 ```
 
 `dump` 是默认子命令，所以 `objc-section <file>` 等价于 `objc-section dump <file>`。
+
+### snapshot / diff / evolution（0006）
+
+三个命令的输入互通：`diff` 与 `evolution` 的每个输入既可以是 Mach-O / fat 二进制 /
+dyld shared cache，也可以是 `snapshot` 产出的 JSON——按首个非空白字节是否为 `{`
+自动识别，二进制会现场索引并冻结。跨 OS 版本追踪系统框架的典型用法：
+
+```bash
+# 每个 OS 版本落一份 baseline（索引是瓶颈，比对是毫秒级）
+objc-section snapshot 15.5/dyld_shared_cache_arm64e --dyld-shared-cache -n CoreLocation \
+    --label 15.5 -o CoreLocation-15.5.json
+
+# 之后比对不再需要原 cache
+objc-section diff CoreLocation-15.5.json CoreLocation-26.5.json
+objc-section evolution CoreLocation-*.json --summary-only
+```
+
+| 选项（diff / evolution 通用） | 作用 |
+|---|---|
+| `--summary-only` | 只打印结论（diff：breaking 判定行；evolution：转换摘要段） |
+| `--json` | 输出结构化 JSON 而不是文本报告（与 `--summary-only` 互斥） |
+| `--fail-on-breaking` | 存在 API-breaking 变更时以非零码退出，供 CI 门禁 |
+| `-o, --output-path <path>` | 写入文件而不是 stdout（进度与日志一律走 stderr） |
+| `--labels a,b,c` | 仅 evolution：版本轴标签，数量必须等于输入数；缺省取快照的 provenance label 或文件名 |
+
+加载类选项（`--dyld-shared-cache` / `-n` / `-p` / `-a`）与 dump 相同，diff / evolution
+下语义是「每个输入都是 cache，从每份里提取同一个镜像」。`snapshot` 不接受
+`--uses-system-dyld-shared-cache`（系统 cache 没有可记录的稳定路径）。
 
 ### 输入：文件、cache 镜像、fat 二进制
 
@@ -105,7 +142,7 @@ C 类型两种拼写都收：源码里的写法（`unsigned long long`，shell �
 `--c-type-preset` 有三套：`stdint`（换成 `uint32_t` 这类）、`foundation`（换成 `NSInteger` / `CGFloat`）、
 `mixed`（整数用 stdint、长整型和浮点用 Foundation）。
 
-## 必须知道的四件事
+## 必须知道的五件事
 
 下面四条都是「从签名和帮助文本里看不出来、但会让你对着一份看起来正常的输出得出错误结论」的东西。
 
@@ -177,6 +214,24 @@ macOS 15 及更早的 cache 在旧版本上也是正常的，所以「以前能�
 走的是普通 ObjC ivar 记录，不受影响。
 
 分析纯 Swift 类时不要把 ivar 偏移当准数用。
+
+### 五、baseline 快照跨工具版本不通用 —— formatVersion 契约
+
+`snapshot` 产出的 JSON 带一个 `formatVersion` 头（当前 = 1）。快照里的键格局
+（`method:-…`、`attr:…`、`adopts:…` 这些命名空间字符串）就是事实上的持久化格式，
+键格局一变，旧 baseline 与新工具比出来的结果会**静默错误**——所以工具在解码时严格校验
+版本号：不相等直接报错（`Unsupported ObjC API snapshot format version …`），
+要求用当前版本的工具重新生成 baseline。
+
+这不是缺陷而是设计：一个显式报错换掉一类无声的误报。把 baseline 存进 git 时，
+建议在文件名或目录里带上生成时的 OS 版本，重新生成的成本只是一次索引。
+
+另外两条 diff 结果的解读须知：
+
+- **ivar 的纯布局变化不可见**：offset 刻意不参与比较（non-fragile ABI 下由运行时滑动，
+  且一处中插会级联报其后所有 ivar）。ivar 的类型变化仍然可见。
+- **判定分不出公开 API 与私有实现**：ObjC 无访问控制，私有 selector 的重命名同样报
+  API-breaking，需要自行结合语义判断。
 
 ## 库调用方：泛型参数是推断出来的
 

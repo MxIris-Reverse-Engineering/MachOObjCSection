@@ -635,6 +635,38 @@ Other options: `-s/--sections` to pick declaration kinds, `-f/--filter` to match
 `-o/--output-path` to write a file, `-c/--color-scheme` for terminal colours, and
 `-v/--verbose` to report indexing progress on stderr.
 
+### API diffing: snapshot / diff / evolution
+
+Three more subcommands compare the ObjC API surface across binaries — the counterpart of
+`swift-section`'s ABI commands, with identical option spelling. Any input can be a Mach-O /
+fat binary, a dyld shared cache (with `--dyld-shared-cache -n <image>`), or a baseline JSON
+produced by `snapshot`; the two are distinguished automatically.
+
+```bash
+# Freeze a binary's ObjC API as a persistable baseline (indexing is the slow part;
+# comparisons against the JSON later need no original binary)
+objc-section snapshot 15.5/dyld_shared_cache_arm64e --dyld-shared-cache -n CoreLocation \
+  --label 15.5 -o CoreLocation-15.5.json
+
+# Structured diff: classes / protocols / categories, with methods, properties, ivars,
+# protocol adoptions and superclass changes classified as added / removed / modified
+objc-section diff CoreLocation-15.5.json CoreLocation-26.5.json
+
+# Track every declaration's lifeline across N ordered versions
+objc-section evolution CoreLocation-*.json --labels 15.5,26.0,26.5 --summary-only
+```
+
+Both `diff` and `evolution` support `--json` for structured output, `--summary-only` for
+just the verdict, `--fail-on-breaking` to exit nonzero on an API-breaking change (CI
+gating), and `-o` to write the report to a file. The engine lives in the `ObjCDiffing`
+library product (`ObjCAPIDiffer` / `ObjCAPIEvolutionBuilder` /
+`ObjCAPISnapshotDocument`), usable directly from Swift via
+`ObjCAPISnapshotBuilder` in `ObjCInterface`.
+
+Baselines carry a `formatVersion` header. The identity/payload key scheme is the de-facto
+persistence format, so a baseline written by a different format version is rejected with a
+clear error instead of being silently mis-compared — regenerate it with the current tool.
+
 > [!NOTE]
 > Reading an image out of a **macOS 26** dyld shared cache needs MachOKit 0.52.101 or newer,
 > which this package already requires. Earlier versions resolve the objc header-info offsets

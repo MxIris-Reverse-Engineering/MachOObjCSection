@@ -29,6 +29,7 @@
 | [0003](0003-objc-relationship-tables-return-to-application.md) | ObjC 关系反向表移出索引层，归还应用 | Implemented |
 | [0004](0004-strip-synthesized-setter-selector-fix.md) | 修正 stripSynthesizedMethods 漏剥 setter 的选择器拼写 | Implemented |
 | [0005](0005-adopt-frameworktoolbox-utilities.md) | 改用 FrameworkToolbox 的 Mutex 与字符串工具，删掉本地手搓的副本 | Implemented |
+| [0006](0006-objc-api-diff-and-evolution.md) | ObjC API Diff 与多版本 Evolution 追踪 | Implemented |
 
 0002 以 0001 为前置，两者共同构成「让 MachOObjCSection 具备与 MachOSwiftSection 对等的
 渲染 / 索引 / 命令行能力」这一条完整路线。
