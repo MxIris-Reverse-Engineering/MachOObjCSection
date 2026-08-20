@@ -766,33 +766,6 @@ extension ObjCType {
     }
 }
 
-extension ObjCCategoryInfo {
-    /// The category spelled the way it is indexed and displayed:
-    /// `NSString(MyAdditions)`.
-    public var uniqueName: String {
-        "\(className)(\(name))"
-    }
-}
-
-extension ObjCPropertyInfo {
-    /// The backing ivar named by the property's `V` attribute, if any.
-    public var ivar: String? {
-        attributes.compactMap(\.ivar).first
-    }
-
-    /// The getter named by the property's `G` attribute, if it overrides the
-    /// default selector.
-    public var customGetter: String? {
-        attributes.compactMap(\.getter).first
-    }
-
-    /// The setter named by the property's `S` attribute, if it overrides the
-    /// default selector.
-    public var customSetter: String? {
-        attributes.compactMap(\.setter).first
-    }
-}
-
 // MARK: - Naming Intelligent
 
 /// A utility for intelligently guessing parameter names from Objective-C method labels.
