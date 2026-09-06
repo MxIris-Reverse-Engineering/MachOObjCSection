@@ -120,6 +120,14 @@ struct ObjCInterfaceSession {
         }
     }
 
+    /// Whether the index holds no declaration at all, of any kind. This is what
+    /// separates "this binary carries no Objective-C metadata" from "the kinds
+    /// you asked for happen to be empty in it" — the two are otherwise
+    /// indistinguishable from an empty dump.
+    var isEmpty: Bool {
+        ObjCSectionKind.allCases.allSatisfy { names(of: $0).isEmpty }
+    }
+
     func interface(of kind: ObjCSectionKind, named name: String) -> SemanticString? {
         switch kind {
         case .classes: classInterface(named: name)
@@ -148,6 +156,6 @@ struct ObjCInterfaceSession {
         if !itemDescription.isEmpty {
             line += " \(itemDescription)"
         }
-        FileHandle.standardError.write(Data((line + "\n").utf8))
+        writeStandardErrorLine(line)
     }
 }

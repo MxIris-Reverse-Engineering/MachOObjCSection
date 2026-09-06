@@ -44,12 +44,54 @@ struct ObjCSectionCommandTests {
 
     // MARK: - Sections and Filter
 
-    @Test("Defaults to every section, and parses an explicit list")
+    @Test("Defaults to every section, and parses an explicit comma-separated list")
     func parsesSections() throws {
-        #expect(try DumpCommand.parse(["/tmp/Sample"]).sections.isEmpty)
+        #expect(try DumpCommand.parse(["/tmp/Sample"]).sections == nil)
 
-        let command = try DumpCommand.parse(["/tmp/Sample", "-s", "classes", "protocols"])
-        #expect(command.sections == [.classes, .protocols])
+        let command = try DumpCommand.parse(["/tmp/Sample", "-s", "classes,protocols"])
+        #expect(command.sections?.kinds == [.classes, .protocols])
+    }
+
+    /// The regression this option's spelling was changed for: `--sections` used
+    /// to consume every following token, so the input path landed in the list
+    /// as one more kind and there was no way to write the option before the
+    /// path at all.
+    @Test("Parses sections written before the input path")
+    func parsesSectionsBeforeFilePath() throws {
+        let command = try DumpCommand.parse(["--sections", "classes,protocols", "/tmp/Sample"])
+        #expect(command.sections?.kinds == [.classes, .protocols])
+        #expect(command.machOOptions.filePath == "/tmp/Sample")
+    }
+
+    /// The two-token shape of the old spelling: `protocols` lands in the
+    /// positional slot, which `validate()` recognizes as a declaration kind and
+    /// reports instead of failing later on a missing file.
+    @Test("Rejects space-separated sections, pointing at the comma form")
+    func rejectsSpaceSeparatedSections() {
+        #expect(throws: (any Error).self) {
+            try DumpCommand.parse(["--sections", "classes", "protocols"])
+        }
+    }
+
+    @Test("Rejects malformed section lists", arguments: ["classes,", "", "bogus", "classes,bogus", "classes protocols"])
+    func rejectsMalformedSections(argument: String) {
+        #expect(throws: (any Error).self) {
+            try DumpCommand.parse(["/tmp/Sample", "--sections", argument])
+        }
+    }
+
+    @Test("Collapses a repeated section so it is not dumped twice")
+    func deduplicatesRepeatedSections() throws {
+        let command = try DumpCommand.parse(["/tmp/Sample", "--sections", "classes,protocols,classes"])
+        #expect(command.sections?.kinds == [.classes, .protocols])
+    }
+
+    /// A path that merely looks like a kind is only an error when `--sections`
+    /// is present too — otherwise it is just a file called `classes`.
+    @Test("Accepts a kind-shaped path when no sections are requested")
+    func acceptsKindShapedPathWithoutSections() throws {
+        let command = try DumpCommand.parse(["classes"])
+        #expect(command.machOOptions.filePath == "classes")
     }
 
     @Test("Parses a name filter")

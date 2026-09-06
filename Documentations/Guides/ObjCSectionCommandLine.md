@@ -1,12 +1,12 @@
 # objc-section 使用指南
 
-- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）
-- **最后更新**: 2026-08-20
+- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）
+- **最后更新**: 2026-09-06
 
 这份文档写给两类人：用 `objc-section` 命令行导出 ObjC 头的人，以及直接调用
 `ObjCInterfaceIndexer` / `ObjCInterfaceBuilder` 处理磁盘上二进制的人。
 
-**从 API 签名和 `--help` 里看不出来、但踩了就出错的东西全在「必须知道的四件事」一节**，
+**从 API 签名和 `--help` 里看不出来、但踩了就出错的东西全在「必须知道的六件事」一节**，
 其余部分是常规用法说明。
 
 ## 它能做什么
@@ -97,7 +97,7 @@ fat 二进制不指定 `-a` 会报错，并把可选架构列出来。
 
 | 选项 | 作用 |
 |---|---|
-| `-s, --sections <kinds>` | 只导出某几类：`classes` `protocols` `categories` `structs` `unions` |
+| `-s, --sections <kinds>` | 只导出某几类，**逗号分隔**：`--sections classes,protocols`。可选值 `classes` `protocols` `categories` `structs` `unions` |
 | `-f, --filter <text>` | 只导出名字包含该文本的声明（不区分大小写） |
 | `-o, --output-path <path>` | 写入文件而不是打印到 stdout |
 | `-c, --color-scheme <scheme>` | 终端着色：`none`（默认）/ `light` / `dark` |
@@ -142,7 +142,7 @@ C 类型两种拼写都收：源码里的写法（`unsigned long long`，shell �
 `--c-type-preset` 有三套：`stdint`（换成 `uint32_t` 这类）、`foundation`（换成 `NSInteger` / `CGFloat`）、
 `mixed`（整数用 stdint、长整型和浮点用 Foundation）。
 
-## 必须知道的五件事
+## 必须知道的六件事
 
 下面四条都是「从签名和帮助文本里看不出来、但会让你对着一份看起来正常的输出得出错误结论」的东西。
 
@@ -232,6 +232,25 @@ macOS 15 及更早的 cache 在旧版本上也是正常的，所以「以前能�
   且一处中插会级联报其后所有 ivar）。ivar 的类型变化仍然可见。
 - **判定分不出公开 API 与私有实现**：ObjC 无访问控制，私有 selector 的重命名同样报
   API-breaking，需要自行结合语义判断。
+
+### 六、dump 的空结果只写 stderr，不改退出码
+
+`dump` 一个声明都没导出时，会往 **stderr** 写一行说明是哪种「空」，**退出码仍然是 0**：
+
+| stderr | 含义 |
+|---|---|
+| `no Objective-C metadata found in <image>` | 整个索引是空的 —— 这个二进制里没有 ObjC 内容 |
+| `no <kind> found in <image>` | 你用 `--sections` 点名的某一类在这个二进制里为空（逐类一行） |
+| `--filter '<text>' matched none of the <N> declarations in <image>` | 索引里有 N 个声明，但没有一个匹配 `--filter` |
+
+第一条与第二条互斥：整个索引为空时只报第一条，不会再逐类重复。默认（不给 `--sections`）
+时不报第二条 —— 否则每次 dump 一个纯 Swift 二进制都会为你从没点名过的类别刷屏。
+
+**退出码不变是有意的**：这是诊断信息，不是失败，不该让任何既有脚本或 CI 因此变红。
+需要门禁的场景走 `diff --fail-on-breaking` 那条专用通道。
+
+在这之前，「二进制里没有 ObjC」「点名的类别为空」「filter 没匹配上」三种情况的输出
+逐字节相同 —— stdout 空、stderr 空、退出码 0 —— 分不出是真没有还是读失败了。
 
 ## 库调用方：泛型参数是推断出来的
 

@@ -48,6 +48,6 @@ struct SnapshotCommand: AsyncParsableCommand {
     }
 
     private func log(_ message: String) {
-        FileHandle.standardError.write(Data((message + "\n").utf8))
+        writeStandardErrorLine(message)
     }
 }

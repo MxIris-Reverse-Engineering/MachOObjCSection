@@ -25,4 +25,12 @@ struct MachOOptionGroup: ParsableArguments, Sendable {
 
     @Option(name: .shortAndLong, help: "The architecture of the Mach-O file. If not specified, the current architecture will be used.")
     var architecture: Architecture?
+
+    /// How to name the analyzed image in a diagnostic: the spelling the caller
+    /// actually typed, so the note points back at their own command line rather
+    /// than at an install name they never mentioned. (For a plain executable
+    /// the Mach-O's own `imagePath` is often the empty string anyway.)
+    var imageDescription: String {
+        cacheImageName ?? cacheImagePath ?? filePath ?? "the system dyld shared cache"
+    }
 }
