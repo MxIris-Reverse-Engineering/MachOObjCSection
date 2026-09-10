@@ -34,6 +34,27 @@ MachOObjCSection 专有名词与约定用法。
 
 - **主要出现在**：`Sources/ObjCDiffing/ObjCAPIModule.swift`、`ObjCAPISnapshot.swift`
 
+### ObjCExportStatus（导出状态）
+
+一个 ObjC 类或实例变量的**链接可见性**——它的符号（`_OBJC_CLASS_$_<类名>` /
+`_OBJC_IVAR_$_<类名>.<ivar 名>`）在不在镜像的 export trie 里。三态：`exported` /
+`notExported` / `imageHasNoExportInformation`，最后一态是**镜像级**的「无从判断」
+（`.o` 目标文件、读不到 linkedit 的镜像），绝不可当作「未导出」使用。
+
+三条必须记住的边界：
+
+1. **这是符号表事实，不是访问级别。** ObjC 没有 `public` / `private` 可供恢复，
+   能说的只有「dyld 能不能从别的镜像解析到这个符号」。
+2. **协议与分类判不了，不是漏做。** ObjC 协议符号一律 `private extern`，从不进
+   export trie；分类没有自己的符号。所以 API 里没有这两个入口。
+3. **查询是 per-image 的。** 对 Foundation 查 `NSArray` 得到 `notExported`——该类由
+   CoreFoundation 定义并导出。只能拿本镜像自己定义的类去查。
+
+- **主要出现在**：`Sources/ObjCMetadataSource/ObjCExportStatus.swift`、
+  `Sources/ObjCMetadataSource/ObjCExportIndex.swift`
+- **延伸阅读**：[实现说明](Internal/ObjCExportStatusResolution.md)、
+  [提案 0008](Evolutions/0008-objc-export-status.md)
+
 ### pseudo-member（伪成员）
 
 不是真实成员、但被投影成成员记录参与 diff 的容器属性：目前只有 `superclass` 一个。

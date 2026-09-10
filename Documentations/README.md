@@ -22,6 +22,7 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [0005](Evolutions/0005-adopt-frameworktoolbox-utilities.md) | 改用 FrameworkToolbox 的 Mutex 与字符串工具，删掉本地手搓的副本 | Implemented |
 | [0006](Evolutions/0006-objc-api-diff-and-evolution.md) | ObjC API Diff 与多版本 Evolution 追踪 | Implemented |
 | [0007](Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md) | 修正 dump 的 `--sections` 写法，并让空结果不再无声 | Implemented |
+| [0008](Evolutions/0008-objc-export-status.md) | ObjC 类与实例变量的导出状态查询 | Implemented |
 
 ## 使用指南
 
@@ -36,3 +37,4 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [ObjC 渲染层与索引层的实现说明](Internal/ObjCRenderingAndIndexingImplementation.md) | 0001 的配套，已按 0005 订正。三个新 target 的分层与依赖方向、Linux 为什么其实早就断了、锁为什么改用 `@Mutex`、事件通道合并，以及与提案不一致之处 |
 | [泛型化到 MachOFile 的实现说明](Internal/ObjCMetadataSourceGenericization.md) | 0002 的配套。`ResolvedSource` 这个 associatedtype 为什么是被逼出来的、IMP 地址抽象边界为何前移、渲染层为何选泛型而非 existential，以及落地时发现的两个上游缺陷 |
 | [ObjC API Diff — 设计与已知局限](Internal/ObjCAPIDiffDesignAndLimitations.md) | 0006 的配套。双键设计与键格局（即持久化格式）、与 SwiftDiffing 的五处有意语义差异（method 换签名报 modified、superclass 伪成员等）、六条已知局限（无访问控制之别、ivar 布局变化不可见等） |
+| [ObjC 导出状态的判定 — 判据、边界与实测](Internal/ObjCExportStatusResolution.md) | 0008 的配套。为什么只有类和 ivar 能判（协议符号一律 private extern，分类无符号）、三处反直觉边界（per-image 语义与 NSArray、零导出算「无信息」、不用前缀搜索的正确性理由），以及建索引占 `prepare()` 0.085% 的实测数据 |
