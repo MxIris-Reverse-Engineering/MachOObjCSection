@@ -4,5 +4,5 @@
 // Verified by .github/workflows/version-check.yml (main) and .github/workflows/release.yml (tag),
 // which publishes the universal binary to GitHub Releases.
 enum BundledVersion {
-    static let value = "0.8.105"
+    static let value = "0.8.106"
 }
