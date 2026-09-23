@@ -32,6 +32,7 @@
 | [0006](0006-objc-api-diff-and-evolution.md) | ObjC API Diff 与多版本 Evolution 追踪 | Implemented |
 | [0007](0007-dump-sections-spelling-and-empty-diagnostics.md) | 修正 dump 的 `--sections` 写法，并让空结果不再无声 | Implemented |
 | [0008](0008-objc-export-status.md) | ObjC 类与实例变量的导出状态查询 | Implemented |
+| [0009](0009-objc-section-release-automation.md) | 推版本 tag 即自动发布 objc-section | Implemented |
 
 0002 以 0001 为前置，两者共同构成「让 MachOObjCSection 具备与 MachOSwiftSection 对等的
 渲染 / 索引 / 命令行能力」这一条完整路线。

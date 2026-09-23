@@ -2,7 +2,8 @@
 
 MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步更新这份索引。
 
-面向公众的文档（`README.md`、`LICENSE`）不在此目录，仍在仓库根目录，且使用英文。
+面向公众的文档（`README.md`、`LICENSE`、每个版本一份的 `Changelogs/<版本>.md`）不在此目录，
+仍在仓库根目录，且使用英文。`Changelogs/<版本>.md` 同时就是该版本 GitHub Release 的正文。
 
 ## 目录
 
@@ -23,12 +24,13 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [0006](Evolutions/0006-objc-api-diff-and-evolution.md) | ObjC API Diff 与多版本 Evolution 追踪 | Implemented |
 | [0007](Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md) | 修正 dump 的 `--sections` 写法，并让空结果不再无声 | Implemented |
 | [0008](Evolutions/0008-objc-export-status.md) | ObjC 类与实例变量的导出状态查询 | Implemented |
+| [0009](Evolutions/0009-objc-section-release-automation.md) | 推版本 tag 即自动发布 objc-section | Implemented |
 
 ## 使用指南
 
 | 文档 | 说明 |
 |---|---|
-| [objc-section 使用指南](Guides/ObjCSectionCommandLine.md) | 0002、0006 与 0007 的配套。命令行用法（含 snapshot / diff / evolution），以及六条从签名和帮助文本里看不出来的契约：文件模式超类链截断、RW data 不在泛型接口上、分析 cache 需要 MachOKit 0.52.101+、纯 Swift 类的 ivar 记录对不上、baseline 的 formatVersion 契约、dump 的空结果只写 stderr 不改退出码 |
+| [objc-section 使用指南](Guides/ObjCSectionCommandLine.md) | 0002、0006 与 0007 的配套。安装（Releases 上的预编译二进制或源码构建）与命令行用法（含 snapshot / diff / evolution），以及六条从签名和帮助文本里看不出来的契约：文件模式超类链截断、RW data 不在泛型接口上、分析 cache 需要 MachOKit 0.52.101+、纯 Swift 类的 ivar 记录对不上、baseline 的 formatVersion 契约、dump 的空结果只写 stderr 不改退出码 |
 
 ## 实现说明
 

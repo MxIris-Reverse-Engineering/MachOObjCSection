@@ -1,7 +1,7 @@
 # objc-section 使用指南
 
-- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）
-- **最后更新**: 2026-09-06
+- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）
+- **最后更新**: 2026-09-23
 
 这份文档写给两类人：用 `objc-section` 命令行导出 ObjC 头的人，以及直接调用
 `ObjCInterfaceIndexer` / `ObjCInterfaceBuilder` 处理磁盘上二进制的人。
@@ -23,6 +23,13 @@
 `objc-section` 就是这个能力的命令行门面。
 
 ## 安装与构建
+
+0.8.106 起，每个版本的 [GitHub Release](https://github.com/MxIris-Reverse-Engineering/MachOObjCSection/releases)
+都附带 `objc-section-macos-universal.zip`（Apple Silicon 与 Intel 通用），解压即用。二进制只做了
+ad-hoc 签名、没有公证，用浏览器下载的副本如果被 macOS 拦下，执行
+`xattr -d com.apple.quarantine objc-section`。
+
+也可以从源码构建（Xcode 26.0 / Swift 6.2 起）：
 
 ```bash
 swift build -c release --product objc-section

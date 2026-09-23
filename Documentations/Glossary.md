@@ -13,6 +13,18 @@ MachOObjCSection 专有名词与约定用法。
 
 按英文名 / 标识符字母序排列。
 
+### fork numbering（fork 版本号）
+
+本仓库是 `p-x9/MachOObjCSection` 的 fork，自己的发布版本号写作
+`<上游 major>.<上游 minor>.1NN`（如 `0.8.106`）：前两段跟随所基于的上游版本，第三段从 100 起
+逐次递增，与上游自己的补丁号（`0.8.2` 之类）永不相撞。这个号同时是 SwiftPM 的包版本（下游
+`from:` / `exact:` 依赖的就是它）和 `objc-section --version` 的输出。发布流水线**只认这个形状**：
+`release.yml` 的 tag 过滤只匹配它，所以同步过来的上游 tag 不会触发发布；`version-check.yml`
+拒绝不符合它的 `BundledVersion.value`，免得打了 tag 却没有任何报错地不发布。
+
+- **主要出现在**：`Sources/objc-section/Version.swift`、`.github/workflows/release.yml`、`.github/workflows/version-check.yml`
+- **延伸阅读**：[提案 0009](Evolutions/0009-objc-section-release-automation.md)
+
 ### key namespace（键命名空间）
 
 `ObjCAPIKey` 的前缀约定：`class:` / `protocol:` / `category:`（容器）、

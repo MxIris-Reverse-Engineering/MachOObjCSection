@@ -587,6 +587,10 @@ Two differences between the modes are worth knowing before you trust the output:
 `objc-section` exposes the same layers as a command-line tool, so a binary can be dumped
 without loading it into a process — including binaries for another architecture or platform.
 
+Download the universal (Apple Silicon + Intel) macOS binary from
+[GitHub Releases](https://github.com/MxIris-Reverse-Engineering/MachOObjCSection/releases),
+or build it from source (Xcode 26.0 / Swift 6.2 or later):
+
 ```bash
 swift build -c release --product objc-section
 ```
