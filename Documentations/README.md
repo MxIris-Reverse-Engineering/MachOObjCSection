@@ -25,6 +25,7 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [0007](Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md) | 修正 dump 的 `--sections` 写法，并让空结果不再无声 | Implemented |
 | [0008](Evolutions/0008-objc-export-status.md) | ObjC 类与实例变量的导出状态查询 | Implemented |
 | [0009](Evolutions/0009-objc-section-release-automation.md) | 推版本 tag 即自动发布 objc-section | Implemented |
+| [0010](Evolutions/0010-remove-objc-section-cli.md) | 移除 objc-section 命令行（并入 swift-section） | Accepted |
 
 ## 使用指南
 
