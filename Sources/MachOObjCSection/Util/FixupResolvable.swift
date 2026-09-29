@@ -154,14 +154,7 @@ extension _FixupResolvable {
         in machO: MachOFile
     ) -> String? {
         guard !machO.isLoadedFromDyldCache else { return nil }
-        guard let fixup = machO.dyldChainedFixups else { return nil }
-
-        let offset: UInt64 = numericCast(fileOffset)
-
-        if let resolved = machO.resolveBind(at: offset) {
-            return fixup.symbolName(for: resolved.0.info.nameOffset)
-        }
-        return nil
+        return machO.chainedFixupBindSymbolName(at: numericCast(fileOffset))
     }
 
     /// Determines whether the specified file offset within the MachO file represents a bind operation.

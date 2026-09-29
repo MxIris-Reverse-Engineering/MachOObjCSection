@@ -138,7 +138,7 @@ let package = Package(
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/MachOKitExtensions",
-                from: "0.1.0"
+                from: "1.0.0"
             )
         ),
         .package(
@@ -176,6 +176,9 @@ let package = Package(
             dependencies: [
                 "MachOObjCSectionC",
                 "MachOKit",
+                // Chained-fixup and dyld cache lookups go through its cached
+                // views; MachOKit's own methods walk the fixup chains on every call.
+                .product(name: "MachOKitExtensions", package: "MachOKitExtensions"),
                 .product(name: "FileIO", package: "swift-fileio"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
             ]

@@ -1,7 +1,7 @@
 # 泛型化到 MachOFile 的实现说明
 
 - **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)
-- **最后更新**: 2026-08-12
+- **最后更新**: 2026-09-29
 
 这份文档记录 0002 落地过程中那些**从代码本身看不出来**的决策，以及与提案设想不一致的地方。
 提案是决策快照，保持原貌；偏差记在这里。
@@ -27,6 +27,12 @@ objc-section              命令行
 新 target 夹在核心解析层与渲染层之间。它可以依赖 `MachOKitExtensions`（渲染层本来就依赖），
 因此地址换算不必重写 —— 而核心 `MachOObjCSection` target 依然不能依赖它，那会造成包级循环
 （MachOSwiftSection 依赖 MachOObjCSection 的高层 product）。
+
+> **2026-09-29 订正**：上面这条理由在 `MachOKitExtensions` 独立成包后已不成立 —— 它只依赖
+> MachOKit 与 AssociatedObject，核心 target 依赖它不会形成循环。核心 target 现在就依赖它：
+> chained fixups 查询与 `DyldCacheLoaded` 的缓存从 MachOKit fork 挪进了它的 cached 视图（见
+> MachOKitExtensions 提案 0001）。代价是它的公开扩展会对整个核心模块可见；曾经撞名的
+> `UnsafeRawPointer` / `UnsafePointer` 抛错版 `init(bitPattern:)` 已移出它，改由 MachOSwiftSection 自己声明。
 
 ## 为什么 shim 协议不放进核心 target
 
