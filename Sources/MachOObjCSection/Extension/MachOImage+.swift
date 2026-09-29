@@ -8,6 +8,7 @@
 
 import Foundation
 import MachOKit
+internal import MachOKitExtensions
 
 extension MachOImage {
     func findObjCSection64(for section: ObjCMachOSection) -> Section64? {
@@ -62,7 +63,7 @@ extension MachOImage {
     /// This method first tries the fast dyld-cache path, then falls back to
     /// `dyld_image_header_containing_address()` which searches ALL loaded images.
     func resolveImage(containing ptr: UnsafeRawPointer) -> MachOImage? {
-        if let cache = DyldCacheLoaded.current,
+        if let cache = DyldCacheLoaded.cachedCurrent,
            let machO = cache.machO(containing: ptr) {
             return machO
         }
@@ -78,7 +79,7 @@ extension MachOImage {
     var objcImageIndex: Int? {
 #if canImport(MachO)
         guard header.isInDyldCache else { return nil }
-        guard let cache = DyldCacheLoaded.current else { return nil }
+        guard let cache = DyldCacheLoaded.cachedCurrent else { return nil }
         if let headerOptimizationRO = cache.headerOptimizationRO64,
            let info = headerOptimizationRO.headerInfo(in: cache, for: self) {
             return info.index

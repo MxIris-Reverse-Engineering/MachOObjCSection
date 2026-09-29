@@ -12,11 +12,8 @@ import MachOKit
 /// (MachOKitUI) gates ObjC-section builders on this single constraint.
 ///
 /// The supertype is `MachORepresentable` rather than the stronger
-/// `MachORepresentableWithCache` (which lives in MachOSwiftSection's
-/// MachOKitExtensions module). Pulling MachOKitExtensions in here would create
-/// a package-level cycle (MachOSwiftSection already depends on
-/// MachOObjCSection's higher-level products), so we trade the `cache` /
-/// `identifier` requirements for cycle-freedom. UI consumers that need
+/// `MachORepresentableWithCache` from MachOKitExtensions, so this protocol does
+/// not carry the `cache` / `identifier` requirements. UI consumers that need
 /// those bits can grab them from `MachOFile` / `MachOImage` directly.
 public protocol MachOObjCSectionRepresentable: MachORepresentable {
     associatedtype ObjCSection: ObjCSectionRepresentable

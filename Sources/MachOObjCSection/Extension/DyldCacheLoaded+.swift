@@ -8,6 +8,7 @@
 
 import Foundation
 import MachOKit
+internal import MachOKitExtensions
 
 #if !canImport(Darwin)
 extension DyldCacheLoaded {
@@ -147,14 +148,14 @@ extension DyldCacheLoaded {
     private func computeMachO(at index: Int) -> MachOImage? {
         if let ro = headerOptimizationRO64,
            ro.contains(index: index) {
-            guard let header = ro.headerInfo(at: index, in: self) else {
+            guard let header = cached.headerInfo(at: index, in: ro) else {
                 return nil
             }
             return header.machO(in: self)
         }
         if let ro = headerOptimizationRO32,
            ro.contains(index: index) {
-            guard let header = ro.headerInfo(at: index, in: self) else {
+            guard let header = cached.headerInfo(at: index, in: ro) else {
                 return nil
             }
             return header.machO(in: self)

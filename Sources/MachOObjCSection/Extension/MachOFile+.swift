@@ -8,6 +8,7 @@
 
 import Foundation
 @_spi(Support) import MachOKit
+internal import MachOKitExtensions
 #if compiler(>=6.0) || (compiler(>=5.10) && hasFeature(AccessLevelOnImport))
 internal import FileIO
 #else
@@ -128,7 +129,17 @@ extension MachOFile {
     func isBind(
         _ offset: Int
     ) -> Bool {
-        resolveBind(at: numericCast(offset)) != nil
+        cached.resolveBind(at: numericCast(offset)) != nil
+    }
+
+    /// The name of the symbol that the chained fixup at `offset` binds to.
+    func chainedFixupBindSymbolName(at offset: UInt64) -> String? {
+        let cached = self.cached
+        guard let dyldChainedFixups = cached.dyldChainedFixups,
+              let (chainedImport, _) = cached.resolveBind(at: offset) else {
+            return nil
+        }
+        return dyldChainedFixups.symbolName(for: chainedImport.info.nameOffset)
     }
 
     func isBind(
@@ -168,7 +179,7 @@ extension MachOFile {
             )
         }
 
-        if let resolved = resolveOptionalRebase(
+        if let resolved = cached.resolveOptionalRebase(
             at: offset
         ) {
             guard let resolvedFileOffset = fileOffset(of: resolved) else {
