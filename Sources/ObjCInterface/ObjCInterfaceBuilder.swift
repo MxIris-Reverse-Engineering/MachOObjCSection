@@ -90,8 +90,11 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
     /// Freezing it, separating the regions and projecting them with
     /// `ObjCGenerationOptions.isVisibilityOptionEnabled(_:)` gives, byte for
     /// byte, what `classInterface(named:options:cTypeReplacements:ivarOffsetCommentBuilder:)`
-    /// renders for those options. `nil` when the indexed image has no such
-    /// class.
+    /// renders for those options. `cTypeReplacements` and
+    /// `ivarOffsetCommentBuilder` take effect as the text is rendered, so only
+    /// the switches can differ between projections of one marked rendering;
+    /// another replacement or offset comment needs a new one. `nil` when the
+    /// indexed image has no such class.
     public func markedClassInterface(
         named name: String,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],

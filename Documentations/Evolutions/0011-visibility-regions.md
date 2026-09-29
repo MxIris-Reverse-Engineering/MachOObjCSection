@@ -1,10 +1,10 @@
-# Draft - 标记模式：一次渲染全量声明，并标出每段内容受哪个开关控制
+# 0011 - 标记模式：一次渲染全量声明，并标出每段内容受哪个开关控制
 
-- **状态**: In Progress
+- **状态**: Implemented
 - **创建日期**: 2026-09-29
-- **最后更新**: 2026-09-29
+- **最后更新**: 2026-09-30
 - **关联**: swift-semantic-string 的设计记录 `docs/VisibilityRegions.md`（提供 `VisibilityRegion`、区域表与投影）；
-  MachOSwiftSection 的同名提案 `draft-visibility-regions`；RuntimeViewer 的 `draft-find-navigator`（使用方）
+  MachOSwiftSection 的提案 0056 `visibility-regions`；RuntimeViewer 的 `draft-find-navigator`（使用方）
 - **实现分支**: `feature/visibility-regions`
 
 ## 摘要
@@ -45,3 +45,5 @@ RuntimeViewer 的 Find 要「语料只打印一次，搜索时按用户当前的
 | 2026-09-29 | strip 规则不复制到 RuntimeViewer | 另一条路是 RuntimeViewer 照抄 `needsStrip*` 的规则和 ObjC 的版式、事后给每行认归属；两边的规则与版式一改就会悄悄对不上。标记模式让这份规则只存在于 builder 里。 |
 | 2026-09-29 | 容器不再单独包「任一成员可见」的区域 | swift-semantic-string 的容器改为把成员的条件带到自己的换行、分隔符与前后缀上，渲染器只需包成员与注释。对照测试在 Foundation 全部声明、24 组组合下一次通过。 |
 | 2026-09-29 | Accepted → In Progress | 实现与测试完成于 `feature/visibility-regions`，未提交。`MachOObjCSectionTests`（XCTest）依赖本机不存在的 `/Users/JH/Downloads/iOS18.5-SwiftUI`，setUp 即崩，与本改动无关；其余测试全部通过。 |
+| 2026-09-30 | In Progress → Implemented，编号 0011，合入 `next` | rebase 到 `next`（0.8.107：fixup 改走 MachOKitExtensions 的缓存视图）无冲突。本地依赖模式（MachOKit `next` 0.53.101、MachOKitExtensions、已合入 `VisibilityRegion` 的 swift-semantic-string `next`）下重跑：除依赖本机缺失文件的 `MachOObjCSectionTests` 外全部通过，含 `ObjCMarkedInterfaceTests`（66.6 秒）。远程依赖下限未抬：`from: "0.3.0"` 的 swift-semantic-string 没有 `VisibilityRegion`，带它的版本发布后同批抬下限；在此之前 `next` 只能以 `USING_LOCAL_DEPENDENCIES=1` 构建。 |
+| 2026-09-30 | 不另写使用指南与实现说明；术语表登记「marked rendering（标记渲染）」 | 用法只有三步（标记入口渲染 → 冻结并`separatingVisibilityRegions()` → 按 `isVisibilityOptionEnabled(_:)` 投影），入口的文档注释与本提案「方案」已写明；唯一不在签名里的约定——只有十个开关可投影，C 类型替换与 ivar 偏移注释模板在渲染时定死——也写在入口注释里。「可见性区域」「投影」是 swift-semantic-string 的术语，由其设计记录定义，本表只链过去。 |
