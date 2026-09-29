@@ -74,6 +74,45 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
         ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
     ) -> SemanticString? {
+        renderClassInterface(
+            named: name,
+            options: options,
+            cTypeReplacements: cTypeReplacements,
+            ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            marksOptionalContent: false
+        )
+    }
+
+    /// The `@interface` for the class named `name` with everything any
+    /// `ObjCGenerationOptions` could show — no member stripped, every comment
+    /// added — and what the switches decide marked with `VisibilityRegion`s.
+    ///
+    /// Freezing it, separating the regions and projecting them with
+    /// `ObjCGenerationOptions.isVisibilityOptionEnabled(_:)` gives, byte for
+    /// byte, what `classInterface(named:options:cTypeReplacements:ivarOffsetCommentBuilder:)`
+    /// renders for those options. `nil` when the indexed image has no such
+    /// class.
+    public func markedClassInterface(
+        named name: String,
+        cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
+    ) -> SemanticString? {
+        renderClassInterface(
+            named: name,
+            options: .default,
+            cTypeReplacements: cTypeReplacements,
+            ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            marksOptionalContent: true
+        )
+    }
+
+    private func renderClassInterface(
+        named name: String,
+        options: ObjCGenerationOptions,
+        cTypeReplacements: [ObjCPrimitiveTypePattern: String],
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?,
+        marksOptionalContent: Bool
+    ) -> SemanticString? {
         guard let classGroup = indexer.classGroup(forName: name),
               let currentClassInfo = classGroup.info.first
         else { return nil }
@@ -84,83 +123,33 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder
         )
 
-        let superclassInfos = classGroup.info.dropFirst()
-        var needsStripClassProperties: Set<String> = []
-        var needsStripProperties: Set<String> = []
-        var needsStripClassMethods: Set<String> = []
-        var needsStripMethods: Set<String> = []
-        var needsStripIvars: Set<String> = []
+        let strippedMembersByOption = strippedMembers(ofClass: currentClassInfo, superclassInfos: classGroup.info.dropFirst())
 
-        if options.stripCtorMethod {
-            needsStripMethods.insert(".cxx_construct")
+        let finalClassInfo: ObjCClassInfo
+        if marksOptionalContent {
+            context.optionalContentMarking = Self.marking(for: strippedMembersByOption)
+            finalClassInfo = currentClassInfo
+        } else {
+            let stripped = Self.union(of: strippedMembersByOption, enabledIn: options)
+            finalClassInfo = ObjCClassInfo(
+                name: currentClassInfo.name,
+                version: currentClassInfo.version,
+                imageName: currentClassInfo.imageName,
+                instanceSize: currentClassInfo.instanceSize,
+                superClassName: currentClassInfo.superClassName,
+                protocols: currentClassInfo.protocols,
+                ivars: currentClassInfo.ivars.removingAll { stripped.ivars.contains($0.name) },
+                classProperties: currentClassInfo.classProperties.removingAll { stripped.classProperties.contains($0.name) },
+                properties: currentClassInfo.properties.removingAll { stripped.properties.contains($0.name) },
+                classMethods: currentClassInfo.classMethods.removingAll { stripped.classMethods.contains($0.name) },
+                methods: currentClassInfo.methods.removingAll { stripped.methods.contains($0.name) }
+            )
         }
-
-        if options.stripDtorMethod {
-            needsStripMethods.insert(".cxx_destruct")
-        }
-
-        if options.stripOverrides {
-            for superclassInfo in superclassInfos {
-                needsStripClassProperties.insert(contentsOf: superclassInfo.classProperties.map(\.name))
-                needsStripProperties.insert(contentsOf: superclassInfo.properties.map(\.name))
-                needsStripClassMethods.insert(contentsOf: superclassInfo.classMethods.map(\.name))
-                needsStripMethods.insert(contentsOf: superclassInfo.methods.map(\.name))
-            }
-        }
-
-        if options.stripProtocolConformance {
-            for protocolInfo in currentClassInfo.protocols {
-                needsStripClassProperties.insert(contentsOf: protocolInfo.classProperties.map(\.name))
-                needsStripProperties.insert(contentsOf: protocolInfo.properties.map(\.name))
-                needsStripClassMethods.insert(contentsOf: protocolInfo.classMethods.map(\.name))
-                needsStripMethods.insert(contentsOf: protocolInfo.methods.map(\.name))
-            }
-        }
-
-        if options.stripSynthesizedIvars || options.stripSynthesizedMethods {
-            var needsStripIvarNames: Set<String> = []
-
-            for property in currentClassInfo.properties + currentClassInfo.classProperties {
-                if options.stripSynthesizedMethods {
-                    collectAccessorSelectors(
-                        of: property,
-                        intoClassMethods: &needsStripClassMethods,
-                        intoMethods: &needsStripMethods
-                    )
-                }
-
-                if options.stripSynthesizedIvars, !property.isClassProperty {
-                    if let ivar = property.ivar {
-                        needsStripIvarNames.insert(ivar)
-                    }
-                }
-            }
-
-            if options.stripSynthesizedIvars {
-                for ivar in currentClassInfo.ivars where needsStripIvarNames.contains(ivar.name) {
-                    needsStripIvars.insert(ivar.name)
-                }
-            }
-        }
-
-        let finalClassInfo = ObjCClassInfo(
-            name: currentClassInfo.name,
-            version: currentClassInfo.version,
-            imageName: currentClassInfo.imageName,
-            instanceSize: currentClassInfo.instanceSize,
-            superClassName: currentClassInfo.superClassName,
-            protocols: currentClassInfo.protocols,
-            ivars: currentClassInfo.ivars.removingAll { needsStripIvars.contains($0.name) },
-            classProperties: currentClassInfo.classProperties.removingAll { needsStripClassProperties.contains($0.name) },
-            properties: currentClassInfo.properties.removingAll { needsStripProperties.contains($0.name) },
-            classMethods: currentClassInfo.classMethods.removingAll { needsStripClassMethods.contains($0.name) },
-            methods: currentClassInfo.methods.removingAll { needsStripMethods.contains($0.name) }
-        )
 
         // IMP addresses are collected from the *unfiltered* metadata so that a
         // stripped accessor still contributes its address to the property it
         // belongs to.
-        if options.addPropertyAccessorAddressComments {
+        if marksOptionalContent || options.addPropertyAccessorAddressComments {
             for method in currentClassInfo.methods where method.imp != 0 {
                 context.methodIMPs[method.name] = method.imp
             }
@@ -170,6 +159,59 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         }
 
         return finalClassInfo.semanticString(using: context)
+    }
+
+    /// The members each strip switch removes from a class, switch by switch,
+    /// so that a plain rendering can take the union of the enabled ones and
+    /// a marked rendering can tell every member which switches remove it.
+    private func strippedMembers(
+        ofClass classInfo: ObjCClassInfo,
+        superclassInfos: some Sequence<ObjCClassInfo>
+    ) -> [ObjCGenerationOptions.VisibilityOption: StrippedMembers] {
+        var strippedMembersByOption: [ObjCGenerationOptions.VisibilityOption: StrippedMembers] = [:]
+
+        strippedMembersByOption[.stripCtorMethod] = StrippedMembers(methods: [".cxx_construct"])
+        strippedMembersByOption[.stripDtorMethod] = StrippedMembers(methods: [".cxx_destruct"])
+
+        var overrides = StrippedMembers()
+        for superclassInfo in superclassInfos {
+            overrides.classProperties.formUnion(superclassInfo.classProperties.map(\.name))
+            overrides.properties.formUnion(superclassInfo.properties.map(\.name))
+            overrides.classMethods.formUnion(superclassInfo.classMethods.map(\.name))
+            overrides.methods.formUnion(superclassInfo.methods.map(\.name))
+        }
+        strippedMembersByOption[.stripOverrides] = overrides
+
+        var conformances = StrippedMembers()
+        for protocolInfo in classInfo.protocols {
+            conformances.classProperties.formUnion(protocolInfo.classProperties.map(\.name))
+            conformances.properties.formUnion(protocolInfo.properties.map(\.name))
+            conformances.classMethods.formUnion(protocolInfo.classMethods.map(\.name))
+            conformances.methods.formUnion(protocolInfo.methods.map(\.name))
+        }
+        strippedMembersByOption[.stripProtocolConformance] = conformances
+
+        var synthesizedMethods = StrippedMembers()
+        var synthesizedIvarNames: Set<String> = []
+        for property in classInfo.properties + classInfo.classProperties {
+            collectAccessorSelectors(
+                of: property,
+                intoClassMethods: &synthesizedMethods.classMethods,
+                intoMethods: &synthesizedMethods.methods
+            )
+            if !property.isClassProperty, let ivar = property.ivar {
+                synthesizedIvarNames.insert(ivar)
+            }
+        }
+        strippedMembersByOption[.stripSynthesizedMethods] = synthesizedMethods
+
+        var synthesizedIvars = StrippedMembers()
+        for ivar in classInfo.ivars where synthesizedIvarNames.contains(ivar.name) {
+            synthesizedIvars.ivars.insert(ivar.name)
+        }
+        strippedMembersByOption[.stripSynthesizedIvars] = synthesizedIvars
+
+        return strippedMembersByOption
     }
 
     // MARK: - Protocol
@@ -182,6 +224,39 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
         ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
     ) -> SemanticString? {
+        renderProtocolInterface(
+            named: name,
+            options: options,
+            cTypeReplacements: cTypeReplacements,
+            ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            marksOptionalContent: false
+        )
+    }
+
+    /// The `@protocol` for the protocol named `name`, marked the way
+    /// `markedClassInterface(named:cTypeReplacements:ivarOffsetCommentBuilder:)`
+    /// marks a class.
+    public func markedProtocolInterface(
+        named name: String,
+        cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
+    ) -> SemanticString? {
+        renderProtocolInterface(
+            named: name,
+            options: .default,
+            cTypeReplacements: cTypeReplacements,
+            ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            marksOptionalContent: true
+        )
+    }
+
+    private func renderProtocolInterface(
+        named name: String,
+        options: ObjCGenerationOptions,
+        cTypeReplacements: [ObjCPrimitiveTypePattern: String],
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?,
+        marksOptionalContent: Bool
+    ) -> SemanticString? {
         guard let currentProtocolInfo = indexer.protocolGroup(forName: name)?.info else { return nil }
 
         let context = makeContext(
@@ -190,61 +265,67 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder
         )
 
-        var needsStripClassProperties: Set<String> = []
-        var needsStripClassMethods: Set<String> = []
-        var needsStripProperties: Set<String> = []
-        var needsStripMethods: Set<String> = []
+        let strippedMembersByOption = strippedMembers(ofProtocol: currentProtocolInfo)
 
-        if options.stripCtorMethod {
-            needsStripMethods.insert(".cxx_construct")
+        if marksOptionalContent {
+            context.optionalContentMarking = Self.marking(for: strippedMembersByOption)
+            return currentProtocolInfo.semanticString(using: context)
         }
 
-        if options.stripDtorMethod {
-            needsStripMethods.insert(".cxx_destruct")
-        }
-
-        if options.stripProtocolConformance {
-            for protocolInfo in currentProtocolInfo.protocols {
-                needsStripClassProperties.insert(contentsOf: protocolInfo.classProperties.map(\.name))
-                needsStripProperties.insert(contentsOf: protocolInfo.properties.map(\.name))
-                needsStripClassMethods.insert(contentsOf: protocolInfo.classMethods.map(\.name))
-                needsStripMethods.insert(contentsOf: protocolInfo.methods.map(\.name))
-
-                needsStripClassProperties.insert(contentsOf: protocolInfo.optionalClassProperties.map(\.name))
-                needsStripProperties.insert(contentsOf: protocolInfo.optionalProperties.map(\.name))
-                needsStripClassMethods.insert(contentsOf: protocolInfo.optionalClassMethods.map(\.name))
-                needsStripMethods.insert(contentsOf: protocolInfo.optionalMethods.map(\.name))
-            }
-        }
-
-        if options.stripSynthesizedMethods {
-            let allProperties = currentProtocolInfo.properties
-                + currentProtocolInfo.classProperties
-                + currentProtocolInfo.optionalProperties
-                + currentProtocolInfo.optionalClassProperties
-            for property in allProperties {
-                collectAccessorSelectors(
-                    of: property,
-                    intoClassMethods: &needsStripClassMethods,
-                    intoMethods: &needsStripMethods
-                )
-            }
-        }
-
+        let stripped = Self.union(of: strippedMembersByOption, enabledIn: options)
         let finalProtocolInfo = ObjCProtocolInfo(
             name: currentProtocolInfo.name,
             protocols: currentProtocolInfo.protocols,
-            classProperties: currentProtocolInfo.classProperties.removingAll { needsStripClassProperties.contains($0.name) },
-            properties: currentProtocolInfo.properties.removingAll { needsStripProperties.contains($0.name) },
-            classMethods: currentProtocolInfo.classMethods.removingAll { needsStripClassMethods.contains($0.name) },
-            methods: currentProtocolInfo.methods.removingAll { needsStripMethods.contains($0.name) },
-            optionalClassProperties: currentProtocolInfo.optionalClassProperties.removingAll { needsStripClassProperties.contains($0.name) },
-            optionalProperties: currentProtocolInfo.optionalProperties.removingAll { needsStripProperties.contains($0.name) },
-            optionalClassMethods: currentProtocolInfo.optionalClassMethods.removingAll { needsStripClassMethods.contains($0.name) },
-            optionalMethods: currentProtocolInfo.optionalMethods.removingAll { needsStripMethods.contains($0.name) }
+            classProperties: currentProtocolInfo.classProperties.removingAll { stripped.classProperties.contains($0.name) },
+            properties: currentProtocolInfo.properties.removingAll { stripped.properties.contains($0.name) },
+            classMethods: currentProtocolInfo.classMethods.removingAll { stripped.classMethods.contains($0.name) },
+            methods: currentProtocolInfo.methods.removingAll { stripped.methods.contains($0.name) },
+            optionalClassProperties: currentProtocolInfo.optionalClassProperties.removingAll { stripped.classProperties.contains($0.name) },
+            optionalProperties: currentProtocolInfo.optionalProperties.removingAll { stripped.properties.contains($0.name) },
+            optionalClassMethods: currentProtocolInfo.optionalClassMethods.removingAll { stripped.classMethods.contains($0.name) },
+            optionalMethods: currentProtocolInfo.optionalMethods.removingAll { stripped.methods.contains($0.name) }
         )
 
         return finalProtocolInfo.semanticString(using: context)
+    }
+
+    /// The members each strip switch removes from a protocol. Only four
+    /// switches apply: a protocol has no ivars and no superclass.
+    private func strippedMembers(ofProtocol protocolInfo: ObjCProtocolInfo) -> [ObjCGenerationOptions.VisibilityOption: StrippedMembers] {
+        var strippedMembersByOption: [ObjCGenerationOptions.VisibilityOption: StrippedMembers] = [:]
+
+        strippedMembersByOption[.stripCtorMethod] = StrippedMembers(methods: [".cxx_construct"])
+        strippedMembersByOption[.stripDtorMethod] = StrippedMembers(methods: [".cxx_destruct"])
+
+        var conformances = StrippedMembers()
+        for inheritedProtocolInfo in protocolInfo.protocols {
+            conformances.classProperties.formUnion(inheritedProtocolInfo.classProperties.map(\.name))
+            conformances.properties.formUnion(inheritedProtocolInfo.properties.map(\.name))
+            conformances.classMethods.formUnion(inheritedProtocolInfo.classMethods.map(\.name))
+            conformances.methods.formUnion(inheritedProtocolInfo.methods.map(\.name))
+
+            conformances.classProperties.formUnion(inheritedProtocolInfo.optionalClassProperties.map(\.name))
+            conformances.properties.formUnion(inheritedProtocolInfo.optionalProperties.map(\.name))
+            conformances.classMethods.formUnion(inheritedProtocolInfo.optionalClassMethods.map(\.name))
+            conformances.methods.formUnion(inheritedProtocolInfo.optionalMethods.map(\.name))
+        }
+        strippedMembersByOption[.stripProtocolConformance] = conformances
+
+        var synthesizedMethods = StrippedMembers()
+        let allProperties = protocolInfo.properties
+            + protocolInfo.classProperties
+            + protocolInfo.optionalProperties
+            + protocolInfo.optionalClassProperties
+        for property in allProperties {
+            collectAccessorSelectors(
+                of: property,
+                intoClassMethods: &synthesizedMethods.classMethods,
+                intoMethods: &synthesizedMethods.methods
+            )
+        }
+        strippedMembersByOption[.stripSynthesizedMethods] = synthesizedMethods
+
+        return strippedMembersByOption
     }
 
     // MARK: - Category
@@ -261,6 +342,39 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
         ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
     ) -> SemanticString? {
+        renderCategoryInterface(
+            uniqueName: uniqueName,
+            options: options,
+            cTypeReplacements: cTypeReplacements,
+            ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            marksOptionalContent: false
+        )
+    }
+
+    /// The category identified by `uniqueName`, marked the way
+    /// `markedClassInterface(named:cTypeReplacements:ivarOffsetCommentBuilder:)`
+    /// marks a class — for a category, only its comments.
+    public func markedCategoryInterface(
+        uniqueName: String,
+        cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
+    ) -> SemanticString? {
+        renderCategoryInterface(
+            uniqueName: uniqueName,
+            options: .default,
+            cTypeReplacements: cTypeReplacements,
+            ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            marksOptionalContent: true
+        )
+    }
+
+    private func renderCategoryInterface(
+        uniqueName: String,
+        options: ObjCGenerationOptions,
+        cTypeReplacements: [ObjCPrimitiveTypePattern: String],
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?,
+        marksOptionalContent: Bool
+    ) -> SemanticString? {
         guard let categoryInfo = indexer.categoryGroup(forName: uniqueName)?.info else { return nil }
 
         let context = makeContext(
@@ -268,8 +382,11 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
             cTypeReplacements: cTypeReplacements,
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder
         )
+        if marksOptionalContent {
+            context.optionalContentMarking = ObjCOptionalContentMarking()
+        }
 
-        if options.addPropertyAccessorAddressComments {
+        if marksOptionalContent || options.addPropertyAccessorAddressComments {
             for method in categoryInfo.methods where method.imp != 0 {
                 context.methodIMPs[method.name] = method.imp
             }
@@ -279,6 +396,52 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         }
 
         return categoryInfo.semanticString(using: context)
+    }
+
+    // MARK: - Stripped Members
+
+    /// The members of one declaration a strip switch removes, list by list —
+    /// by name, as the metadata lists are filtered.
+    private struct StrippedMembers {
+        var ivars: Set<String> = []
+        var classProperties: Set<String> = []
+        var properties: Set<String> = []
+        var classMethods: Set<String> = []
+        var methods: Set<String> = []
+    }
+
+    /// What the enabled switches strip together.
+    private static func union(
+        of strippedMembersByOption: [ObjCGenerationOptions.VisibilityOption: StrippedMembers],
+        enabledIn options: ObjCGenerationOptions
+    ) -> StrippedMembers {
+        var union = StrippedMembers()
+        for (option, strippedMembers) in strippedMembersByOption where options.isEnabled(option) {
+            union.ivars.formUnion(strippedMembers.ivars)
+            union.classProperties.formUnion(strippedMembers.classProperties)
+            union.properties.formUnion(strippedMembers.properties)
+            union.classMethods.formUnion(strippedMembers.classMethods)
+            union.methods.formUnion(strippedMembers.methods)
+        }
+        return union
+    }
+
+    /// Every member some switch strips, with the switches that do.
+    private static func marking(for strippedMembersByOption: [ObjCGenerationOptions.VisibilityOption: StrippedMembers]) -> ObjCOptionalContentMarking {
+        var marking = ObjCOptionalContentMarking()
+        func record(_ names: Set<String>, as kind: ObjCOptionalContentMarking.MemberKind, strippedBy option: ObjCGenerationOptions.VisibilityOption) {
+            for name in names {
+                marking.strippingOptionsByMember[ObjCOptionalContentMarking.Member(kind: kind, name: name), default: []].insert(option)
+            }
+        }
+        for (option, strippedMembers) in strippedMembersByOption {
+            record(strippedMembers.ivars, as: .ivar, strippedBy: option)
+            record(strippedMembers.classProperties, as: .classProperty, strippedBy: option)
+            record(strippedMembers.properties, as: .property, strippedBy: option)
+            record(strippedMembers.classMethods, as: .classMethod, strippedBy: option)
+            record(strippedMembers.methods, as: .method, strippedBy: option)
+        }
+        return marking
     }
 
     // MARK: - C Struct / Union

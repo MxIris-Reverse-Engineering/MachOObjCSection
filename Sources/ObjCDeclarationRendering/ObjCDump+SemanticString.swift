@@ -46,6 +46,11 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
     /// by name. The `isStruct` flag distinguishes structs from unions.
     public var isExpandHandler: (_ name: String?, _ isStruct: Bool) -> Bool
 
+    /// Set for a marked rendering: every member and every comment is
+    /// rendered, and what the switches in `options` would decide is marked
+    /// with `VisibilityRegion`s instead. `options` is then not consulted.
+    public var optionalContentMarking: ObjCOptionalContentMarking?
+
     public init(
         machO: MachO,
         options: ObjCGenerationOptions = .default,
@@ -54,7 +59,8 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
         currentArray: SemanticString? = nil,
         methodIMPs: [String: UInt64] = [:],
         classMethodIMPs: [String: UInt64] = [:],
-        isExpandHandler: @escaping (_ name: String?, _ isStruct: Bool) -> Bool = { _, _ in true }
+        isExpandHandler: @escaping (_ name: String?, _ isStruct: Bool) -> Bool = { _, _ in true },
+        optionalContentMarking: ObjCOptionalContentMarking? = nil
     ) {
         self.machO = machO
         self.options = options
@@ -64,6 +70,7 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
         self.methodIMPs = methodIMPs
         self.classMethodIMPs = classMethodIMPs
         self.isExpandHandler = isExpandHandler
+        self.optionalContentMarking = optionalContentMarking
     }
 }
 
@@ -88,7 +95,7 @@ extension ObjCClassInfo {
         Joined {
             MemberList(level: 1) {
                 for ivar in ivars {
-                    ivar.semanticString(using: context)
+                    context.member(.ivar, named: ivar.name) { ivar.semanticString(using: context) }
                 }
             }
         } prefix: {
@@ -103,22 +110,22 @@ extension ObjCClassInfo {
         Joined(suffix: BreakLine()) {
             BlockList {
                 for property in classProperties {
-                    property.semanticString(using: context)
+                    context.member(.classProperty, named: property.name) { property.semanticString(using: context) }
                 }
             }
             BlockList {
                 for property in properties {
-                    property.semanticString(using: context)
+                    context.member(.property, named: property.name) { property.semanticString(using: context) }
                 }
             }
             BlockList {
                 for method in classMethods {
-                    method.semanticString(using: context)
+                    context.member(.classMethod, named: method.name) { method.semanticString(using: context) }
                 }
             }
             BlockList {
                 for method in methods {
-                    method.semanticString(using: context)
+                    context.member(.method, named: method.name) { method.semanticString(using: context) }
                 }
             }
         }
@@ -146,22 +153,22 @@ extension ObjCProtocolInfo {
             Joined {
                 BlockList {
                     for property in classProperties {
-                        property.semanticString(using: context)
+                        context.member(.classProperty, named: property.name) { property.semanticString(using: context) }
                     }
                 }
                 BlockList {
                     for property in properties {
-                        property.semanticString(using: context)
+                        context.member(.property, named: property.name) { property.semanticString(using: context) }
                     }
                 }
                 BlockList {
                     for method in classMethods {
-                        method.semanticString(using: context)
+                        context.member(.classMethod, named: method.name) { method.semanticString(using: context) }
                     }
                 }
                 BlockList {
                     for method in methods {
-                        method.semanticString(using: context)
+                        context.member(.method, named: method.name) { method.semanticString(using: context) }
                     }
                 }
             } prefix: {
@@ -172,22 +179,22 @@ extension ObjCProtocolInfo {
             Joined {
                 BlockList {
                     for property in optionalClassProperties {
-                        property.semanticString(using: context)
+                        context.member(.classProperty, named: property.name) { property.semanticString(using: context) }
                     }
                 }
                 BlockList {
                     for property in optionalProperties {
-                        property.semanticString(using: context)
+                        context.member(.property, named: property.name) { property.semanticString(using: context) }
                     }
                 }
                 BlockList {
                     for method in optionalClassMethods {
-                        method.semanticString(using: context)
+                        context.member(.classMethod, named: method.name) { method.semanticString(using: context) }
                     }
                 }
                 BlockList {
                     for method in optionalMethods {
-                        method.semanticString(using: context)
+                        context.member(.method, named: method.name) { method.semanticString(using: context) }
                     }
                 }
             } prefix: {
@@ -220,25 +227,25 @@ extension ObjCCategoryInfo {
         Joined(suffix: BreakLine()) {
             BlockList {
                 for property in classProperties {
-                    property.semanticString(using: context)
+                    context.member(.classProperty, named: property.name) { property.semanticString(using: context) }
                 }
             }
 
             BlockList {
                 for property in properties {
-                    property.semanticString(using: context)
+                    context.member(.property, named: property.name) { property.semanticString(using: context) }
                 }
             }
 
             BlockList {
                 for method in classMethods {
-                    method.semanticString(using: context)
+                    context.member(.classMethod, named: method.name) { method.semanticString(using: context) }
                 }
             }
 
             BlockList {
                 for method in methods {
-                    method.semanticString(using: context)
+                    context.member(.method, named: method.name) { method.semanticString(using: context) }
                 }
             }
         }
@@ -280,7 +287,7 @@ extension ObjCIvarInfo {
             }
         }
 
-        if context.options.addIvarOffsetComments {
+        context.optionalContent(.addIvarOffsetComments) {
             Space()
             if let ivarOffsetCommentBuilder = context.ivarOffsetCommentBuilder {
                 Comment(ivarOffsetCommentBuilder(offset))
@@ -355,7 +362,7 @@ extension ObjCPropertyInfo {
         MemberDeclaration(name)
         ";"
 
-        if context.options.addPropertyAttributesComments {
+        context.optionalContent(.addPropertyAttributesComments) {
             Joined(separator: " ", prefix: " ") {
                 if attributes.contains(.dynamic) {
                     Comment("@dynamic \(name)")
@@ -371,7 +378,7 @@ extension ObjCPropertyInfo {
             }
         }
 
-        if context.options.addPropertyAccessorAddressComments {
+        context.optionalContent(.addPropertyAccessorAddressComments) {
             let imps = isClassProperty ? context.classMethodIMPs : context.methodIMPs
             let getterName = customGetter ?? name
             let setterName = customSetter ?? "set\(name.box.uppercasedFirst()):"
@@ -435,7 +442,7 @@ extension ObjCMethodInfo {
 
         ";"
         
-        if context.options.addMethodIMPAddressComments {
+        context.optionalContent(.addMethodIMPAddressComments) {
             Space()
             context.machO.impAddressComment(label: "IMP", rawValue: imp)
         }
