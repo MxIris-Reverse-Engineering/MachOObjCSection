@@ -7,7 +7,10 @@ import Foundation
 /// Every switch defaults to `false`, i.e. ``default`` renders the declaration
 /// exactly as the metadata describes it — nothing removed, nothing annotated.
 public struct ObjCGenerationOptions: Sendable, Equatable, Hashable, Codable {
-    /// Drops the `<Protocol, …>` conformance list from the class declaration.
+    /// Drops every property and method the adopted protocols declare —
+    /// required and optional, along the whole protocol inheritance chain —
+    /// as a hand-written header leaves them out. The `<Protocol, …>` list
+    /// stays.
     public var stripProtocolConformance: Bool
     /// Drops methods that merely override a superclass method.
     public var stripOverrides: Bool

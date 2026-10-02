@@ -185,14 +185,7 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         }
         strippedMembersByOption[.stripOverrides] = overrides
 
-        var conformances = StrippedMembers()
-        for protocolInfo in classInfo.protocols {
-            conformances.classProperties.formUnion(protocolInfo.classProperties.map(\.name))
-            conformances.properties.formUnion(protocolInfo.properties.map(\.name))
-            conformances.classMethods.formUnion(protocolInfo.classMethods.map(\.name))
-            conformances.methods.formUnion(protocolInfo.methods.map(\.name))
-        }
-        strippedMembersByOption[.stripProtocolConformance] = conformances
+        strippedMembersByOption[.stripProtocolConformance] = Self.membersDeclared(byProtocolChainsOf: classInfo.protocols)
 
         var synthesizedMethods = StrippedMembers()
         var synthesizedIvarNames: Set<String> = []
@@ -300,19 +293,7 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         strippedMembersByOption[.stripCtorMethod] = StrippedMembers(methods: [".cxx_construct"])
         strippedMembersByOption[.stripDtorMethod] = StrippedMembers(methods: [".cxx_destruct"])
 
-        var conformances = StrippedMembers()
-        for inheritedProtocolInfo in protocolInfo.protocols {
-            conformances.classProperties.formUnion(inheritedProtocolInfo.classProperties.map(\.name))
-            conformances.properties.formUnion(inheritedProtocolInfo.properties.map(\.name))
-            conformances.classMethods.formUnion(inheritedProtocolInfo.classMethods.map(\.name))
-            conformances.methods.formUnion(inheritedProtocolInfo.methods.map(\.name))
-
-            conformances.classProperties.formUnion(inheritedProtocolInfo.optionalClassProperties.map(\.name))
-            conformances.properties.formUnion(inheritedProtocolInfo.optionalProperties.map(\.name))
-            conformances.classMethods.formUnion(inheritedProtocolInfo.optionalClassMethods.map(\.name))
-            conformances.methods.formUnion(inheritedProtocolInfo.optionalMethods.map(\.name))
-        }
-        strippedMembersByOption[.stripProtocolConformance] = conformances
+        strippedMembersByOption[.stripProtocolConformance] = Self.membersDeclared(byProtocolChainsOf: protocolInfo.protocols)
 
         var synthesizedMethods = StrippedMembers()
         let allProperties = protocolInfo.properties
@@ -411,6 +392,27 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         var properties: Set<String> = []
         var classMethods: Set<String> = []
         var methods: Set<String> = []
+    }
+
+    /// Every member the protocols in `protocolInfos` and all their ancestors
+    /// declare — required and optional, instance and class. A hand-written
+    /// header does not redeclare them in an adopting class or a derived
+    /// protocol, which is what `stripProtocolConformance` reproduces
+    /// (proposal 0012). Each protocol is visited once, however many paths
+    /// reach it: `NSObject` typically sits under several.
+    private static func membersDeclared(byProtocolChainsOf protocolInfos: [ObjCProtocolInfo]) -> StrippedMembers {
+        var declaredMembers = StrippedMembers()
+        var visitedProtocolNames: Set<String> = []
+        var pendingProtocolInfos = protocolInfos
+        while let protocolInfo = pendingProtocolInfos.popLast() {
+            guard visitedProtocolNames.insert(protocolInfo.name).inserted else { continue }
+            declaredMembers.classProperties.formUnion((protocolInfo.classProperties + protocolInfo.optionalClassProperties).map(\.name))
+            declaredMembers.properties.formUnion((protocolInfo.properties + protocolInfo.optionalProperties).map(\.name))
+            declaredMembers.classMethods.formUnion((protocolInfo.classMethods + protocolInfo.optionalClassMethods).map(\.name))
+            declaredMembers.methods.formUnion((protocolInfo.methods + protocolInfo.optionalMethods).map(\.name))
+            pendingProtocolInfos.append(contentsOf: protocolInfo.protocols)
+        }
+        return declaredMembers
     }
 
     /// What the enabled switches strip together.

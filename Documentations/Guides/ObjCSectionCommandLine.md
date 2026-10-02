@@ -119,7 +119,7 @@ fat 二进制不指定 `-a` 会报错，并把可选架构列出来。
 
 | 开关 | 作用 |
 |---|---|
-| `--strip-protocol-conformance` | 去掉 `<Protocol, …>` 列表，以及这些协议已经声明过的成员 |
+| `--strip-protocol-conformance` | 去掉所遵循协议声明的全部属性和方法（必需与可选，沿整条协议继承链），像手写头文件那样不重复声明；`<Protocol, …>` 列表保留 |
 | `--strip-overrides` | 去掉只是覆写超类的成员（**文件模式下会剥得更少，见下文**） |
 | `--strip-synthesized-ivars` | 去掉 `@property` 合成的 ivar |
 | `--strip-synthesized-methods` | 去掉 `@property` 合成的 getter / setter |
