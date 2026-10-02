@@ -35,6 +35,7 @@
 | [0009](0009-objc-section-release-automation.md) | 推版本 tag 即自动发布 objc-section | Implemented |
 | [0010](0010-remove-objc-section-cli.md) | 移除 objc-section 命令行（并入 swift-section） | Accepted |
 | [0011](0011-visibility-regions.md) | 标记模式：一次渲染全量声明，并标出每段内容受哪个开关控制 | Implemented |
+| [0012](0012-strip-protocol-conformance-members.md) | stripProtocolConformance 剥掉协议声明的全部成员，保留遵循列表 | Implemented |
 
 0002 以 0001 为前置，两者共同构成「让 MachOObjCSection 具备与 MachOSwiftSection 对等的
 渲染 / 索引 / 命令行能力」这一条完整路线。
