@@ -42,3 +42,4 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [泛型化到 MachOFile 的实现说明](Internal/ObjCMetadataSourceGenericization.md) | 0002 的配套。`ResolvedSource` 这个 associatedtype 为什么是被逼出来的、IMP 地址抽象边界为何前移、渲染层为何选泛型而非 existential，以及落地时发现的两个上游缺陷 |
 | [ObjC API Diff — 设计与已知局限](Internal/ObjCAPIDiffDesignAndLimitations.md) | 0006 的配套。双键设计与键格局（即持久化格式）、与 SwiftDiffing 的五处有意语义差异（method 换签名报 modified、superclass 伪成员等）、六条已知局限（无访问控制之别、ivar 布局变化不可见等） |
 | [ObjC 导出状态的判定 — 判据、边界与实测](Internal/ObjCExportStatusResolution.md) | 0008 的配套。为什么只有类和 ivar 能判（协议符号一律 private extern，分类无符号）、三处反直觉边界（per-image 语义与 NSArray、零导出算「无信息」、不用前缀搜索的正确性理由），以及建索引占 `prepare()` 0.085% 的实测数据 |
+| [dyld cache 里的指针槽位必须先解码](Internal/DyldCachePointerSlotDecoding.md) | 一次 bug 修复的记录，没有提案。cache 里的指针槽位存的是 slide info 编码（v5 起是相对 cache 起点的偏移，不是地址），必须先经 `resolveRebase` 解码。内容包括：macOS 14.4–15.3.2 上 `objc` 命令 SIGTRAP、11.x–14.3.1 上协议方法丢名的根因，各版本受影响的范围，为什么 CI 上测不到，以及验证数据 |

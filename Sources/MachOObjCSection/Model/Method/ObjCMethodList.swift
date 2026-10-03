@@ -182,16 +182,30 @@ extension ObjCMethodList {
                 numberOfElements: count,
                 swapHandler: nil
             )
-            return sequence
-                .map { pointerMethod($0, in: machO) }
+            let size = MemoryLayout<ObjCMethod.Pointer64>.size
+            return sequence.enumerated()
+                .map {
+                    pointerMethod(
+                        $1,
+                        in: machO,
+                        entryOffset: numericCast(offset) + $0 * size
+                    )
+                }
         case .pointer:
             let sequence: DataSequence<ObjCMethod.Pointer32> = fileHandle.readDataSequence(
                 offset: fileOffset,
                 numberOfElements: count,
                 swapHandler: nil
             )
-            return sequence
-                .map { pointerMethod($0, in: machO) }
+            let size = MemoryLayout<ObjCMethod.Pointer32>.size
+            return sequence.enumerated()
+                .map {
+                    pointerMethod(
+                        $1,
+                        in: machO,
+                        entryOffset: numericCast(offset) + $0 * size
+                    )
+                }
 
         case .relativeIndirect:
             let sequence: DataSequence<ObjCMethod.RelativeInDirect> = fileHandle.readDataSequence(
@@ -259,49 +273,49 @@ extension ObjCMethodList {
 }
 
 extension ObjCMethodList {
+    // Every field of a pointer-format entry is a pointer slot. In a dyld cache
+    // a slot holds its mapping's slide info encoding, not an address — under
+    // slide info v5 an offset from the cache start, which is below the shared
+    // region — so each one is resolved through its rebase before it is read.
     private func pointerMethod(
         _ pointer: ObjCMethod.Pointer64,
-        in machO: MachOFile
+        in machO: MachOFile,
+        entryOffset: Int
     ) -> ObjCMethod {
-        let imp: UInt64 = if let cache = machO.cache, pointer.imp > 0 {
-            numericCast(pointer.imp) - cache.mainCacheHeader.sharedRegionStart
-        } else {
-            machO.fileOffset(of: numericCast(pointer.imp)) ?? 0
-        }
-
-        return ObjCMethod(
+        ObjCMethod(
             name: resolveString(
                 in: machO,
-                forAddress: pointer.name
+                slot: .init(fieldOffset: entryOffset, value: pointer.name)
             ),
             types: resolveString(
                 in: machO,
-                forAddress: pointer.types
+                slot: .init(fieldOffset: entryOffset + 8, value: pointer.types)
             ),
-            imp: imp
+            imp: resolveOffset(
+                in: machO,
+                slot: .init(fieldOffset: entryOffset + 16, value: pointer.imp)
+            )
         )
     }
 
     private func pointerMethod(
         _ pointer: ObjCMethod.Pointer32,
-        in machO: MachOFile
+        in machO: MachOFile,
+        entryOffset: Int
     ) -> ObjCMethod {
-        let imp: UInt64 = if let cache = machO.cache, pointer.imp > 0 {
-            numericCast(pointer.imp) - cache.mainCacheHeader.sharedRegionStart
-        } else {
-            machO.fileOffset(of: numericCast(pointer.imp)) ?? 0
-        }
-
-        return ObjCMethod(
+        ObjCMethod(
             name: resolveString(
                 in: machO,
-                forAddress: numericCast(pointer.name)
+                slot: .init(fieldOffset: entryOffset, value: numericCast(pointer.name))
             ),
             types: resolveString(
                 in: machO,
-                forAddress: numericCast(pointer.types)
+                slot: .init(fieldOffset: entryOffset + 4, value: numericCast(pointer.types))
             ),
-            imp: imp
+            imp: resolveOffset(
+                in: machO,
+                slot: .init(fieldOffset: entryOffset + 8, value: numericCast(pointer.imp))
+            )
         )
     }
 
@@ -426,5 +440,34 @@ extension ObjCMethodList {
             return ""
         }
         return fileHandle.readString(offset: fileOffset) ?? ""
+    }
+
+    /// The string a pointer slot points to, the slot resolved through its
+    /// rebase first.
+    private func resolveString(
+        in machO: MachOFile,
+        slot: UnresolvedValue
+    ) -> String {
+        guard slot.value != 0,
+              let resolved = machO.resolveRebase(slot),
+              let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forResolvedValue: resolved) else {
+            return ""
+        }
+        return fileHandle.readString(offset: fileOffset) ?? ""
+    }
+
+    /// The offset a pointer slot points to, the slot resolved through its
+    /// rebase first: from the main cache's start for a dyld cache image, from
+    /// the Mach-O header for a file. A null slot — every protocol method's
+    /// `imp` — stays 0.
+    private func resolveOffset(
+        in machO: MachOFile,
+        slot: UnresolvedValue
+    ) -> UInt64 {
+        guard slot.value != 0,
+              let resolved = machO.resolveRebase(slot) else {
+            return 0
+        }
+        return resolved.offset
     }
 }

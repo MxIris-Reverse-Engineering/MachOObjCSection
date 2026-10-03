@@ -59,11 +59,12 @@ extension MachOFile: ObjCMetadataSource {
     }
 
     /// In file mode the raw `imp` is already an offset — `ObjCMethodList`
-    /// converts it while decoding, subtracting `sharedRegionStart` for a cache
-    /// image and taking the file offset for a standalone binary (see
-    /// `ObjCMethodList.pointerMethod(_:in:)`). Relative method lists, which is
-    /// what current arm64 binaries emit, produce an offset directly. So the
-    /// value goes straight into `address(forOffset:)` with no base to subtract.
+    /// converts it while decoding, resolving the slot's rebase to an offset
+    /// from the main cache's start for a cache image and to the file offset
+    /// for a standalone binary (see `ObjCMethodList.pointerMethod(_:in:entryOffset:)`).
+    /// Relative method lists, which is what current arm64 binaries emit,
+    /// produce an offset directly. So the value goes straight into
+    /// `address(forOffset:)` with no base to subtract.
     public func objcResolvedIMPAddress(forRawValue rawValue: UInt64) -> UInt64? {
         guard rawValue != 0 else { return nil }
         return address(forOffset: Int(rawValue))

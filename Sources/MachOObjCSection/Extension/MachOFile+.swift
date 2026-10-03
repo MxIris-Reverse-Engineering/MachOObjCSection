@@ -71,10 +71,10 @@ extension MachOFile {
             return (fileHandle, fileOffset + numericCast(headerStartOffset))
         }
 
-        if let cache,
-           let (_cache, fileOffset) = cacheAndFileOffset(
-            fromStart: address - cache.mainCacheHeader.sharedRegionStart
-           ) {
+        // Looked up as the address it is: one below the shared region — a slot
+        // still in its slide info encoding, say — lies in no mapping and
+        // resolves to nil, where subtracting the region start would trap.
+        if let (_cache, fileOffset) = cacheAndFileOffset(for: address) {
             return (_cache.fileHandle, fileOffset)
         }
 
@@ -173,6 +173,12 @@ extension MachOFile {
             fromStart: offset
         ) {
             let address = cache.resolveOptionalRebase(at: _offset) ?? unresolvedValue.value
+            // The raw value stands in when the slot has no rebase to resolve,
+            // and a raw slot can be null or an encoding the slide info decoder
+            // did not take: neither is an address in the shared region.
+            guard address >= cache.mainCacheHeader.sharedRegionStart else {
+                return nil
+            }
             return .init(
                 address: address,
                 offset: address - cache.mainCacheHeader.sharedRegionStart

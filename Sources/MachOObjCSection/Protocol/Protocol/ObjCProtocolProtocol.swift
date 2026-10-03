@@ -272,30 +272,32 @@ extension ObjCProtocolProtocol {
             return nil
         }
 
+        // The array's element is a pointer slot too — in a dyld cache it holds
+        // its mapping's slide info encoding, not an address — so it is resolved
+        // through its rebase like the field that led here.
+        let elementValue: UInt64
         if machO.is64Bit {
-            let address: UInt64 = try! fileHandle.read(
+            let element: UInt64 = try! fileHandle.read(
                 offset: numericCast(fileOffset)
             )
-            guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: address) else {
-                return nil
-            }
-
-            return fileHandle.readString(
-                offset: fileOffset
-            )
+            elementValue = element
         } else {
-            let _address: UInt32 = try! fileHandle.read(
+            let element: UInt32 = try! fileHandle.read(
                 offset: numericCast(fileOffset)
             )
-            let address: UInt64 = numericCast(_address)
-            guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: address) else {
-                return nil
-            }
-
-            return fileHandle.readString(
-                offset: fileOffset
-            )
+            elementValue = numericCast(element)
         }
+        guard elementValue != 0,
+              let resolvedElement = machO.resolveRebase(
+                  .init(fieldOffset: numericCast(resolved.offset), value: elementValue)
+              ),
+              let (elementFileHandle, elementFileOffset) = machO.fileHandleAndOffset(forResolvedValue: resolvedElement) else {
+            return nil
+        }
+
+        return elementFileHandle.readString(
+            offset: elementFileOffset
+        )
     }
 
     public func demangledName(in machO: MachOFile) -> String? {
