@@ -29,37 +29,13 @@ extension MachOFile {
 }
 
 // MARK: - dyld cache
-extension MachOFile {
-    func cache(for address: UInt64) -> DyldCache? {
-        guard let cache else { return nil }
-        if let fullCache = cache._cachedFullCache {
-            return fullCache.cache(for: address)
-        }
-        return cache.locateValue({ $0.fileOffset(of: address) })?.cache
-    }
-
-    /// Convert an address that is not slided into the actual cache it contains and the file offset in it.
-    /// - Parameter address: address (unslid)
-    /// - Returns: cache and file offset
-    func cacheAndFileOffset(for address: UInt64) -> (DyldCache, UInt64)? {
-        guard let cache else { return nil }
-        if let fullCache = cache._cachedFullCache {
-            return fullCache.cacheAndFileOffset(for: address)
-        }
-        return cache.locateValue { $0.fileOffset(of: address) }
-    }
-
-    /// Converts the offset from the start of the main cache to the actual cache
-    /// it contains and the file offset within that cache.
-    /// - Parameter offset: Offset from the start of the main cache.
-    /// - Returns: cache and file offset
-    func cacheAndFileOffset(fromStart offset: UInt64) -> (DyldCache, UInt64)? {
-        guard let cache else { return nil }
-        return cacheAndFileOffset(
-            for: cache.mainCacheHeader.sharedRegionStart + offset
-        )
-    }
-}
+//
+// `cache(for:)`, `cacheAndFileOffset(for:)` and `cacheAndFileOffset(fromStart:)`
+// come from MachOKitExtensions, which builds each sub-cache of the file's cache
+// once and hands back the same instance every time. The copies this module
+// kept assembled a sub-cache afresh for every read that crossed into one, and
+// from a cache opened from its main file alone that meant opening and mapping
+// the file again: `fileHandle` keys its mapping on the cache instance.
 
 // MARK: - FileIO
 extension MachOFile {
