@@ -138,7 +138,10 @@ let package = Package(
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/MachOKitExtensions",
-                from: "1.0.0"
+                // 1.1.1 builds each sub-cache of a dyld cache once and hands
+                // back the same instance on every lookup, which `fileHandle`
+                // keys its mapping on.
+                from: "1.1.1"
             )
         ),
         .package(

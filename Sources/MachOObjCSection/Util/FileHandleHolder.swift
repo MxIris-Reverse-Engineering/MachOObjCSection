@@ -19,9 +19,7 @@ internal final class FileHandleHolder<
 >: @unchecked Sendable {
     private let lock: NSRecursiveLock = .init()
 
-#if canImport(ObjectiveC)
-    private let _mapTable: NSMapTable<Owner, File> = .weakToStrongObjects()
-#else
+#if !canImport(ObjectiveC)
     private var _mapTable = WeakKeyStrongValueMap<Owner, File>()
 #endif
 
@@ -36,6 +34,18 @@ internal final class FileHandleHolder<
         lock.lock()
         defer { lock.unlock() }
 
+#if canImport(ObjectiveC)
+        // The file hangs off its owner and goes away with it. A weak-to-strong
+        // `NSMapTable` keeps the value of a key that went away until the table
+        // next resizes, so the mapping of a dropped cache stayed open.
+        let associationKey = UnsafeRawPointer(Unmanaged.passUnretained(self).toOpaque())
+        if let fileHandle = objc_getAssociatedObject(owner, associationKey) as? File {
+            return fileHandle
+        }
+        let fileHandle = initialize()
+        objc_setAssociatedObject(owner, associationKey, fileHandle, .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
+        return fileHandle
+#else
         if let fileHandle = _mapTable.object(forKey: owner) {
             return fileHandle
         } else {
@@ -43,5 +53,6 @@ internal final class FileHandleHolder<
             _mapTable.setObject(fileHandle, forKey: owner)
             return fileHandle
         }
+#endif
     }
 }
