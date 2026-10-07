@@ -104,11 +104,13 @@ let package = Package(
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/MachOKit",
-                // 0.54.100 is the fork's release over upstream 0.54.0. It
+                // 0.54.101 is the fork's release over upstream 0.54.0. It
                 // carries 0.52.105, which releases a file handle's identity
                 // together with the handle; `FileHandleHolder` keys the
-                // mapping of every file and dyld cache it reads on it.
-                from: "0.54.100"
+                // mapping of every file and dyld cache it reads on it. It
+                // also reads an image without an export trie as exporting
+                // nothing, where 0.53.0 through 0.54.100 trapped.
+                from: "0.54.101"
             )
         ),
         .package(
