@@ -1,5 +1,5 @@
 {
-  "originHash" : "32c179f761ddd9515c12991d6fe6202255dc5699a57282e0c4deb784c7c5abeb",
+  "originHash" : "abaf379416743f785c5e16be7a3cf1a4ab223d5b2b54f5a2af03a791bb61e6b2",
   "pins" : [
     {
       "identity" : "associatedobject",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/MxIris-Reverse-Engineering/MachOKit",
       "state" : {
-        "revision" : "fec9503cdf3d595ef8cf4abac1602e299a8c3be4",
-        "version" : "0.52.101"
+        "revision" : "a8723af017b12c28b60557d4e6655fde1c38d4d6",
+        "version" : "0.54.100"
       }
     },
     {
@@ -69,8 +69,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/apple/swift-asn1.git",
       "state" : {
-        "revision" : "a9a5efd40eaf558a2bcd48d64b1d1646be686008",
-        "version" : "1.7.1"
+        "revision" : "9f542610331815e29cc3821d3b6f488db8715517",
+        "version" : "1.6.0"
       }
     },
     {
