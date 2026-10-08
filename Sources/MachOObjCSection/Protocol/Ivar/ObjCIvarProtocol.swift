@@ -41,8 +41,9 @@ extension ObjCIvarProtocol {
 
 extension ObjCIvarProtocol {
     public func offset(in machO: MachOFile) -> UInt32? {
-        guard layout.offset > 0 else { return nil }
-
+        // An exported ivar's offset pointer binds to its `_OBJC_IVAR_$_`
+        // symbol, and a bind slot of an LC_DYLD_INFO(_ONLY) file holds zero:
+        // `resolveRebase` tells that from a null slot, the slot's value cannot.
         let unresolved = unresolvedValue(of: .offset)
         guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
