@@ -137,12 +137,10 @@ extension _FixupResolvable {
     /// This function determines if the bind operation can be resolved from the provided file offset
     /// in the MachO file. Bind operations are used to dynamically link symbols at runtime.
     ///
-    /// The function checks the following conditions:
-    /// 1. The MachO file must not be loaded from the Dyld shared cache. If it is, the method returns `nil`.
-    /// 2. The MachO file must contain `dyldChainedFixups` data. If not available, the method returns `nil`.
-    ///
-    /// If these conditions are satisfied, the method attempts to resolve the bind operation at the given offset
-    /// and retrieves the associated symbol name.
+    /// A Mach-O loaded from a dyld shared cache has no binds: the cache builder
+    /// resolved them. Otherwise the bind is read from the chained fixups, or,
+    /// in a file that predates them, from the LC_DYLD_INFO(_ONLY) opcode
+    /// streams.
     ///
     /// - Parameters:
     ///   - fileOffset: An `Int` value representing the offset in the file where the bind operation occurs.
@@ -154,7 +152,7 @@ extension _FixupResolvable {
         in machO: MachOFile
     ) -> String? {
         guard !machO.isLoadedFromDyldCache else { return nil }
-        return machO.chainedFixupBindSymbolName(at: numericCast(fileOffset))
+        return machO.boundSymbolName(atFileOffset: fileOffset)
     }
 
     /// Determines whether the specified file offset within the MachO file represents a bind operation.
@@ -162,11 +160,8 @@ extension _FixupResolvable {
     /// This function evaluates if the file offset corresponds to a bind operation. Bind operations
     /// are used in MachO files to dynamically link symbols at runtime.
     ///
-    /// The function operates as follows:
-    /// 1. Checks if the MachO file is loaded from the Dyld shared cache. If so, returns `false` as
-    ///    bind operations cannot be evaluated in this context.
-    /// 2. Converts the file offset to a `UInt64` value to ensure compatibility with MachOKit APIs.
-    /// 3. Invokes `machO.isBind(_:)` to determine if the specified offset corresponds to a bind operation.
+    /// Answers from the same sources as ``resolveBind(fileOffset:in:)``, so
+    /// the two agree on every slot.
     ///
     /// - Parameters:
     ///   - fileOffset: The offset in the MachO file to check for a bind operation.
@@ -178,8 +173,7 @@ extension _FixupResolvable {
         in machO: MachOFile
     ) -> Bool {
         guard !machO.isLoadedFromDyldCache else { return false }
-        let offset: UInt64 = numericCast(fileOffset)
-        return machO.isBind(numericCast(offset))
+        return machO.holdsBind(atFileOffset: fileOffset)
     }
 }
 

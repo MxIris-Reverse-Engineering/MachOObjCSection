@@ -101,27 +101,20 @@ extension MachOFile {
 }
 
 // MARK: - rebase / bind
+//
+// Bind lookups come from MachOKitExtensions (`resolveBind(fileOffset:)`,
+// `isBind(fileOffset:)`, `resolveSelfBind(fileOffset:)`), which read the
+// LC_DYLD_INFO(_ONLY) opcode streams of a file that predates chained fixups as
+// well as the chained fixups themselves.
 extension MachOFile {
-    func isBind(
-        _ offset: Int
-    ) -> Bool {
-        cached.resolveBind(at: numericCast(offset)) != nil
+    /// The name of the symbol the bind at `fileOffset` names.
+    func boundSymbolName(atFileOffset fileOffset: Int) -> String? {
+        resolveBind(fileOffset: fileOffset)
     }
 
-    /// The name of the symbol that the chained fixup at `offset` binds to.
-    func chainedFixupBindSymbolName(at offset: UInt64) -> String? {
-        let cached = self.cached
-        guard let dyldChainedFixups = cached.dyldChainedFixups,
-              let (chainedImport, _) = cached.resolveBind(at: offset) else {
-            return nil
-        }
-        return dyldChainedFixups.symbolName(for: chainedImport.info.nameOffset)
-    }
-
-    func isBind(
-        _ unresolvedValue: UnresolvedValue
-    ) -> Bool {
-        isBind(unresolvedValue.fieldOffset)
+    /// Whether the slot at `fileOffset` holds a bind.
+    func holdsBind(atFileOffset fileOffset: Int) -> Bool {
+        isBind(fileOffset: fileOffset)
     }
 
     /// Resolves a rebase from an `UnresolvedValue`.
@@ -133,9 +126,14 @@ extension MachOFile {
     ///
     /// Otherwise (non-cache Mach-O):
     /// - resolve against the file directly
+    /// - a bind to this image's own export (`BIND_SPECIAL_DYLIB_SELF`, what
+    ///   `-interposable` links every pointer to an exported symbol as)
+    ///   resolves to that export, as dyld resolves it at load time
+    /// - a bind into another image resolves to nothing: its slot holds the
+    ///   bind's encoding, not an address in this image
     ///
     /// If it cannot be resolved, we still return a `ResolvedValue` that contains:
-    /// - the raw input value (unrebased)
+    /// - the raw input value (unrebased), unless it is null
     /// - file offset resolved from that raw value
     ///
     /// - Parameter unresolvedValue: position (file offset) and raw pointer value stored in the image
@@ -173,7 +171,26 @@ extension MachOFile {
             )
         }
 
-        guard let fallbackFileOffset = fileOffset(of: unresolvedValue.value) else {
+        if let selfBindTarget = resolveSelfBind(fileOffset: Int(offset)) {
+            guard let resolvedFileOffset = fileOffset(of: selfBindTarget) else {
+                return nil
+            }
+            return .init(
+                address: selfBindTarget,
+                offset: resolvedFileOffset
+            )
+        }
+
+        // Covers the LC_DYLD_INFO(_ONLY) opcode streams as well as chained
+        // fixups. A bind slot there holds the bind's addend — usually zero —
+        // which the fallback below would take for the address of the Mach-O
+        // header.
+        if resolveBind(fileOffset: Int(offset)) != nil {
+            return nil
+        }
+
+        guard unresolvedValue.value != 0,
+              let fallbackFileOffset = fileOffset(of: unresolvedValue.value) else {
             return nil
         }
         return .init(

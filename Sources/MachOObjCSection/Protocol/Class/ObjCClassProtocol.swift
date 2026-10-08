@@ -232,12 +232,9 @@ extension ObjCClassProtocol {
         field: LayoutField,
         in machO: MachOFile
     ) -> (MachOFile, Self)? {
-        let unresolved = unresolvedValue(of: field)
-        guard unresolved.value > 0 else { return nil }
-
-        if isBind(field, in: machO) { return nil }
-
-        guard let resolved = machO.resolveRebase(unresolved) else { return nil }
+        // Nothing to read for a null slot or a class bound in from another
+        // image; a class this image binds to itself does resolve.
+        guard let resolved = machO.resolveRebase(unresolvedValue(of: field)) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forResolvedValue: resolved) else {
             return nil
@@ -262,17 +259,14 @@ extension ObjCClassProtocol {
         field: LayoutField,
         in machO: MachOFile
     ) -> String? {
-        let unresolved = unresolvedValue(of: field)
-        guard unresolved.value > 0 else { return nil }
-
-        if !isBind(field, in: machO),
-           let resolved = machO.resolveRebase(unresolved) {
-            if let name = Self._readClassName(
-                resolved: resolved,
-                in: machO
-            ) {
-                return name
-            }
+        // A bind slot of an LC_DYLD_INFO(_ONLY) file holds zero, so the slot's
+        // value cannot tell a null class from a bound one.
+        if let resolved = machO.resolveRebase(unresolvedValue(of: field)),
+           let name = Self._readClassName(
+               resolved: resolved,
+               in: machO
+           ) {
+            return name
         }
 
         if let bindSymbolName = resolveBind(field, in: machO) {
