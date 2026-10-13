@@ -213,6 +213,11 @@ Foundation 在 `.01`）。基准不同则永不匹配，index 为 nil，所有�
 这个缺陷从 MachOKit 0.23.0 起就在代码里，但只有 macOS 26 这种子 cache 布局才触发它 ——
 macOS 15 及更早的 cache 在旧版本上也是正常的，所以「以前能用」不构成依赖可以不升的理由。
 
+同一种布局还让本库自己漏过一次，症状也一样不报错：2026-10-13 之前，从 **macOS 26.4 起**的 cache
+里读被别的镜像加过 category 的类（NSView、NSWindow、NSString 等）时，**实例属性和协议列表是空的**，
+方法照常。那几张表在 `.dylddata` 文件里，而读取器只在镜像 header 所在的文件里找。详见
+[实现说明](../Internal/RelativeListsAcrossSubCacheFiles.md)。
+
 ### 四、纯 Swift 类的 ivar 记录两种模式对不上
 
 编译器为纯 Swift 类（名字形如 `_TtC8ModuleName9TypeName`）生成的 ObjC 兼容记录里，
