@@ -91,12 +91,15 @@ extension MachOFile {
             return nil
         }
 
-        let address = cache.mainCacheHeader.sharedRegionStart + offset
-        guard let fileOffset = located.cache.fileOffset(of: address) else {
+        // Looked up in every file of the cache, not just the one holding the
+        // image's header: since macOS 26.4 a cache keeps each group of images'
+        // data in files of its own (`.dylddata`), so a property or protocol
+        // list lies in another file than its image's header.
+        guard let (listCache, fileOffset) = located.value.cacheAndFileOffset(fromStart: offset) else {
             return nil
         }
 
-        return (located.value, located.cache, fileOffset)
+        return (located.value, listCache, fileOffset)
     }
 }
 
