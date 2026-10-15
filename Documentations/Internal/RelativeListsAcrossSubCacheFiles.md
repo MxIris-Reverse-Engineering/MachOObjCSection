@@ -49,8 +49,9 @@ macOS 26.7 上逐个类对比文件模式与镜像模式：AppKit 2,573 个类�
 
 ## 与上游的关系
 
-- 移植自上游 `10b3dd5`（Fix relative list cache resolution，2026-08-06，随 PR #37 合入上游 main）。
-- 同一个 PR 的 `ff936fa`（Preserve all relative list entries）没有移植：它在同一镜像有多张列表时全部读入，而本库只取第一张。macOS 26.7 上本机已加载的 516 个 cache 镜像、26,296 个类里，只有 UniformTypeIdentifiers 的 `_UTCoreType` 同一镜像有两张方法表。同一镜像里的 category 一般在链接时就被 `ld` 合进了类本身（`-no_objc_category_merging` 才关掉），所以这种情况很少。
+- 移植自上游 `10b3dd5`（Fix relative list cache resolution，2026-08-06，随 PR #37 合入上游 main，上游 0.8.2 带出）。
+- 同一个 PR 的 `ff936fa`（Preserve all relative list entries）当时没有移植：它在同一镜像有多张列表时全部读入，而本库只取第一张。macOS 26.7 上本机已加载的 516 个 cache 镜像、26,296 个类里，只有 UniformTypeIdentifiers 的 `_UTCoreType` 同一镜像有两张方法表。同一镜像里的 category 一般在链接时就被 `ld` 合进了类本身（`-no_objc_category_merging` 才关掉），所以这种情况很少。
+- 2026-10-15 整个合入上游 0.8.2（0.8.200），`ff936fa` 随之进来：文件模式与镜像模式都读入同一镜像的全部列表。`relativeListLocation(for:)` 那处冲突保留本库的移植版，与上游的写法逻辑相同。回归测试 `Tests/ObjCMetadataSourceTests/SameImageRelativeListsTests.swift` 在运行中系统的 cache 里找这样的类（macOS 26.7 上就是 `_UTCoreType`），断言两种模式读出的方法名等于它自己镜像那几张表的全部方法，合入前两条都失败。
 
 ## 验证
 
@@ -64,5 +65,5 @@ macOS 26.7 上逐个类对比文件模式与镜像模式：AppKit 2,573 个类�
 
 ## 边界
 
-- 只解决「列表在哪个文件里」。同一镜像有多张列表时仍只取第一张，见上一节。
+- 只解决「列表在哪个文件里」。同一镜像有多张列表时只取第一张的问题在 0.8.200 随上游 0.8.2 修掉，见上一节。
 - 读出的属性表照原样保留同名项（`ld` 合并 category 时不去重），本库不处理。
