@@ -210,7 +210,7 @@ extension MachOFile {
             if let fullCache = cache._cachedFullCache {
                 return fullCache.relativeMethodSelectorBaseAddressOffset
             }
-            return cache.locateValue(\.relativeMethodSelectorBaseAddressOffset)?.value
+            return (try? cache.locateValue(\.relativeMethodSelectorBaseAddressOffset))?.value
         }
 
         return nil
@@ -262,12 +262,12 @@ extension MachOFile {
     var objcImageIndex: Int? {
         guard isLoadedFromDyldCache else { return nil }
         guard let cache else { return nil }
-        if let (cache, headerOptimizationRO) = cache._headerOptimizationRO64,
-           let info = headerOptimizationRO.headerInfo(in: cache, for: self) {
+        if let located = cache._headerOptimizationRO64,
+           let info = located.value.headerInfo(in: located.cache, for: self) {
             return info.index
         }
-        if let (cache, headerOptimizationRO) = cache._headerOptimizationRO32,
-           let info = headerOptimizationRO.headerInfo(in: cache, for: self) {
+        if let located = cache._headerOptimizationRO32,
+           let info = located.value.headerInfo(in: located.cache, for: self) {
             return info.index
         }
         return nil

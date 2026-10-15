@@ -104,13 +104,15 @@ let package = Package(
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/MachOKit",
-                // 0.54.101 is the fork's release over upstream 0.54.0. It
+                // 0.55.100 is the fork's release over upstream 0.55.0, the
+                // first to provide `DyldCache.locateValue` and `LocatedValue`
+                // (SPI `Support`). They replace this package's own helpers of
+                // the same names, which 0.55.0 made ambiguous. It still
                 // carries 0.52.105, which releases a file handle's identity
-                // together with the handle; `FileHandleHolder` keys the
-                // mapping of every file and dyld cache it reads on it. It
-                // also reads an image without an export trie as exporting
-                // nothing, where 0.53.0 through 0.54.100 trapped.
-                from: "0.54.101"
+                // together with the handle (`FileHandleHolder` keys the
+                // mapping of every file and dyld cache it reads on it), and
+                // reads an image without an export trie as exporting nothing.
+                from: "0.55.100"
             )
         ),
         .package(
