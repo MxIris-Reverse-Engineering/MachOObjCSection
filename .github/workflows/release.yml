@@ -3,12 +3,13 @@ name: Release
 on:
   push:
     tags:
-      # Fork release tags only: <upstream major>.<upstream minor>.1NN, e.g.
-      # 0.8.106. Tags merged in from upstream (0.8.2 and the like) must not
-      # trigger a release of this fork. version-check.yml rejects a
-      # BundledVersion.value outside this shape, so a release cannot be
-      # skipped silently.
-      - '[0-9]+.[0-9]+.1[0-9][0-9]*'
+      # Fork release tags only: <upstream major>.<upstream minor>.<P>NN with
+      # P >= 1 following the upstream patch merged in (0.8.1NN up to upstream
+      # 0.8.1, 0.8.2NN from upstream 0.8.2). Tags merged in from upstream
+      # (0.8.2 and the like) must not trigger a release of this fork.
+      # version-check.yml rejects a BundledVersion.value outside this shape,
+      # so a release cannot be skipped silently.
+      - '[0-9]+.[0-9]+.[1-9][0-9][0-9]*'
 
 permissions:
   contents: write
