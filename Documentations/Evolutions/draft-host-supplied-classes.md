@@ -126,7 +126,7 @@ README 的库用法一节（英文）、使用指南里面向库的一半补一�
 1. 核心 target 的追加 API 与一致性测试。（已完成）
 2. `ObjCMetadataSource` 的新要求与两种模式的实现。（已完成）
 3. 索引器：新类型、`init` 参数、`prepare()`（含 stub 上 category 的归属）、查询与文档注释，及其测试。（已完成）
-4. 渲染层、builder、snapshot builder，及其测试。
+4. 渲染层、builder、snapshot builder，及其测试。（已完成）
 5. README、使用指南、术语表。
 6. 把分支告诉 MachOSwiftSection；拿到真实偏移后补上真实二进制测试。落地合入 `next` 后，发一个 fork 版本供
    MachOSwiftSection 依赖（发版由用户决定）。
@@ -150,3 +150,4 @@ README 的库用法一节（英文）、使用指南里面向库的一半补一�
 | 2026-10-27 | 只凭 RO 建出的 `version` 按 `ObjCClassProtocol.version(for:)` 的规则取（元类 7，其余 0），镜像模式的一致性测试不比较 `version` | 镜像模式下已实现的类的 `version` 来自运行时数据，由 `class_setVersion` 写入，`class_ro_t` 里没有这个值。 |
 | 2026-10-27 | 补充类的测试放进 `ObjCMetadataSourceTests`，真实二进制测试随第 3 步提前落地 | 这些测试要现编 C 与 Swift fixture，还要用 builder 和 snapshot builder，这个 target 已经依赖这几个模块，也已有现编 fixture 的先例（`SelfBindFixture`）；Xcode Service 的偏移在开工前已经拿到。 |
 | 2026-10-27 | 进度事件的总数在开始时去掉空名字与重名的补充类；名字被 class object 占用或 RO 读不出的补充类仍计入总数 | 这两种要走到它才知道；宿主按 Swift metadata 算出的补充类本不会撞上 class object，也都读得出，只有宿主出错时计数才到不了总数。 |
+| 2026-10-27 | 偏移未知的 ivar 不交给 `ivarOffsetCommentBuilder`，一律写 `offset: unknown` | 这个闭包只接收一个 `Int`，表达不了「未知」；交给它就只能传 0，读者会把 0 当成真实偏移。 |
