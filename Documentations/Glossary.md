@@ -96,7 +96,7 @@ pattern 中的 `class_ro_t` 模板，`name` 为 NULL、ivar 偏移槽为空）�
 
 - **主要出现在**：`Sources/ObjCIndexing/ObjCSuppliedClass.swift`、`ObjCInterfaceIndexer.swift`、
   `Sources/MachOObjCSection/Support/ObjCDump.swift` 末尾
-- **延伸阅读**：[提案](Evolutions/draft-host-supplied-classes.md)、
+- **延伸阅读**：[提案 0014](Evolutions/0014-host-supplied-classes.md)、
   [使用指南](Guides/ObjCSectionCommandLine.md#库调用方没有-class-object-的类由宿主补充)
 
 ### uniqueName

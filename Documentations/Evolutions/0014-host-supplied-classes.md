@@ -1,6 +1,6 @@
-# Draft - 由宿主补充文件里没有 class object 的类
+# 0014 - 由宿主补充文件里没有 class object 的类
 
-- **状态**: In Progress
+- **状态**: Implemented
 - **创建日期**: 2026-10-27
 - **最后更新**: 2026-10-27
 - **关联**: MachOSwiftSection [issue #137](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/issues/137)
@@ -155,3 +155,4 @@ README 的库用法一节（英文）、使用指南里面向库的一半补一�
 | 2026-10-27 | 偏移未知的 ivar 不交给 `ivarOffsetCommentBuilder`，一律写 `offset: unknown` | 这个闭包只接收一个 `Int`，表达不了「未知」；交给它就只能传 0，读者会把 0 当成真实偏移。 |
 | 2026-10-27 | 不另写实现说明；核心 target 的例外补记进《泛型化到 MachOFile 的实现说明》，术语表登记「supplied class（补充类）」 | 维护者会踩到、代码里看不出的只有一件事：上游文件末尾那段是 fork 的、为什么放那里、靠什么防漂移，它属于那篇文档讲核心目录边界的一节。其余取舍都已在本提案的决策日志里。 |
 | 2026-10-27 | 实现完成，待合并 | 第 1–5 步都已落在 `feature/host-supplied-classes`；`swift test --skip MachOObjCSectionTests`（与 CI 相同）220 个测试全部通过，退出码 0。合并、编号与 fork 发版留给用户。 |
+| 2026-10-27 | In Progress → Implemented，落地编号 0014 | 用户批准收尾，合进 `next` 并随 0.8.201 发布。与方案的出入都已记在上面各行：第 1、2 步合成一个提交；补充类的测试放进 `ObjCMetadataSourceTests`；真实二进制测试随第 3 步提前落地；另加了 strip 过的二进制里 stub 上 category 的测试。文档：使用指南补了库调用方一节，不另写实现说明（核心 target 的例外补记进《泛型化到 MachOFile 的实现说明》），术语表登记「supplied class（补充类）」，README 补了库用法；没有未做的后续项。 |

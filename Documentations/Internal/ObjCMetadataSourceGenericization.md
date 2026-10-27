@@ -44,7 +44,7 @@ objc-section              命令行
 代价是 `ObjCClassProtocol.name(in: MachOFile)` 这个补齐扩展也住在新 target 里，
 而它的兄弟方法 `name(in: MachOImage)` 在核心 target。查找时会觉得割裂 —— 这是有意付的成本。
 
-> **2026-10-27 补记**：由宿主补充的类（[提案](../Evolutions/draft-host-supplied-classes.md)）
+> **2026-10-27 补记**：由宿主补充的类（[提案 0014](../Evolutions/0014-host-supplied-classes.md)）
 > 是这条边界唯一的例外。「只凭 `class_ro_t` 建类信息」「按给定类名建 category 信息」要用
 > `Support/ObjCDump.swift` 里的 `fileprivate` 辅助函数（relative list 解析、协议展开），放进 fork
 > 自己的 target 就得把它们重写一遍，所以这几个函数追加在该文件末尾，从
