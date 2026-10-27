@@ -272,6 +272,38 @@ struct ObjCInterfaceTests {
         #expect(stripped.contains(found.lookalikeSelector))
     }
 
+    /// A read-only property synthesizes no setter, so a `setFoo:` the class
+    /// declares beside it was written by hand and is no accessor to strip.
+    @Test("stripSynthesizedMethods keeps a read-only property's setter")
+    func stripSynthesizedMethodsKeepsReadOnlyPropertySetter() async throws {
+        let (indexer, machO) = try await SharedFixture.shared.load()
+        let builder = ObjCInterfaceBuilder(indexer: indexer, machO: machO)
+
+        var target: (className: String, setterSelector: String)?
+        for className in indexer.classNames {
+            guard let classInfo = indexer.classGroup(forName: className)?.info.first else { continue }
+            let methodNames = Set(classInfo.methods.map(\.name))
+
+            for property in classInfo.properties
+            where property.customSetter == nil && property.attributes.contains(.readonly) {
+                let setterSelector = "set" + property.name.box.uppercasedFirst() + ":"
+                if methodNames.contains(setterSelector) {
+                    target = (className, setterSelector)
+                    break
+                }
+            }
+            if target != nil { break }
+        }
+
+        let found = try #require(target, "no class in Foundation declares a setter beside a read-only property")
+
+        var options = ObjCGenerationOptions.default
+        options.stripSynthesizedMethods = true
+        let stripped = try #require(builder.classInterface(named: found.className, options: options)).string
+
+        #expect(stripped.contains(found.setterSelector))
+    }
+
     @Test("stripCtorMethod and stripDtorMethod remove .cxx_ methods")
     func stripCtorDtorSwitches() async throws {
         let (indexer, machO) = try await SharedFixture.shared.load()
