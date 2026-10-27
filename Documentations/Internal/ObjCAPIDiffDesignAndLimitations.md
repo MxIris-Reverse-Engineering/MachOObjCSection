@@ -76,7 +76,7 @@ refinement 同构，同一函数（`ObjCMemberRecord.compatibilityOverride(old:n
 被双侧 differ 与 evolution builder 共用，N == 2 时两条路径的 verdict 不可能分叉。
 
 **协议新采纳另一个协议**按同一条理由判定（见提案
-[协议新采纳另一个协议时按破坏性改动判定](../Evolutions/draft-protocol-adoption-compatibility.md)）：
+[0013 协议新采纳另一个协议时按破坏性改动判定](../Evolutions/0013-protocol-adoption-compatibility.md)）：
 `@protocol P <Q>` 把 Q 的必选成员同样加到 P 的 conformer 头上。协议容器新增的 `adopts:<Q>`，
 在新快照的协议表里把 Q 连同它自己的采纳逐层展开，只要有一个必选成员不在旧快照里 P 已要求的
 必选成员中（同样逐层展开），就是 breaking；Q 不在新快照里、无法展开时也判 breaking。类与
