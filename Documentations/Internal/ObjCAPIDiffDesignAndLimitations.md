@@ -115,6 +115,12 @@ category 身份是 `ClassName(CategoryName)`。同一二进制里对同一类声
 category 是运行时允许的（后果自负），会触发键碰撞诊断——first-wins 保留第一个，
 Warnings 段列出被丢弃的。
 
+> **2026-10-27 订正**：这条诊断对类和 category 实际上触发不了。索引器按名字存类和 category，同名项在进入
+> 快照之前就只剩一个；而正常链接出来的镜像里也不会有同名项——同名类在链接时撞符号，同一类的同名 category
+> 被合并成一个（实测本仓库测试包里两个文件对 NSString 的 Swift 扩展只剩一个 category）。上表「诊断通道」
+> 一行说碰撞的现实来源是 duplicate class，同样不成立：运行时的 duplicate class 告警说的是两个镜像。
+> 裁决与推翻条件见 [代码审查的已裁决清单](CodeReviewAdjudications.md)。
+
 ## 测试结构
 
 - `Tests/ObjCDiffingTests/` —— 纯值单元测试（45 个）：投影键格局、三路匹配、
