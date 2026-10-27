@@ -413,10 +413,15 @@ extension ObjCMethodInfo {
         if numberOfArguments == 0 {
             FunctionDeclaration(name)
         } else {
-            let nameAndLabels = name.split(separator: ":")
+            // One label per colon, an empty one included: `add::` takes two
+            // arguments, the second unlabeled. Splitting the empty pieces away
+            // dropped an argument for each unlabeled one.
+            let labels = name
+                .split(separator: ":", omittingEmptySubsequences: false)
+                .prefix(numberOfArguments)
             let argumentInfos = type?.argumentInfos ?? []
 
-            for (index, label) in nameAndLabels.enumerated() {
+            for (index, label) in labels.enumerated() {
                 if index > 0 {
                     Space()
                 }

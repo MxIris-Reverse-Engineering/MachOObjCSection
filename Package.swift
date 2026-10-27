@@ -122,7 +122,10 @@ let package = Package(
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/swift-objc-dump",
-                from: "0.8.100"
+                // 0.8.102 writes every argument of a selector with unlabeled
+                // ones in `ObjCMethodInfo.headerString`, the member signature
+                // the API diff reports.
+                from: "0.8.102"
             )
         ),
         .package(

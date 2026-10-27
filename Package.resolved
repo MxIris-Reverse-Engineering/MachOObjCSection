@@ -1,5 +1,5 @@
 {
-  "originHash" : "093d1d5416b0dda834ae7ac45bdc6b76fac49085b8a89f48a7b875230d984ceb",
+  "originHash" : "5287d6e8236b85177aa5b7e9de9ff3fd3f0fb954f33c06c4c508dfc1bc545fab",
   "pins" : [
     {
       "identity" : "associatedobject",
@@ -132,8 +132,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/MxIris-Reverse-Engineering/swift-objc-dump",
       "state" : {
-        "revision" : "641d257d60385b231a608ab8c4ecdf31348c779e",
-        "version" : "0.8.101"
+        "revision" : "255c8cca86479b093f7a1b083c73bfb82a111382",
+        "version" : "0.8.102"
       }
     },
     {
