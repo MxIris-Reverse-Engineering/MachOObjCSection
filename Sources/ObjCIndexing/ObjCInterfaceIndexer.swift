@@ -30,6 +30,16 @@ import SwiftStdlibToolbox
 /// chain stops at the first superclass defined elsewhere. See
 /// ``ObjCMetadataSource/objcSuperClass(of:)``.
 ///
+/// ## Classes without a class object
+///
+/// The walk finds classes through the image's class lists, and three kinds of
+/// Swift class with an Objective-C ancestor are not on them: generic classes,
+/// and the classes registered through `__objc_stublist`. A host that reads
+/// Swift metadata passes them in as ``ObjCSuppliedClass`` values at `init`;
+/// they are indexed after the listed classes and appear in ``classNames``, but
+/// are looked up through ``suppliedClassGroup(forName:)`` rather than
+/// ``classGroup(forName:)``, since no class object stands behind them.
+///
 /// This index answers "what is in this binary". It deliberately does not
 /// answer "what subclasses what" — inheritance and protocol adoption are
 /// broadcast through ``ObjCIndexingEvent`` as the walk discovers them, and
@@ -120,6 +130,9 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
     private var classes: [String: ObjCClassGroup] = [:]
 
     @Mutex
+    private var suppliedClassGroups: [String: ObjCSuppliedClassGroup] = [:]
+
+    @Mutex
     private var protocols: [String: ObjCProtocolGroup] = [:]
 
     @Mutex
@@ -130,6 +143,8 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
 
     @Mutex
     private var unions: [String: CStructOrUnion] = [:]
+
+    private let suppliedClasses: [ObjCSuppliedClass]
 
     private let eventHandler: (@Sendable (ObjCIndexingEvent) -> Void)?
 
@@ -142,6 +157,14 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
     ///   - imagePath: The path recorded into emitted events. Passed explicitly
     ///     rather than derived from the image, because the two can legitimately
     ///     differ — see the `imagePath` stored property.
+    ///   - suppliedClasses: Classes the image keeps no class object for, as a
+    ///     host that reads Swift metadata found them. Each is read from its
+    ///     `class_ro_t` and indexed after the classes of the class lists, in
+    ///     the order given. One is skipped, with nothing reported, when its
+    ///     name is empty or already taken — by a class object, or by a
+    ///     supplied class earlier in the array — or when no `class_ro_t` can be
+    ///     read at its offset; ``suppliedClassGroup(forName:)`` then returns
+    ///     `nil` for it.
     ///   - eventHandler: Receives progress and relationship events during
     ///     ``prepare()``.
     ///
@@ -163,10 +186,12 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
     public init(
         machO: MachO,
         imagePath: String,
+        suppliedClasses: [ObjCSuppliedClass] = [],
         eventHandler: (@Sendable (ObjCIndexingEvent) -> Void)? = nil
     ) {
         self.machO = machO
         self.imagePath = imagePath
+        self.suppliedClasses = suppliedClasses
         self.eventHandler = eventHandler
     }
 
@@ -185,8 +210,9 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
     /// - **Emission order is deterministic.** For one image and one version of
     ///   this library, two runs emit exactly the same sequence. Every
     ///   class-phase event precedes every category-phase event; within the
-    ///   class phase classes follow the `__objc_classlist` walk, each emitting
-    ///   its `subclassIndexed` before its `conformanceIndexed` events in
+    ///   class phase classes follow the `__objc_classlist` walk, then the
+    ///   supplied classes in the order given, each emitting its
+    ///   `subclassIndexed` before its `conformanceIndexed` events in
     ///   declaration order; the category phase walks its list the same way.
     ///   Accumulating the stream in arrival order therefore reproduces the
     ///   binary's declaration order, which is what this library's own reverse
@@ -204,7 +230,7 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
     ///   this returns.
     ///
     /// - **The handler's execution context is not promised.** See the
-    ///   `eventHandler` parameter of ``init(machO:imagePath:eventHandler:)``.
+    ///   `eventHandler` parameter of ``init(machO:imagePath:suppliedClasses:eventHandler:)``.
     public func prepare() async throws {
         var classByName: [String: ObjCClassGroup] = [:]
         var protocolByName: [String: ObjCProtocolGroup] = [:]
@@ -279,17 +305,27 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
                 + machO.objc.nonLazyClasses64.orEmpty + machO.objc.nonLazyClasses32.orEmpty
         ).filter { seenClassOffsets.insert($0.offset).inserted }
 
+        // A supplied class whose name is empty or repeats an earlier one's
+        // is skipped before the count is taken; one whose name a class object
+        // took, or whose `class_ro_t` cannot be read, only when it comes up.
+        var seenSuppliedClassNames: Set<String> = []
+        let candidateSuppliedClasses = suppliedClasses.filter {
+            !$0.name.isEmpty && seenSuppliedClassNames.insert($0.name).inserted
+        }
+        let classCount = objcClasses.count + candidateSuppliedClasses.count
+
         // One-shot progress marker so the loading indicator can surface
         // "Indexing Objective-C subclasses…" before the per-class loop
         // starts pushing `.loadingObjCClasses` updates. Inheritance and
         // protocol-adoption events are emitted inline below — every class in
         // `__objc_classlist` (including Swift-derived ones via the same
-        // record format) is reported as we walk the list.
+        // record format) is reported as we walk the list, and every supplied
+        // class after them.
         eventHandler?(ObjCIndexingEvent.progress(
             phase: .indexingSubclasses,
             itemDescription: "",
             currentCount: 0,
-            totalCount: objcClasses.count
+            totalCount: classCount
         ))
 
         for objcClass in objcClasses {
@@ -300,7 +336,7 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
                 phase: .loadingClasses,
                 itemDescription: objcClassInfo.name,
                 currentCount: classByName.count,
-                totalCount: objcClasses.count
+                totalCount: classCount
             ))
 
             // Report the relationships this record carries. The class info is
@@ -343,6 +379,85 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
 
             setObjCTypeFromProperties(objcClassInfo.properties + objcClassInfo.classProperties)
             setObjCTypeFromMethods(objcClassInfo.methods + objcClassInfo.classMethods)
+        }
+
+        // The supplied classes, read from their `class_ro_t` and reported the
+        // way the listed classes are. All three kinds are Swift classes of the
+        // stable ABI.
+        var suppliedClassReadings: [(suppliedClass: ObjCSuppliedClass, info: ObjCClassInfo, ivarNamesWithUnknownOffset: Set<String>)] = []
+        var suppliedClassInfoByName: [String: (suppliedClass: ObjCSuppliedClass, info: ObjCClassInfo)] = [:]
+
+        for suppliedClass in candidateSuppliedClasses {
+            guard classByName[suppliedClass.name] == nil,
+                  let (suppliedClassInfo, ivarNamesWithUnknownOffset) = machO.objcClassInfo(
+                      readOnlyDataOffset: suppliedClass.readOnlyDataOffset,
+                      metaclassReadOnlyDataOffset: suppliedClass.metaclassReadOnlyDataOffset,
+                      name: suppliedClass.name,
+                      superClassName: suppliedClass.superClassName
+                  )
+            else { continue }
+            suppliedClassReadings.append((suppliedClass, suppliedClassInfo, ivarNamesWithUnknownOffset))
+            suppliedClassInfoByName[suppliedClass.name] = (suppliedClass, suppliedClassInfo)
+            eventHandler?(ObjCIndexingEvent.progress(
+                phase: .loadingClasses,
+                itemDescription: suppliedClassInfo.name,
+                currentCount: classByName.count + suppliedClassInfoByName.count,
+                totalCount: classCount
+            ))
+
+            if let superClassName = suppliedClassInfo.superClassName, !superClassName.isEmpty {
+                eventHandler?(
+                    ObjCIndexingEvent.subclassIndexed(
+                        className: suppliedClassInfo.name,
+                        superclass: superClassName,
+                        imagePath: imagePath,
+                        isSwiftStable: true
+                    )
+                )
+            }
+
+            for adoptedProtocol in suppliedClassInfo.protocols {
+                eventHandler?(
+                    ObjCIndexingEvent.conformanceIndexed(
+                        className: suppliedClassInfo.name,
+                        protocolName: adoptedProtocol.name,
+                        imagePath: imagePath,
+                        isSwiftStable: true
+                    )
+                )
+            }
+
+            for ivar in suppliedClassInfo.ivars {
+                if let type = ivar.type {
+                    setObjCType(type)
+                }
+            }
+
+            setObjCTypeFromProperties(suppliedClassInfo.properties + suppliedClassInfo.classProperties)
+            setObjCTypeFromMethods(suppliedClassInfo.methods + suppliedClassInfo.classMethods)
+        }
+
+        // Superclass chains go by name, once every supplied class is read: a
+        // supplied superclass can come later in the array than its subclass.
+        var suppliedClassGroupByName: [String: ObjCSuppliedClassGroup] = [:]
+        for reading in suppliedClassReadings {
+            var chain = [reading.info]
+            var visitedClassNames: Set<String> = [reading.suppliedClass.name]
+            var nextSuperclassName = reading.suppliedClass.superClassName
+            while let superclassName = nextSuperclassName, visitedClassNames.insert(superclassName).inserted {
+                if let superclassGroup = classByName[superclassName] {
+                    chain.append(contentsOf: superclassGroup.info)
+                    break
+                }
+                guard let superclass = suppliedClassInfoByName[superclassName] else { break }
+                chain.append(superclass.info)
+                nextSuperclassName = superclass.suppliedClass.superClassName
+            }
+            suppliedClassGroupByName[reading.suppliedClass.name] = ObjCSuppliedClassGroup(
+                suppliedClass: reading.suppliedClass,
+                info: chain,
+                ivarNamesWithUnknownOffset: reading.ivarNamesWithUnknownOffset
+            )
         }
 
         // `__objc_protolist` carries a full `protocol_t` record for *every*
@@ -394,8 +509,31 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
             totalCount: objcCategories.count
         ))
 
+        // Swift points the `@objc` extensions of a class registered through
+        // `__objc_stublist` at the class's stub, which names no class: such
+        // a category goes under the supplied class's name, the one the class
+        // is indexed by. Where two supplied classes give the same stub, the
+        // first keeps it.
+        var suppliedClassNameByStubOffset: [Int: String] = [:]
+        for reading in suppliedClassReadings {
+            guard let classStubOffset = reading.suppliedClass.classStubOffset,
+                  suppliedClassNameByStubOffset[classStubOffset] == nil
+            else { continue }
+            suppliedClassNameByStubOffset[classStubOffset] = reading.suppliedClass.name
+        }
+
         for objcCategory in objcCategories {
-            guard let objcCategoryInfo = machO.objcCategoryInfo(of: objcCategory) else { continue }
+            let suppliedTargetClassName: String? = if suppliedClassNameByStubOffset.isEmpty {
+                nil
+            } else {
+                machO.objcCategoryTargetClassStubOffset(of: objcCategory).flatMap { suppliedClassNameByStubOffset[$0] }
+            }
+            let categoryInfo: ObjCCategoryInfo? = if let suppliedTargetClassName {
+                machO.objcCategoryInfo(of: objcCategory, className: suppliedTargetClassName)
+            } else {
+                machO.objcCategoryInfo(of: objcCategory)
+            }
+            guard let objcCategoryInfo = categoryInfo else { continue }
             categoryByName[objcCategoryInfo.uniqueName] = (objcCategory, objcCategoryInfo)
             eventHandler?(ObjCIndexingEvent.progress(
                 phase: .loadingCategories,
@@ -423,8 +561,13 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
             // differ for the common case of extending another framework's
             // class. Consumers have always seen it this way; changing it would
             // be a behaviour change, not a fix.
+            //
+            // A category on a supplied class's stub resolves no class record;
+            // the class is a Swift class of the stable ABI all the same.
             let targetIsSwiftStable: Bool
-            if let (_, targetClass) = machO.objcCategoryTargetClass(of: objcCategory) {
+            if suppliedTargetClassName != nil {
+                targetIsSwiftStable = true
+            } else if let (_, targetClass) = machO.objcCategoryTargetClass(of: objcCategory) {
                 targetIsSwiftStable = targetClass.isSwiftStable
             } else {
                 targetIsSwiftStable = false
@@ -443,6 +586,7 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
         }
 
         classes = classByName
+        suppliedClassGroups = suppliedClassGroupByName
         protocols = protocolByName
         categories = categoryByName
         structs = structsByName
@@ -512,8 +656,18 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
 
     /// The class plus its superclass chain for `name`, or `nil` if `name` is
     /// not a class in this image. `info.first` is the class itself.
+    ///
+    /// A supplied class has no class object to put in the group, so it is
+    /// `nil` here too; see ``suppliedClassGroup(forName:)``.
     public func classGroup(forName name: String) -> ObjCClassGroup? {
         classes[name]
+    }
+
+    /// The supplied class named `name` with its superclass chain, or `nil` if
+    /// no supplied class of that name was indexed. `info.first` is the class
+    /// itself.
+    public func suppliedClassGroup(forName name: String) -> ObjCSuppliedClassGroup? {
+        suppliedClassGroups[name]
     }
 
     /// The protocol record for `name`, or `nil` if `name` is not a protocol
@@ -527,10 +681,11 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
         categories[uniqueName]
     }
 
-    /// Names of every class in this image (`__objc_classlist` order is not
-    /// preserved — dictionary iteration order).
+    /// Names of every class in this image, the supplied classes among them
+    /// (`__objc_classlist` order is not preserved — dictionary iteration
+    /// order).
     public var classNames: [String] {
-        Array(classes.keys)
+        Array(classes.keys) + Array(suppliedClassGroups.keys)
     }
 
     public var protocolNames: [String] {
