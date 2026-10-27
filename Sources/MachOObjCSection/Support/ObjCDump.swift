@@ -776,3 +776,318 @@ fileprivate extension ObjCClassRODataProtocol {
         return protocolList(in: machO).map { [(machO, $0)] } ?? []
     }
 }
+
+// MARK: - Classes Without a Class Object
+//
+// Added by this fork for the host-supplied classes proposal, and kept to the
+// end of the file so the upstream code above stays untouched. Some Swift
+// classes with an Objective-C ancestor have no class object in the image: a
+// generic class keeps only a `class_ro_t` template in its generic metadata
+// pattern, and a class registered through `__objc_stublist` keeps its
+// `class_ro_t` in its resilient metadata pattern. Finding either takes Swift
+// metadata, which a host reads; given the offsets, the functions below read
+// such a class from its `class_ro_t` alone, and read a category whose class
+// pointer is such a class's stub under the name the host gives the class.
+// They assemble the information as `info(in:options:)` above does, and tests
+// hold the two equal.
+
+extension ObjCClassRODataProtocol {
+    /// The `class_ro_t` at `offset`, or `nil` when no record fits there.
+    ///
+    /// `offset` follows the convention of ``offset``: a file offset within
+    /// the slice for a standalone binary, an offset from the main cache's
+    /// start for an image in a dyld shared cache.
+    public init?(offset: Int, in machO: MachOFile) {
+        guard offset >= 0,
+              let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forOffset: numericCast(offset)),
+              let layout = try? fileHandle.read(offset: numericCast(fileOffset), as: Layout.self) else {
+            return nil
+        }
+        self.init(layout: layout, offset: offset)
+    }
+
+    /// The `class_ro_t` at `offset` bytes from `machO`'s header, or `nil`
+    /// when the memory there cannot be read.
+    public init?(offset: Int, in machO: MachOImage) {
+        let pointer = machO.ptr.advanced(by: offset)
+        guard isPointerSafelyReadable(pointer, length: MemoryLayout<Layout>.size) else {
+            return nil
+        }
+        self.init(
+            layout: pointer.assumingMemoryBound(to: Layout.self).pointee,
+            offset: offset
+        )
+    }
+}
+
+extension ObjCClassRODataProtocol {
+    /// The information of the class this `class_ro_t` describes, read from
+    /// it and from `metaclassData` alone.
+    ///
+    /// The name and the superclass's name are used as given: a generic
+    /// class's template carries no name, and nothing here points at the
+    /// superclass. Class properties and class methods come from
+    /// `metaclassData`, and are empty without it.
+    ///
+    /// An ivar whose offset slot is empty is kept, with an `offset` of 0,
+    /// and named in `ivarNamesWithUnknownOffset`: the fields of a generic
+    /// class lie where each specialization puts them, so its template leaves
+    /// the slots for the runtime to fill. `ObjCClassProtocol.info(in:options:)`
+    /// drops such an ivar.
+    public func classInfo(
+        name: String,
+        superClassName: String?,
+        metaclassData: Self?,
+        in machO: MachOFile,
+        options: ObjCInfoOptions = .recursive
+    ) -> (info: ObjCClassInfo, ivarNamesWithUnknownOffset: Set<String>) {
+        // See `ObjCClassProtocol.info(in: MachOFile)` for why this is cached.
+        var _imageIndex: Int??
+        func imageIndex() -> Int? {
+            if let v = _imageIndex { return v }
+            let v = machO.objcImageIndex
+            _imageIndex = .some(v)
+            return v
+        }
+
+        let protocols = resolvedProtocolLists(in: machO, imageIndex: imageIndex())
+            .flatMap { (m, list) in
+                list.referencedProtocolInfos(
+                    in: m,
+                    options: options.protocolInfoOptions
+                )
+            }
+
+        var ivars: [ObjCIvarInfo] = []
+        var ivarNamesWithUnknownOffset: Set<String> = []
+        for ivar in ivarList(in: machO)?.ivars(in: machO) ?? [] {
+            if let info = ivar.info(in: machO) {
+                ivars.append(info)
+            } else if let name = ivar.name(in: machO),
+                      let type = ivar.type(in: machO) {
+                ivars.append(.init(name: name, typeEncoding: type, offset: 0))
+                ivarNamesWithUnknownOffset.insert(name)
+            }
+        }
+
+        // Instance
+        let properties = resolvedPropertyLists(in: machO, imageIndex: imageIndex())
+            .flatMap { (m, list) in list.properties(in: m) }
+            .compactMap { $0.info(isClassProperty: false) }
+
+        let methods = resolvedMethodLists(in: machO, imageIndex: imageIndex())
+            .flatMap { (m, list) in list.methods(in: m) ?? [] }
+            .compactMap { $0.info(isClassMethod: false) }
+
+        // Meta
+        let classProperties = metaclassData?
+            .resolvedPropertyLists(in: machO, imageIndex: imageIndex())
+            .flatMap { (m, list) in list.properties(in: m) }
+            .compactMap { $0.info(isClassProperty: true) } ?? []
+
+        let classMethods = metaclassData?
+            .resolvedMethodLists(in: machO, imageIndex: imageIndex())
+            .flatMap { (m, list) in list.methods(in: m) ?? [] }
+            .compactMap { $0.info(isClassMethod: true) } ?? []
+
+        let info = ObjCClassInfo(
+            name: name,
+            // What `ObjCClassProtocol.version(for:)` reads off the same data.
+            version: isMetaClass ? 7 : 0,
+            imageName: machO.imagePath,
+            instanceSize: numericCast(layout.instanceSize),
+            superClassName: superClassName,
+            protocols: protocols,
+            ivars: ivars,
+            classProperties: classProperties,
+            properties: properties,
+            classMethods: classMethods,
+            methods: methods
+        )
+        return (info, ivarNamesWithUnknownOffset)
+    }
+
+    /// The information of the class this `class_ro_t` describes, read from
+    /// it and from `metaclassData` alone, as the `MachOFile` counterpart
+    /// reads it.
+    public func classInfo(
+        name: String,
+        superClassName: String?,
+        metaclassData: Self?,
+        in machO: MachOImage,
+        options: ObjCInfoOptions = .recursive
+    ) -> (info: ObjCClassInfo, ivarNamesWithUnknownOffset: Set<String>) {
+        // See `ObjCClassProtocol.info(in: MachOFile)` for why this is cached.
+        var _imageIndex: Int??
+        func imageIndex() -> Int? {
+            if let v = _imageIndex { return v }
+            let v = machO.objcImageIndex
+            _imageIndex = .some(v)
+            return v
+        }
+
+        let protocols = resolvedProtocolLists(in: machO, imageIndex: imageIndex())
+            .flatMap { (m, list) in
+                list.referencedProtocolInfos(
+                    in: m,
+                    options: options.protocolInfoOptions
+                )
+            }
+
+        var ivars: [ObjCIvarInfo] = []
+        var ivarNamesWithUnknownOffset: Set<String> = []
+        for ivar in ivarList(in: machO)?.ivars(in: machO) ?? [] {
+            if let info = ivar.info(in: machO) {
+                ivars.append(info)
+            } else if let type = ivar.type(in: machO) {
+                let name = ivar.name(in: machO)
+                ivars.append(.init(name: name, typeEncoding: type, offset: 0))
+                ivarNamesWithUnknownOffset.insert(name)
+            }
+        }
+
+        // Instance
+        let properties = resolvedPropertyLists(in: machO, imageIndex: imageIndex())
+            .flatMap { (m, list) in list.properties(in: m) }
+            .compactMap { $0.info(isClassProperty: false) }
+
+        let methods = resolvedMethodLists(in: machO, imageIndex: imageIndex())
+            .flatMap { (m, list) in list.methods(in: m) }
+            .compactMap { $0.info(isClassMethod: false) }
+
+        // Meta
+        let classProperties = metaclassData?
+            .resolvedPropertyLists(in: machO, imageIndex: imageIndex())
+            .flatMap { (m, list) in list.properties(in: m) }
+            .compactMap { $0.info(isClassProperty: true) } ?? []
+
+        let classMethods = metaclassData?
+            .resolvedMethodLists(in: machO, imageIndex: imageIndex())
+            .flatMap { (m, list) in list.methods(in: m) }
+            .compactMap { $0.info(isClassMethod: true) } ?? []
+
+        let info = ObjCClassInfo(
+            name: name,
+            // What `ObjCClassProtocol.version(for:)` reads off the same data.
+            version: isMetaClass ? 7 : 0,
+            imageName: machO.path,
+            instanceSize: numericCast(layout.instanceSize),
+            superClassName: superClassName,
+            protocols: protocols,
+            ivars: ivars,
+            classProperties: classProperties,
+            properties: properties,
+            classMethods: classMethods,
+            methods: methods
+        )
+        return (info, ivarNamesWithUnknownOffset)
+    }
+}
+
+extension ObjCCategoryProtocol {
+    /// The information of this category, attributed to the class named
+    /// `className` rather than to a name read off its class pointer.
+    ///
+    /// Swift points a category of a class registered through
+    /// `__objc_stublist` at the class's stub, which records no name:
+    /// `className(in:)` then falls back on a local symbol, and a stripped
+    /// image has none, so `info(in:options:)` returns `nil`. Given the name
+    /// of the class whose stub it is, the category reads all the same.
+    public func info(
+        in machO: MachOFile,
+        className: String,
+        options: ObjCInfoOptions = .recursive
+    ) -> ObjCCategoryInfo? {
+        guard let name = name(in: machO) else {
+            return nil
+        }
+
+        let protocols = protocolList(in: machO)?
+            .referencedProtocolInfos(
+                in: machO,
+                options: options.protocolInfoOptions
+            ) ?? []
+
+        // Instance
+        let propertiesList = instancePropertyList(in: machO)
+        let properties = propertiesList?
+            .properties(in: machO)
+            .compactMap { $0.info(isClassProperty: false) } ?? []
+
+        let methodsList = instanceMethodList(in: machO)
+        let methods = methodsList?
+            .methods(in: machO)?
+            .compactMap { $0.info(isClassMethod: false) } ?? []
+
+        // Meta
+        let classPropertiesList = classPropertyList(in: machO)
+        let classProperties = classPropertiesList?
+            .properties(in: machO)
+            .compactMap { $0.info(isClassProperty: true) } ?? []
+
+        let classMethodsList = classMethodList(in: machO)
+        let classMethods = classMethodsList?
+            .methods(in: machO)?
+            .compactMap { $0.info(isClassMethod: true) } ?? []
+
+        return .init(
+            name: name,
+            className: className,
+            protocols: protocols,
+            classProperties: classProperties,
+            properties: properties,
+            classMethods: classMethods,
+            methods: methods
+        )
+    }
+
+    /// The information of this category, attributed to the class named
+    /// `className`, as the `MachOFile` counterpart reads it.
+    public func info(
+        in machO: MachOImage,
+        className: String,
+        options: ObjCInfoOptions = .recursive
+    ) -> ObjCCategoryInfo? {
+        guard let name = name(in: machO) else {
+            return nil
+        }
+
+        let protocols = protocolList(in: machO)?
+            .referencedProtocolInfos(
+                in: machO,
+                options: options.protocolInfoOptions
+            ) ?? []
+
+        // Instance
+        let propertiesList = instancePropertyList(in: machO)
+        let properties = propertiesList?
+            .properties(in: machO)
+            .compactMap { $0.info(isClassProperty: false) } ?? []
+
+        let methodsList = instanceMethodList(in: machO)
+        let methods = methodsList?
+            .methods(in: machO)
+            .compactMap { $0.info(isClassMethod: false) } ?? []
+
+        // Meta
+        let classPropertiesList = classPropertyList(in: machO)
+        let classProperties = classPropertiesList?
+            .properties(in: machO)
+            .compactMap { $0.info(isClassProperty: true) } ?? []
+
+        let classMethodsList = classMethodList(in: machO)
+        let classMethods = classMethodsList?
+            .methods(in: machO)
+            .compactMap { $0.info(isClassMethod: true) } ?? []
+
+        return .init(
+            name: name,
+            className: className,
+            protocols: protocols,
+            classProperties: classProperties,
+            properties: properties,
+            classMethods: classMethods,
+            methods: methods
+        )
+    }
+}

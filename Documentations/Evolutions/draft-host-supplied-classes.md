@@ -1,6 +1,6 @@
 # Draft - 由宿主补充文件里没有 class object 的类
 
-- **状态**: Accepted
+- **状态**: In Progress
 - **创建日期**: 2026-10-27
 - **最后更新**: 2026-10-27
 - **关联**: MachOSwiftSection [issue #137](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/issues/137)
@@ -123,8 +123,8 @@ README 的库用法一节（英文）、使用指南里面向库的一半补一�
 
 ### 落地步骤
 
-1. 核心 target 的追加 API 与一致性测试。
-2. `ObjCMetadataSource` 的新要求与两种模式的实现。
+1. 核心 target 的追加 API 与一致性测试。（已完成）
+2. `ObjCMetadataSource` 的新要求与两种模式的实现。（已完成）
 3. 索引器：新类型、`init` 参数、`prepare()`（含 stub 上 category 的归属）、查询与文档注释，及其测试。
 4. 渲染层、builder、snapshot builder，及其测试。
 5. README、使用指南、术语表。
@@ -145,3 +145,6 @@ README 的库用法一节（英文）、使用指南里面向库的一半补一�
 | 2026-10-27 | `Kind` 多列一个 `swiftClassWithGenericAncestry` | Swift 编译器里不进 `__objc_classlist` 的带 ObjC 祖先的类恰好三种（`ClassMetadataStrategy` 为 Resilient 的泛型类、Resilient 的非泛型类、Singleton），后两种的 stub 都进 `__objc_stublist`（`GenMeta.cpp` `emitClassMetadata`）。宿主遍历 stub list 时两种都会遇到；一次列全，免得以后加 case 破坏穷尽 `switch`。MachOSwiftSection 确认三种都会提供；同时具有 resilient 与泛型祖先的类（如超类为 `SwiftUI.NSHostingView<MenuBarLabel>`）走 Resilient 策略，归第二种。 |
 | 2026-10-27 | 加 `classStubOffset`，把指向补充类 stub 的 category 归到补充类名下 | MachOSwiftSection 审阅接口时提出。stub 上的 category 今天在 strip 过的二进制里被整个丢掉，没 strip 时类名来自本地符号、可能与宿主给的名字对不上。只多一个可选字段，不传时行为不变。 |
 | 2026-10-27 | 用户批准，开始实现 | 用户批准本提案，包括在上游文件 `Support/ObjCDump.swift` 末尾追加函数、以一致性测试钉住与原逻辑不漂移。 |
+| 2026-10-27 | 读 RO 用 `ObjCClassRODataProtocol` 上的可失败构造器 `init?(offset:in:)`；只凭 RO 建类信息用 `classInfo(name:superClassName:metaclassData:in:options:)`，返回带标签的元组 `(info:ivarNamesWithUnknownOffset:)` | 上游文件里不新增类型；返回元组是该库已有的写法（`metaClass(in:)`、`stubClass(in:)`）。 |
+| 2026-10-27 | category 所指 stub 的偏移由 `ObjCMetadataSource.objcCategoryTargetClassStubOffset(of:)` 用上游已公开的 `stubClass(in:)` 取，核心 target 不为此追加代码；镜像模式下 stub 不在本镜像时返回 `nil` | 镜像模式的偏移从各自镜像的 header 算起，别的镜像里的 stub 可能与本镜像某个 stub 偏移相同；文件模式下 dyld cache 的偏移从主 cache 起点算，不会相撞。 |
+| 2026-10-27 | 只凭 RO 建出的 `version` 按 `ObjCClassProtocol.version(for:)` 的规则取（元类 7，其余 0），镜像模式的一致性测试不比较 `version` | 镜像模式下已实现的类的 `version` 来自运行时数据，由 `class_setVersion` 写入，`class_ro_t` 里没有这个值。 |

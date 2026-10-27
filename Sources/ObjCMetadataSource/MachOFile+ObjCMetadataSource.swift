@@ -58,6 +58,48 @@ extension MachOFile: ObjCMetadataSource {
         return resolved
     }
 
+    public func objcClassInfo(
+        readOnlyDataOffset: Int,
+        metaclassReadOnlyDataOffset: Int?,
+        name: String,
+        superClassName: String?,
+        options: ObjCInfoOptions = .recursive
+    ) -> (info: ObjCClassInfo, ivarNamesWithUnknownOffset: Set<String>)? {
+        func classInfo<ReadOnlyData: ObjCClassRODataProtocol>(
+            _: ReadOnlyData.Type
+        ) -> (info: ObjCClassInfo, ivarNamesWithUnknownOffset: Set<String>)? {
+            guard let readOnlyData = ReadOnlyData(offset: readOnlyDataOffset, in: self) else { return nil }
+            let metaclassReadOnlyData = metaclassReadOnlyDataOffset.flatMap { ReadOnlyData(offset: $0, in: self) }
+            return readOnlyData.classInfo(
+                name: name,
+                superClassName: superClassName,
+                metaclassData: metaclassReadOnlyData,
+                in: self,
+                options: options
+            )
+        }
+        return is64Bit ? classInfo(ObjCClassROData64.self) : classInfo(ObjCClassROData32.self)
+    }
+
+    public func objcCategoryInfo<Category: ObjCCategoryProtocol>(
+        of objcCategory: Category,
+        className: String,
+        options: ObjCInfoOptions = .recursive
+    ) -> ObjCCategoryInfo? {
+        objcCategory.info(in: self, className: className, options: options)
+    }
+
+    /// The stub's offset in a dyld shared cache counts from the main cache's
+    /// start, so a stub in another image of the cache keeps an offset no stub
+    /// of this image has.
+    public func objcCategoryTargetClassStubOffset<Category: ObjCCategoryProtocol>(
+        of objcCategory: Category
+    ) -> Int? {
+        // Explicitly typed for the same reason as `objcSuperClass(of:)`.
+        let resolved: (MachOFile, Category.ObjCStubClass)? = objcCategory.stubClass(in: self)
+        return resolved?.1.offset
+    }
+
     /// In file mode the raw `imp` is already an offset — `ObjCMethodList`
     /// converts it while decoding, resolving the slot's rebase to an offset
     /// from the main cache's start for a cache image and to the file offset
