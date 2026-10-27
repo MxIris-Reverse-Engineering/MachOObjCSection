@@ -38,6 +38,33 @@ struct ObjCOutputTransformerTests {
         #expect(module.transform(input).string == "CGFloat value")
     }
 
+    /// A replacement stands in for a whole C type: the keywords spelling one
+    /// type, nothing before or around them.
+    struct WholeTypeCase: Sendable, CustomTestStringConvertible {
+        let keywords: [String]
+        let replacements: [Transformer.CType.Pattern: String]
+        let expected: String
+
+        var testDescription: String { keywords.joined(separator: " ") }
+    }
+
+    @Test(
+        "CType replaces whole types only",
+        arguments: [
+            // A qualifier before the type keeps its space.
+            WholeTypeCase(keywords: ["const", "double"], replacements: [.double: "CGFloat"], expected: "const CGFloat"),
+            // `unsigned long` is a type of its own, not `long` with a prefix.
+            WholeTypeCase(keywords: ["unsigned", "long"], replacements: [.long: "NSInteger"], expected: "unsigned long"),
+            // Nor is `long double` a `long` followed by a `double`.
+            WholeTypeCase(keywords: ["long", "double"], replacements: Transformer.CType.Presets.foundation, expected: "long double"),
+        ]
+    )
+    func cTypeReplacesWholeTypesOnly(wholeTypeCase: WholeTypeCase) {
+        var module = Transformer.CType(isEnabled: true)
+        module.replacements = wholeTypeCase.replacements
+        #expect(module.transform(semanticKeywords(wholeTypeCase.keywords)).string == wholeTypeCase.expected)
+    }
+
     @Test("ObjCIvarOffset renders its template")
     func objcIvarOffsetRendersTemplate() {
         let module = Transformer.ObjCIvarOffset(isEnabled: true)
