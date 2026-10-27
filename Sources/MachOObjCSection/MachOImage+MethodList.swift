@@ -56,7 +56,7 @@ extension MachOImage.ObjCMethodLists {
         }
 
         public mutating func next() -> Element? {
-            guard nextOffset < tableSize else {
+            guard nextOffset + MemoryLayout<Element.Header>.size <= tableSize else {
                 return nil
             }
             let ptr = basePointer
@@ -79,8 +79,7 @@ extension MachOImage.ObjCMethodLists {
             }
 
             defer {
-                nextOffset += list.size
-                nextOffset += nextOffset % numericCast(power(2, align))
+                nextOffset = roundedUp(nextOffset + list.size, toAlignmentExponent: align)
             }
 
             return list
@@ -88,6 +87,13 @@ extension MachOImage.ObjCMethodLists {
     }
 }
 
-func power(_ x: Int, _ n: Int ) -> Int {
-    (1..<n).reduce(into: x, { result, _ in result *= 2 })
+/// `offset` rounded up to a multiple of `2^alignmentExponent`, the alignment a
+/// section's `align` field states as a power-of-two exponent. An exponent too
+/// large to shift by — no section is aligned that far — leaves `offset` as is.
+func roundedUp(_ offset: Int, toAlignmentExponent alignmentExponent: Int) -> Int {
+    guard (0 ..< Int.bitWidth - 1).contains(alignmentExponent) else {
+        return offset
+    }
+    let alignment = 1 << alignmentExponent
+    return (offset + alignment - 1) & ~(alignment - 1)
 }
