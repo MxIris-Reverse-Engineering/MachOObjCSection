@@ -64,9 +64,10 @@ extension MachOFile: ObjCMetadataSource {
     /// for a standalone binary (see `ObjCMethodList.pointerMethod(_:in:entryOffset:)`).
     /// Relative method lists, which is what current arm64 binaries emit,
     /// produce an offset directly. So the value goes straight into
-    /// `address(forOffset:)` with no base to subtract.
+    /// `address(forOffset:)` with no base to subtract. A value past what an
+    /// `Int` holds is no offset at all and is rejected rather than trapping.
     public func objcResolvedIMPAddress(forRawValue rawValue: UInt64) -> UInt64? {
-        guard rawValue != 0 else { return nil }
-        return address(forOffset: Int(rawValue))
+        guard rawValue != 0, let offset = Int(exactly: rawValue) else { return nil }
+        return address(forOffset: offset)
     }
 }
