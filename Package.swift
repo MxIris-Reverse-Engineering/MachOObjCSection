@@ -341,6 +341,14 @@ let package = Package(
                 .product(name: "MachOKitExtensions", package: "MachOKitExtensions"),
                 .product(name: "Semantic", package: "swift-semantic-string"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ],
+            exclude: [
+                "Fixtures/ObjCSection32BitFixture.m",
+                "Fixtures/ObjCSection64BitFixture.m",
+            ],
+            resources: [
+                .copy("Fixtures/libObjCSection32BitFixture.dylib"),
+                .copy("Fixtures/libObjCSection64BitFixture.dylib"),
             ]
         ),
         .testTarget(
