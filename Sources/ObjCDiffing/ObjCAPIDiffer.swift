@@ -47,9 +47,18 @@ public struct ObjCAPIDiffer: Sendable {
             newSideKeyCollisions: new.keyCollisions()
         )
         let diagnostics = candidateDiagnostics.isEmpty ? nil : candidateDiagnostics
+        let oldRequirements = ObjCProtocolRequirements(protocols: old.protocols)
+        let newRequirements = ObjCProtocolRequirements(protocols: new.protocols)
         return ObjCAPIDiff(
             classes: diffContainerSnapshots(old.classes, new.classes),
-            protocols: diffContainerSnapshots(old.protocols, new.protocols),
+            protocols: diffContainerSnapshots(old.protocols, new.protocols) { adoption, protocolName in
+                ObjCMemberRecord.adoptionCompatibilityOverride(
+                    adding: adoption,
+                    toProtocolNamed: protocolName,
+                    oldRequirements: oldRequirements,
+                    newRequirements: newRequirements
+                )
+            },
             categories: diffContainerSnapshots(old.categories, new.categories),
             oldProvenance: oldProvenance,
             newProvenance: newProvenance,
@@ -145,7 +154,13 @@ public struct ObjCAPIDiffer: Sendable {
     /// Match container snapshots by key, then diff each matched pair's
     /// members. One helper serves every axis — classes, protocols, and
     /// categories — since they are all `[ObjCContainerSnapshot]` once frozen.
-    private func diffContainerSnapshots(_ old: [ObjCContainerSnapshot], _ new: [ObjCContainerSnapshot]) -> [ObjCContainerChange] {
+    /// `addedAdoptionOverride` judges an adoption a container gains, given the
+    /// container's name; only the protocol axis passes one.
+    private func diffContainerSnapshots(
+        _ old: [ObjCContainerSnapshot],
+        _ new: [ObjCContainerSnapshot],
+        addedAdoptionOverride: ((_ adoption: ObjCMemberRecord, _ containerName: String) -> ObjCCompatibility?)? = nil
+    ) -> [ObjCContainerChange] {
         let matched = threeWayMatch(old: old, new: new) { $0.key }
 
         var changes: [ObjCContainerChange] = []
@@ -156,7 +171,13 @@ public struct ObjCAPIDiffer: Sendable {
             ObjCContainerChange(key: $0.key, name: $0.name, containerKind: $0.kind, status: .added, memberChanges: [])
         })
         for (oldContainer, newContainer) in matched.common {
-            let memberChanges = diffMembers(old: oldContainer.members, new: newContainer.members)
+            let memberChanges = diffMembers(
+                old: oldContainer.members,
+                new: newContainer.members,
+                addedAdoptionOverride: addedAdoptionOverride.map { override in
+                    { adoption in override(adoption, newContainer.name) }
+                }
+            )
             if !memberChanges.isEmpty {
                 changes.append(ObjCContainerChange(
                     key: newContainer.key,
@@ -176,14 +197,29 @@ public struct ObjCAPIDiffer: Sendable {
     /// Public so it can be unit-tested on hand-built records without any
     /// Mach-O or runtime involvement.
     public func diffMembers(old: [ObjCMemberRecord], new: [ObjCMemberRecord]) -> [ObjCMemberChange] {
+        diffMembers(old: old, new: new, addedAdoptionOverride: nil)
+    }
+
+    /// ``diffMembers(old:new:)``, with `addedAdoptionOverride` judging each
+    /// adoption the container gains in place of the record-level rule.
+    func diffMembers(
+        old: [ObjCMemberRecord],
+        new: [ObjCMemberRecord],
+        addedAdoptionOverride: ((_ adoption: ObjCMemberRecord) -> ObjCCompatibility?)?
+    ) -> [ObjCMemberChange] {
         let matched = threeWayMatch(old: old, new: new) { $0.identityKey }
 
         var changes: [ObjCMemberChange] = []
         changes.append(contentsOf: matched.removed.map {
             ObjCMemberChange(key: $0.identityKey, kind: $0.kind, status: .removed, oldSignature: $0.signature, newSignature: nil, compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: $0, new: nil))
         })
-        changes.append(contentsOf: matched.added.map {
-            ObjCMemberChange(key: $0.identityKey, kind: $0.kind, status: .added, oldSignature: nil, newSignature: $0.signature, compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: nil, new: $0))
+        changes.append(contentsOf: matched.added.map { addedRecord in
+            let compatibilityOverride: ObjCCompatibility? = if addedRecord.kind == .protocolAdoption, let addedAdoptionOverride {
+                addedAdoptionOverride(addedRecord)
+            } else {
+                ObjCMemberRecord.compatibilityOverride(old: nil, new: addedRecord)
+            }
+            return ObjCMemberChange(key: addedRecord.identityKey, kind: addedRecord.kind, status: .added, oldSignature: nil, newSignature: addedRecord.signature, compatibilityOverride: compatibilityOverride)
         })
         for (oldRecord, newRecord) in matched.common where oldRecord.payloadKey != newRecord.payloadKey {
             changes.append(ObjCMemberChange(key: newRecord.identityKey, kind: newRecord.kind, status: .modified, oldSignature: oldRecord.signature, newSignature: newRecord.signature, compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: oldRecord, new: newRecord)))

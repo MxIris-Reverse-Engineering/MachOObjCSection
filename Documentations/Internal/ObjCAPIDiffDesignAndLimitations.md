@@ -75,6 +75,15 @@ record 级 refinement：**协议新增 required 成员 → breaking**（现有 c
 refinement 同构，同一函数（`ObjCMemberRecord.compatibilityOverride(old:new:)`）
 被双侧 differ 与 evolution builder 共用，N == 2 时两条路径的 verdict 不可能分叉。
 
+**协议新采纳另一个协议**按同一条理由判定（见提案
+[协议新采纳另一个协议时按破坏性改动判定](../Evolutions/draft-protocol-adoption-compatibility.md)）：
+`@protocol P <Q>` 把 Q 的必选成员同样加到 P 的 conformer 头上。协议容器新增的 `adopts:<Q>`，
+在新快照的协议表里把 Q 连同它自己的采纳逐层展开，只要有一个必选成员不在旧快照里 P 已要求的
+必选成员中（同样逐层展开），就是 breaking；Q 不在新快照里、无法展开时也判 breaking。类与
+category 新采纳协议仍是 additive，它们是在提供实现。这条判定要看两侧的协议表，单条 record
+看不出来，所以放在容器层：`ObjCMemberRecord.adoptionCompatibilityOverride` 由双侧 differ 与
+evolution builder 共用，各自传入相邻两个快照的 `ObjCProtocolRequirements`。
+
 ## 已知局限
 
 ### 1. ObjC 无访问控制 → 判定分不出公开 API 与私有实现
@@ -107,7 +116,8 @@ offset 不折入 payload（见上），所以「类型不变、只有布局位�
 
 `protocols` 数组是递归物化的树，快照只取第一层的 `name`（即直接采纳）。
 间接采纳的变化由对应协议自己的容器报告。这也避免了把树序列化进 baseline 的
-指数膨胀。
+指数膨胀。判定协议新采纳是否 breaking 时要用到间接采纳，它不读这棵树，而是在快照的
+协议表里按名字逐层查（见上文「兼容性判定」）。
 
 ### 6. category 同名合并风险
 
