@@ -7,6 +7,7 @@
   （`swift-section objc dump` 漏掉 Swift 定义的两类 ObjC 类）；MachOSwiftSection 侧在
   `ObjCInterfaceSession.make` 里从 Swift metadata 算出补充类并传入
 - **实现分支**: `feature/host-supplied-classes`
+- **配套文档**: [使用指南的库调用方一节](../Guides/ObjCSectionCommandLine.md#库调用方没有-class-object-的类由宿主补充)；[泛型化到 MachOFile 的实现说明](../Internal/ObjCMetadataSourceGenericization.md)里核心 target 例外的补记
 
 ## 摘要
 
@@ -119,7 +120,8 @@ public func suppliedClassGroup(forName name: String) -> ObjCSuppliedClassGroup?
 ### 文档
 
 README 的库用法一节（英文）、使用指南里面向库的一半补一节契约（偏移约定、跳过规则、两个查询入口的分工、偏移未知
-的 ivar），术语表登记「supplied class（补充类）」。实现说明在落地时判断是否需要。
+的 ivar、stub 上的 category），术语表登记「supplied class（补充类）」。不另写实现说明：核心 target 的例外补记进
+《泛型化到 MachOFile 的实现说明》讲边界的那一节。
 
 ### 落地步骤
 
@@ -127,9 +129,9 @@ README 的库用法一节（英文）、使用指南里面向库的一半补一�
 2. `ObjCMetadataSource` 的新要求与两种模式的实现。（已完成）
 3. 索引器：新类型、`init` 参数、`prepare()`（含 stub 上 category 的归属）、查询与文档注释，及其测试。（已完成）
 4. 渲染层、builder、snapshot builder，及其测试。（已完成）
-5. README、使用指南、术语表。
+5. README、使用指南、术语表。（已完成）
 6. 把分支告诉 MachOSwiftSection；拿到真实偏移后补上真实二进制测试。落地合入 `next` 后，发一个 fork 版本供
-   MachOSwiftSection 依赖（发版由用户决定）。
+   MachOSwiftSection 依赖（发版由用户决定）。（分支已告知，真实二进制测试已随第 3 步落地；合并与发版待用户）
 
 ## 决策日志
 
@@ -151,3 +153,5 @@ README 的库用法一节（英文）、使用指南里面向库的一半补一�
 | 2026-10-27 | 补充类的测试放进 `ObjCMetadataSourceTests`，真实二进制测试随第 3 步提前落地 | 这些测试要现编 C 与 Swift fixture，还要用 builder 和 snapshot builder，这个 target 已经依赖这几个模块，也已有现编 fixture 的先例（`SelfBindFixture`）；Xcode Service 的偏移在开工前已经拿到。 |
 | 2026-10-27 | 进度事件的总数在开始时去掉空名字与重名的补充类；名字被 class object 占用或 RO 读不出的补充类仍计入总数 | 这两种要走到它才知道；宿主按 Swift metadata 算出的补充类本不会撞上 class object，也都读得出，只有宿主出错时计数才到不了总数。 |
 | 2026-10-27 | 偏移未知的 ivar 不交给 `ivarOffsetCommentBuilder`，一律写 `offset: unknown` | 这个闭包只接收一个 `Int`，表达不了「未知」；交给它就只能传 0，读者会把 0 当成真实偏移。 |
+| 2026-10-27 | 不另写实现说明；核心 target 的例外补记进《泛型化到 MachOFile 的实现说明》，术语表登记「supplied class（补充类）」 | 维护者会踩到、代码里看不出的只有一件事：上游文件末尾那段是 fork 的、为什么放那里、靠什么防漂移，它属于那篇文档讲核心目录边界的一节。其余取舍都已在本提案的决策日志里。 |
+| 2026-10-27 | 实现完成，待合并 | 第 1–5 步都已落在 `feature/host-supplied-classes`；`swift test --skip MachOObjCSectionTests`（与 CI 相同）220 个测试全部通过，退出码 0。合并、编号与 fork 发版留给用户。 |

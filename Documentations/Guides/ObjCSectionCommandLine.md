@@ -1,7 +1,7 @@
 # objc-section 使用指南
 
-- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）
-- **最后更新**: 2026-09-23
+- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）、[由宿主补充文件里没有 class object 的类](../Evolutions/draft-host-supplied-classes.md)（库调用方）
+- **最后更新**: 2026-10-27
 
 这份文档写给两类人：用 `objc-section` 命令行导出 ObjC 头的人，以及直接调用
 `ObjCInterfaceIndexer` / `ObjCInterfaceBuilder` 处理磁盘上二进制的人。
@@ -292,6 +292,35 @@ func makeIndexer() -> ObjCInterfaceIndexer
 private var indexer: ObjCInterfaceIndexer<MachOImage>
 func makeIndexer() -> ObjCInterfaceIndexer<MachOImage>
 ```
+
+## 库调用方：没有 class object 的类由宿主补充
+
+带 ObjC 祖先的 Swift 类里有三种不在 `__objc_classlist`：泛型类，以及经 `__objc_stublist`
+注册的类（超类在开了 library evolution 的别的模块里，或超类是泛型）。索引器只遍历类列表，
+看不到它们；它们的 `class_ro_t` 要读 Swift metadata 才找得到，本库不读，由宿主
+（MachOSwiftSection）算好后经 `init(machO:imagePath:suppliedClasses:eventHandler:)` 传进来，
+术语见[补充类](../Glossary.md#supplied-class补充类)。命令行不接这个入口。下面几条在签名里看不出来：
+
+- **偏移约定与 `ObjCClassRODataProtocol.offset` 相同。** 独立二进制是 slice 内的文件偏移，
+  dyld cache 里的镜像是「未滑动地址减 `sharedRegionStart`」，`MachOImage` 是到镜像 header
+  的距离。传错约定不会报错，只会读不出（被跳过）或读成别的数据。
+- **跳过不报错。** 名字为空、名字已被占用（class object 优先，补充类之间先到先得）、偏移处读不出
+  `class_ro_t` 的补充类都被静默跳过，`prepare()` 之后 `suppliedClassGroup(forName:)` 返回
+  `nil` 就是被跳过了。进度事件的总数在开始时只去掉空名字和重名的，所以宿主传错时
+  `currentCount` 到不了 `totalCount`。
+- **两个查询入口分工。** 补充类进 `classNames`、事件、渲染与 API snapshot，但
+  `classGroup(forName:)` 对它返回 `nil`（`ObjCClassGroup` 要求一个 class object），要用
+  `suppliedClassGroup(forName:)`。只认 `classGroup` 的下游代码会把补充类当成不存在。
+- **名字原样使用，超类链按名字接。** 不读 RO 的 `name`（泛型模板里是 NULL）；超类链只在
+  本索引里按名字接，遇到本镜像之外的名字即停，所以超类在别的镜像时 `stripOverrides`
+  剥不到继承来的成员，镜像模式也一样。
+- **偏移未知的 ivar 的 `offset` 是 0，不是真实偏移。** 泛型类模板的 ivar 偏移由运行时按特化填，
+  这些 ivar 列在 `ivarNamesWithUnknownOffset` 里；渲染时偏移注释写 `offset: unknown`，
+  不经过 `ivarOffsetCommentBuilder`。自己读 `ObjCClassInfo.ivars` 的调用方要先查这个集合。
+- **stub 上的 category 靠 `classStubOffset`。** Swift 把 stub 注册类的 `@objc` 扩展编成
+  category，`cls` 指向 class stub（`__objc_stublist` 条目里存的地址，即 stub 的 isa 字，
+  `CMs` 符号所在处）。给了这个偏移，这些 category 就记在补充类的名字下，
+  `targetIsSwiftStable` 为 `true`；不给，strip 过的二进制里它们会被整个丢掉。
 
 ## 不建议 conform `ObjCMetadataSource`
 
