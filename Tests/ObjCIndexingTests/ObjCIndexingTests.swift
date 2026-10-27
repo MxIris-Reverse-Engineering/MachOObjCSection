@@ -328,6 +328,82 @@ struct ObjCIndexingTests {
         #expect(lastClassPhase < firstCategoryPhase)
     }
 
+    // MARK: - Non-Lazy Classes and Categories
+
+    /// Clang lists a class or category that implements `+load` in
+    /// `__objc_classlist` / `__objc_catlist` like every other, and again in
+    /// `__objc_nlclslist` / `__objc_nlcatlist`.
+    @Test("A class that implements +load is reported once")
+    func nonLazyClassIsReportedOnce() async throws {
+        let machO = try #require(MachOImage(name: "Foundation"))
+        let nonLazyClassNames = Set((machO.objc.nonLazyClasses64 ?? []).compactMap { $0.info(in: machO)?.name })
+        try #require(!nonLazyClassNames.isEmpty, "Foundation has no class that implements +load")
+
+        let collector = EventCollector()
+        _ = try await Self.makeIndexer(collectingInto: collector)
+
+        var reportCountsByClassName: [String: Int] = [:]
+        for case .subclassIndexed(let className, _, _, _) in collector.events where nonLazyClassNames.contains(className) {
+            reportCountsByClassName[className, default: 0] += 1
+        }
+        #expect(!reportCountsByClassName.isEmpty)
+        #expect(reportCountsByClassName.filter { $0.value > 1 }.keys.sorted() == [])
+    }
+
+    @Test("Class loading progress ends at its total")
+    func classLoadingProgressEndsAtTotal() async throws {
+        let collector = EventCollector()
+        _ = try await Self.makeIndexer(collectingInto: collector)
+
+        var lastProgress: (currentCount: Int, totalCount: Int)?
+        for case .progress(.loadingClasses, _, let currentCount, let totalCount) in collector.events {
+            lastProgress = (currentCount, totalCount)
+        }
+        let progress = try #require(lastProgress)
+        #expect(progress.currentCount == progress.totalCount)
+    }
+
+    @Test(
+        "Category loading progress ends at its total",
+        .enabled(if: MachOImage(name: "Foundation")?.objc.nonLazyCategories64?.isEmpty == false)
+    )
+    func categoryLoadingProgressEndsAtTotal() async throws {
+        let collector = EventCollector()
+        _ = try await Self.makeIndexer(collectingInto: collector)
+
+        var lastProgress: (currentCount: Int, totalCount: Int)?
+        for case .progress(.loadingCategories, _, let currentCount, let totalCount) in collector.events {
+            lastProgress = (currentCount, totalCount)
+        }
+        let progress = try #require(lastProgress)
+        #expect(progress.currentCount == progress.totalCount)
+    }
+
+    // MARK: - Same-Named Categories
+
+    /// The indexer keeps one category per `Class(Category)` spelling, so two
+    /// categories spelled alike in one image would lose one to the other.
+    /// Swift names an extension's category after the module, yet the two
+    /// extensions of NSString in this bundle's two files (see
+    /// `SecondNSStringExtension.swift`) end up as one category in the linked
+    /// image. The test pins that premise of the decision to keep one per
+    /// spelling (`Documentations/Internal/CodeReviewAdjudications.md`): should
+    /// a toolchain ever leave two, it fails.
+    @Test("Every category of an image is indexed, same-named ones included")
+    func sameNamedCategoriesAreAllIndexed() async throws {
+        let (machO, fixturePath) = try Self.fixtureImage()
+        let indexer = ObjCInterfaceIndexer(machO: machO, imagePath: fixturePath)
+        try await indexer.prepare()
+
+        let methodNames = Set(
+            indexer.categoryNames
+                .compactMap { indexer.categoryGroup(forName: $0)?.info }
+                .filter { $0.className == "NSString" }
+                .flatMap { $0.methods.map(\.name) }
+        )
+        #expect(methodNames.isSuperset(of: ["objcIndexingFixtureMethod", "objcIndexingSecondFixtureMethod"]))
+    }
+
     /// A comparable stand-in for an event, so two runs can be diffed without
     /// requiring `ObjCIndexingEvent` itself to be `Equatable`.
     private static func orderingKey(for event: ObjCIndexingEvent) -> String {

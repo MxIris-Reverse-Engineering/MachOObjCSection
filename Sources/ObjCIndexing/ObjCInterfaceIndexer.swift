@@ -268,7 +268,16 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
             }
         }
 
-        let objcClasses: [any ObjCClassProtocol] = machO.objc.classes64.orEmpty + machO.objc.classes32.orEmpty + machO.objc.nonLazyClasses64.orEmpty + machO.objc.nonLazyClasses32.orEmpty
+        // Clang lists a class that implements `+load` in `__objc_nlclslist`
+        // and in `__objc_classlist` as well, so the two overlap: each class
+        // record is taken once, where it first appears. Walked twice, such a
+        // class reported its relationships twice, and the progress count,
+        // deduplicated by name, never reached its total.
+        var seenClassOffsets: Set<Int> = []
+        let objcClasses: [any ObjCClassProtocol] = (
+            machO.objc.classes64.orEmpty + machO.objc.classes32.orEmpty
+                + machO.objc.nonLazyClasses64.orEmpty + machO.objc.nonLazyClasses32.orEmpty
+        ).filter { seenClassOffsets.insert($0.offset).inserted }
 
         // One-shot progress marker so the loading indicator can surface
         // "Indexing Objective-C subclasses…" before the per-class loop
@@ -369,6 +378,11 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
         objcCategories.append(contentsOf: machO.objc.nonLazyCategories32.orEmpty)
         objcCategories.append(contentsOf: machO.objc.categories2_64.orEmpty)
         objcCategories.append(contentsOf: machO.objc.categories2_32.orEmpty)
+
+        // `__objc_nlcatlist` repeats the categories that implement `+load`
+        // from `__objc_catlist`, as the class lists above do.
+        var seenCategoryOffsets: Set<Int> = []
+        objcCategories = objcCategories.filter { seenCategoryOffsets.insert($0.offset).inserted }
 
         // One-shot marker that conformance indexing starts; each category
         // extends the conformer set of its target class for every protocol
