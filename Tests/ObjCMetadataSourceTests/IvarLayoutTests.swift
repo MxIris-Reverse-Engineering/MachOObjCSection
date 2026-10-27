@@ -49,7 +49,14 @@ struct IvarLayoutTests {
         let image = try #require(Self.loadedImage(atPath: fixturePath))
         let fixtureClass = try #require(image.objc.classes64?.first { $0.info(in: image)?.name == Self.fixtureClassName })
 
-        #expect(fixtureClass.classROData(in: image)?.ivarLayout(in: image) == Self.expectedLayout)
+        // Looking the class up above realized it: its data now points at the
+        // runtime's read-write record, which leads on to the read-only one.
+        let layout: [UInt8]? = if let readWriteData = fixtureClass.classRWData(in: image) {
+            readWriteData.classROData(in: image)?.ivarLayout(in: image)
+        } else {
+            fixtureClass.classROData(in: image)?.ivarLayout(in: image)
+        }
+        #expect(layout == Self.expectedLayout)
     }
 
     private static func loadedImage(atPath path: String) -> MachOImage? {
