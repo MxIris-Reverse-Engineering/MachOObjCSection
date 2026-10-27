@@ -210,7 +210,7 @@ extension MachOFile {
             if let fullCache = cache._cachedFullCache {
                 return fullCache.relativeMethodSelectorBaseAddressOffset
             }
-            return (try? cache.locateValue(\.relativeMethodSelectorBaseAddressOffset))?.value
+            return cache.locateValueSkippingUnreadableSubCaches(\.relativeMethodSelectorBaseAddressOffset)?.value
         }
 
         return nil
