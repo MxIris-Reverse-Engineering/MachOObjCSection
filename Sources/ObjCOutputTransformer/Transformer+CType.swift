@@ -38,79 +38,78 @@ extension Transformer {
             self.replacements = try container.decodeIfPresent([Pattern: String].self, forKey: .replacements) ?? [:]
         }
 
+        /// A replacement stands in for a whole type: the type keywords in a
+        /// row, apart only by whitespace, are looked up together, and a type
+        /// with no replacement is left as it is. Matching a pattern wherever
+        /// its keywords appeared turned `unsigned long` into `unsigned` plus a
+        /// replacement for `long`, and a match starting at a space swallowed
+        /// it: `const double` became `constCGFloat`.
         public func transform(_ input: SemanticString) -> SemanticString {
-            let sorted = sortedReplacements
-            guard !sorted.isEmpty else { return input }
+            let replacementsByKeywords = Dictionary(
+                replacements
+                    .filter { !$0.value.isEmpty }
+                    .map { ($0.key.keywords, $0.value) },
+                uniquingKeysWith: { first, _ in first }
+            )
+            guard !replacementsByKeywords.isEmpty else { return input }
 
             let components = input.components
-            guard !components.isEmpty else { return input }
-
             var result: [AtomicComponent] = []
             var index = 0
 
             while index < components.count {
-                if let (replacement, consumed) = match(in: components, at: index, patterns: sorted) {
-                    result.append(AtomicComponent(string: replacement, type: .type(.other, .name)))
-                    index += consumed
-                } else {
+                guard let typeSpelling = Self.typeSpelling(in: components, startingAt: index) else {
                     result.append(components[index])
                     index += 1
+                    continue
                 }
+                if let replacement = replacementsByKeywords[typeSpelling.keywords] {
+                    result.append(AtomicComponent(string: replacement, type: .type(.other, .name)))
+                } else {
+                    result.append(contentsOf: components[index ..< typeSpelling.endIndex])
+                }
+                index = typeSpelling.endIndex
             }
 
             return SemanticString(components: result)
         }
 
-        // Sorted by pattern length (longest first)
-        private var sortedReplacements: [(Pattern, String)] {
-            replacements
-                .filter { !$0.value.isEmpty }
-                .sorted { $0.key.keywords.count > $1.key.keywords.count }
-                .map { ($0.key, $0.value) }
+        /// Every keyword a C primitive type is spelled with.
+        private static let typeKeywords = Set(Pattern.allCases.flatMap(\.keywords))
+
+        private static func isTypeKeyword(_ component: AtomicComponent) -> Bool {
+            component.type == .keyword && typeKeywords.contains(component.string)
         }
 
-        private func match(
-            in components: [AtomicComponent],
-            at startIndex: Int,
-            patterns: [(Pattern, String)]
-        ) -> (String, Int)? {
-            for (pattern, replacement) in patterns {
-                if let consumed = matchKeywords(pattern.keywords, in: components, at: startIndex) {
-                    return (replacement, consumed)
-                }
-            }
-            return nil
+        private static func isWhitespace(_ component: AtomicComponent) -> Bool {
+            component.type == .standard && component.string.allSatisfy(\.isWhitespace)
         }
 
-        private func matchKeywords(
-            _ keywords: [String],
+        /// The keywords of the type spelled from `startIndex` on, and the index
+        /// just past the last of them — whitespace after it is not part of the
+        /// type. `nil` when no type keyword starts there.
+        private static func typeSpelling(
             in components: [AtomicComponent],
-            at startIndex: Int
-        ) -> Int? {
-            guard !keywords.isEmpty else { return nil }
+            startingAt startIndex: Int
+        ) -> (keywords: [String], endIndex: Int)? {
+            guard isTypeKeyword(components[startIndex]) else { return nil }
 
-            var ci = startIndex
-            var ki = 0
-            var consumed = 0
-
-            while ki < keywords.count && ci < components.count {
-                let c = components[ci]
-
-                // Skip whitespace
-                if c.type == .standard && c.string.allSatisfy(\.isWhitespace) {
-                    ci += 1
-                    consumed += 1
-                    continue
+            var keywords = [components[startIndex].string]
+            var endIndex = startIndex + 1
+            var candidateIndex = endIndex
+            while candidateIndex < components.count {
+                let component = components[candidateIndex]
+                if isWhitespace(component) {
+                    candidateIndex += 1
+                } else if isTypeKeyword(component) {
+                    keywords.append(component.string)
+                    candidateIndex += 1
+                    endIndex = candidateIndex
+                } else {
+                    break
                 }
-
-                guard c.type == .keyword, c.string == keywords[ki] else { return nil }
-
-                ki += 1
-                ci += 1
-                consumed += 1
             }
-
-            return ki == keywords.count ? consumed : nil
+            return (keywords, endIndex)
         }
     }
 }

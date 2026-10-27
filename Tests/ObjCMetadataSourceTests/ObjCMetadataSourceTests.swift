@@ -235,6 +235,31 @@ struct ObjCMetadataSourceTests {
         #expect(fixture.file.formattedAddress(forRawValue: 0) == nil)
     }
 
+    /// On arm64e a method list in the pointer format holds every IMP signed:
+    /// the pointer authentication code sits in the bits above the address.
+    /// This process's own IMPs are unsigned, so the bits are set by hand, once
+    /// with the top bit and once without.
+    @Test(
+        "A signed IMP resolves to the address of the unsigned one",
+        arguments: [UInt64(0x9F17_8000_0000_0000), UInt64(0x0017_8000_0000_0000)]
+    )
+    func signedIMPResolvesLikeUnsigned(authenticationCodeBits: UInt64) async throws {
+        let fixture = try await DualModeFixture.shared.load()
+        let classInfo = try #require(fixture.imageIndexer.classGroup(forName: "ObjCMetadataSourceFixtureHost")?.info.first)
+        let method = try #require(classInfo.methods.first { $0.name == "fixtureMethodWithValue:" })
+        let unsignedAddress = try #require(fixture.image.objcResolvedIMPAddress(forRawValue: method.imp))
+
+        #expect(fixture.image.objcResolvedIMPAddress(forRawValue: method.imp | authenticationCodeBits) == unsignedAddress)
+    }
+
+    /// In file mode the raw value is an offset into the file; one past what an
+    /// `Int` can hold is no offset at all.
+    @Test("A file-mode IMP beyond any offset resolves to nothing")
+    func fileIMPBeyondAnyOffsetIsRejected() async throws {
+        let fixture = try await DualModeFixture.shared.load()
+        #expect(fixture.file.objcResolvedIMPAddress(forRawValue: 0x9F17_8000_0000_0000) == nil)
+    }
+
     // MARK: - Documented Difference
 
     /// The one difference the two modes are *allowed* to have, pinned down so

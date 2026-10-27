@@ -119,13 +119,25 @@ extension ObjCMemberRecord {
     /// A directly adopted protocol. Identity equals payload — an adoption can
     /// only appear or disappear.
     public static func makeProtocolAdoption(protocolName: String) -> ObjCMemberRecord {
-        let key = ObjCAPIKey(rawValue: "adopts:\(protocolName)")
+        let key = ObjCAPIKey(rawValue: Self.protocolAdoptionKeyPrefix + protocolName)
         return ObjCMemberRecord(
             identityKey: key,
             payloadKey: key,
             kind: .protocolAdoption,
             signature: "adopts <\(protocolName)>"
         )
+    }
+
+    private static let protocolAdoptionKeyPrefix = "adopts:"
+
+    /// The protocol a `protocolAdoption` record adopts; `nil` for any other
+    /// record. Read back from the key, which is the persisted format.
+    var adoptedProtocolName: String? {
+        guard kind == .protocolAdoption,
+              identityKey.rawValue.hasPrefix(Self.protocolAdoptionKeyPrefix) else {
+            return nil
+        }
+        return String(identityKey.rawValue.dropFirst(Self.protocolAdoptionKeyPrefix.count))
     }
 
     /// A class's superclass as a pseudo-member: stable identity, the
@@ -147,12 +159,40 @@ extension ObjCMemberRecord {
     /// A protocol member **added as required** is breaking: existing
     /// conformers lack the implementation, so callers relying on the new
     /// contract hit `unrecognized selector`. Added as optional stays additive
-    /// (the plain status rule).
+    /// (the plain status rule). An adoption a protocol gains is judged by
+    /// ``adoptionCompatibilityOverride(adding:toProtocolNamed:oldRequirements:newRequirements:)``,
+    /// which needs both snapshots' protocol tables.
     static func compatibilityOverride(old: ObjCMemberRecord?, new: ObjCMemberRecord?) -> ObjCCompatibility? {
         if old == nil, let newRecord = new, newRecord.isOptionalRequirement == false {
             return .breaking
         }
         return nil
+    }
+
+    /// The refinement for an adoption a *protocol* gains, shared by the
+    /// two-sided differ and the evolution builder like the rule above.
+    ///
+    /// `@protocol P <Q>` makes every conformer of P implement Q's required
+    /// members, as adding them to P directly would. So the adoption is
+    /// breaking when Q, followed through its own adoptions in the new
+    /// snapshot, requires a member that P, followed the same way in the old
+    /// one, did not; otherwise — Q's members all optional, or already required
+    /// through another adoption — it stays additive. A Q the new snapshot does
+    /// not hold cannot be followed and is judged breaking rather than risk
+    /// missing a break. A class or category that adopts a protocol takes on
+    /// the implementing side, so this is never applied to them.
+    static func adoptionCompatibilityOverride(
+        adding adoption: ObjCMemberRecord,
+        toProtocolNamed adoptingProtocolName: String,
+        oldRequirements: ObjCProtocolRequirements,
+        newRequirements: ObjCProtocolRequirements
+    ) -> ObjCCompatibility? {
+        guard let adoptedProtocolName = adoption.adoptedProtocolName,
+              let adoptedRequiredMemberKeys = newRequirements.requiredMemberKeys(ofProtocolNamed: adoptedProtocolName) else {
+            return .breaking
+        }
+        let previouslyRequiredMemberKeys = oldRequirements.requiredMemberKeys(ofProtocolNamed: adoptingProtocolName) ?? []
+        return adoptedRequiredMemberKeys.isSubset(of: previouslyRequiredMemberKeys) ? nil : .breaking
     }
 
     private static func optionalitySuffix(_ isOptionalRequirement: Bool?) -> String {

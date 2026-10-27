@@ -441,11 +441,21 @@ extension ObjCClassRODataProtocol {
             return nil
         }
 
-        guard let string = fileHandle.readString(offset: fileOffset),
-              let data = string.data(using: .utf8) else {
-            return nil
+        // A layout is bytes, not text: one of 0x80 or more is not valid UTF-8
+        // on its own, and going through a `String` replaced it. So the bytes
+        // are read as they are, up to the terminating zero.
+        var layout: [UInt8] = []
+        var chunkOffset = fileOffset
+        while let chunk = try? fileHandle.readData(offset: numericCast(chunkOffset), upToCount: 16),
+              !chunk.isEmpty {
+            if let terminatorIndex = chunk.firstIndex(of: 0) {
+                layout += chunk[chunk.startIndex ..< terminatorIndex]
+                return layout
+            }
+            layout += chunk
+            chunkOffset += numericCast(chunk.count)
         }
-        return Array(data)
+        return nil
     }
 
     private func _ivarLayout(
@@ -455,10 +465,8 @@ extension ObjCClassRODataProtocol {
         guard let ptr = UnsafeRawPointer(bitPattern: UInt(offset)) else {
             return nil
         }
-        guard let string = String(cString: ptr.assumingMemoryBound(to: CChar.self), encoding: .utf8),
-              let data = string.data(using: .utf8) else {
-            return nil
-        }
-        return Array(data)
+        // Bytes, not text: see the file-backed reader above.
+        let length = strlen(ptr.assumingMemoryBound(to: CChar.self))
+        return Array(UnsafeBufferPointer(start: ptr.assumingMemoryBound(to: UInt8.self), count: length))
     }
 }

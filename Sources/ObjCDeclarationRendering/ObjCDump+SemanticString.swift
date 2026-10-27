@@ -33,9 +33,6 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
     /// rendering falls back to `offset: <decimal>`.
     public var ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?
 
-    /// Scratch space used while rendering a C array type.
-    public var currentArray: SemanticString?
-
     /// Instance-method IMP addresses, keyed by selector.
     public var methodIMPs: [String: UInt64]
 
@@ -56,7 +53,6 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
         options: ObjCGenerationOptions = .default,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
         ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil,
-        currentArray: SemanticString? = nil,
         methodIMPs: [String: UInt64] = [:],
         classMethodIMPs: [String: UInt64] = [:],
         isExpandHandler: @escaping (_ name: String?, _ isStruct: Bool) -> Bool = { _, _ in true },
@@ -66,7 +62,6 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
         self.options = options
         self.cTypeReplacements = cTypeReplacements
         self.ivarOffsetCommentBuilder = ivarOffsetCommentBuilder
-        self.currentArray = currentArray
         self.methodIMPs = methodIMPs
         self.classMethodIMPs = classMethodIMPs
         self.isExpandHandler = isExpandHandler
@@ -267,16 +262,15 @@ extension ObjCIvarInfo {
                 Variable(name)
                 ";"
             } else {
-                if let type = type?.semanticDecoded(context: context) {
-                    type
-                    if type.string.last != "*" {
+                if let type {
+                    let (elementType, dimensions) = type.arrayElementTypeAndDimensions
+                    let renderedType = elementType.semanticDecoded(context: context)
+                    renderedType
+                    if renderedType.string.last != "*" {
                         Space()
                     }
                     Variable(name)
-                    if let currentArray = context.currentArray {
-                        currentArray
-                        context.currentArray = nil
-                    }
+                    arrayDimensions(dimensions)
                     ";"
                 } else {
                     UnknownError()
@@ -419,10 +413,15 @@ extension ObjCMethodInfo {
         if numberOfArguments == 0 {
             FunctionDeclaration(name)
         } else {
-            let nameAndLabels = name.split(separator: ":")
+            // One label per colon, an empty one included: `add::` takes two
+            // arguments, the second unlabeled. Splitting the empty pieces away
+            // dropped an argument for each unlabeled one.
+            let labels = name
+                .split(separator: ":", omittingEmptySubsequences: false)
+                .prefix(numberOfArguments)
             let argumentInfos = type?.argumentInfos ?? []
 
-            for (index, label) in nameAndLabels.enumerated() {
+            for (index, label) in labels.enumerated() {
                 if index > 0 {
                     Space()
                 }
@@ -452,9 +451,11 @@ extension ObjCMethodInfo {
 extension ObjCField {
     @SemanticStringBuilder
     public func semanticString<MachO: ObjCMetadataSource>(fallbackName: String, level: Int = 1, context: ObjCRenderingContext<MachO>) -> SemanticString {
-        type.semanticDecoded(level: level, context: context)
+        let (elementType, dimensions) = type.arrayElementTypeAndDimensions
+        elementType.semanticDecoded(level: level, context: context)
         Space()
         Variable(name ?? fallbackName)
+        arrayDimensions(dimensions)
         if let bitWidth {
             " : "
             Numeric(bitWidth)
@@ -492,6 +493,37 @@ extension ObjCModifier {
 }
 
 extension ObjCType {
+    /// The type under every array dimension of this one, and those dimensions
+    /// outermost first — the order C writes them after the declared name:
+    /// `int grid[8][4]`, encoded `[8[4i]]`, is eight arrays of four ints.
+    ///
+    /// Each declaration splits its type this way and writes the dimensions
+    /// itself. Handing them on through the rendering context instead left a
+    /// struct field's dimension unwritten, for the next ivar to pick up.
+    var arrayElementTypeAndDimensions: (elementType: ObjCType, dimensions: [Int?]) {
+        var elementType = self
+        var dimensions: [Int?] = []
+        while case .array(let innerType, let size) = elementType {
+            dimensions.append(size)
+            elementType = innerType
+        }
+        return (elementType, dimensions)
+    }
+}
+
+/// `[8][4]` for the dimensions `[8, 4]`; one of unknown size is `[]`.
+@SemanticStringBuilder
+func arrayDimensions(_ dimensions: [Int?]) -> SemanticString {
+    for dimension in dimensions {
+        "["
+        if let dimension {
+            Numeric(dimension)
+        }
+        "]"
+    }
+}
+
+extension ObjCType {
     @SemanticStringBuilder
     func semanticDecodedForArgument<MachO: ObjCMetadataSource>(context: ObjCRenderingContext<MachO>) -> SemanticString {
         switch self {
@@ -508,10 +540,12 @@ extension ObjCType {
                     if let fields {
                         Joined(separator: " ") {
                             for (index, field) in fields.enumerated() {
+                                let (elementType, dimensions) = field.type.arrayElementTypeAndDimensions
                                 Group {
-                                    field.type.semanticDecodedForArgument(context: context)
+                                    elementType.semanticDecodedForArgument(context: context)
                                     Space()
                                     Variable(field.name ?? "x\(index)")
+                                    arrayDimensions(dimensions)
                                     if let bitWidth = field.bitWidth {
                                         " : "
                                         Numeric(bitWidth)
@@ -550,10 +584,10 @@ extension ObjCType {
         case .selector:
             Keyword("SEL")
         case .char:
-            if let r = context.cTypeReplacements[.char] { TypeName(kind: .other, r) } else { Keyword("char") }
+            if let replacement = context.cTypeReplacements[.char] { TypeName(kind: .other, replacement) } else { Keyword("char") }
         case .uchar:
-            if let r = context.cTypeReplacements[.uchar] {
-                TypeName(kind: .other, r)
+            if let replacement = context.cTypeReplacements[.uchar] {
+                TypeName(kind: .other, replacement)
             } else {
                 Joined(separator: Space()) {
                     Keyword("unsigned")
@@ -561,10 +595,10 @@ extension ObjCType {
                 }
             }
         case .short:
-            if let r = context.cTypeReplacements[.short] { TypeName(kind: .other, r) } else { Keyword("short") }
+            if let replacement = context.cTypeReplacements[.short] { TypeName(kind: .other, replacement) } else { Keyword("short") }
         case .ushort:
-            if let r = context.cTypeReplacements[.ushort] {
-                TypeName(kind: .other, r)
+            if let replacement = context.cTypeReplacements[.ushort] {
+                TypeName(kind: .other, replacement)
             } else {
                 Joined(separator: Space()) {
                     Keyword("unsigned")
@@ -572,10 +606,10 @@ extension ObjCType {
                 }
             }
         case .int:
-            if let r = context.cTypeReplacements[.int] { TypeName(kind: .other, r) } else { Keyword("int") }
+            if let replacement = context.cTypeReplacements[.int] { TypeName(kind: .other, replacement) } else { Keyword("int") }
         case .uint:
-            if let r = context.cTypeReplacements[.uint] {
-                TypeName(kind: .other, r)
+            if let replacement = context.cTypeReplacements[.uint] {
+                TypeName(kind: .other, replacement)
             } else {
                 Joined(separator: Space()) {
                     Keyword("unsigned")
@@ -583,10 +617,10 @@ extension ObjCType {
                 }
             }
         case .long:
-            if let r = context.cTypeReplacements[.long] { TypeName(kind: .other, r) } else { Keyword("long") }
+            if let replacement = context.cTypeReplacements[.long] { TypeName(kind: .other, replacement) } else { Keyword("long") }
         case .ulong:
-            if let r = context.cTypeReplacements[.ulong] {
-                TypeName(kind: .other, r)
+            if let replacement = context.cTypeReplacements[.ulong] {
+                TypeName(kind: .other, replacement)
             } else {
                 Joined(separator: Space()) {
                     Keyword("unsigned")
@@ -594,8 +628,8 @@ extension ObjCType {
                 }
             }
         case .longLong:
-            if let r = context.cTypeReplacements[.longLong] {
-                TypeName(kind: .other, r)
+            if let replacement = context.cTypeReplacements[.longLong] {
+                TypeName(kind: .other, replacement)
             } else {
                 Joined(separator: Space()) {
                     Keyword("long")
@@ -603,8 +637,8 @@ extension ObjCType {
                 }
             }
         case .ulongLong:
-            if let r = context.cTypeReplacements[.ulongLong] {
-                TypeName(kind: .other, r)
+            if let replacement = context.cTypeReplacements[.ulongLong] {
+                TypeName(kind: .other, replacement)
             } else {
                 Joined(separator: Space()) {
                     Keyword("unsigned")
@@ -617,12 +651,12 @@ extension ObjCType {
         case .uint128:
             TypeName(kind: .other, "__uint128_t")
         case .float:
-            if let r = context.cTypeReplacements[.float] { TypeName(kind: .other, r) } else { Keyword("float") }
+            if let replacement = context.cTypeReplacements[.float] { TypeName(kind: .other, replacement) } else { Keyword("float") }
         case .double:
-            if let r = context.cTypeReplacements[.double] { TypeName(kind: .other, r) } else { Keyword("double") }
+            if let replacement = context.cTypeReplacements[.double] { TypeName(kind: .other, replacement) } else { Keyword("double") }
         case .longDouble:
-            if let r = context.cTypeReplacements[.longDouble] {
-                TypeName(kind: .other, r)
+            if let replacement = context.cTypeReplacements[.longDouble] {
+                TypeName(kind: .other, replacement)
             } else {
                 Joined(separator: Space()) {
                     Keyword("long")
@@ -721,15 +755,14 @@ extension ObjCType {
             "*"
             Space()
             InlineComment("function pointer")
-        case .array(let type, let size):
-            type.semanticDecoded(level: level, context: context)
-            context.currentArray = SemanticString {
-                "["
-                if let size {
-                    Numeric(size)
-                }
-                "]"
-            }
+        case .array:
+            // Declarations write the dimensions after the name they declare
+            // (see `arrayElementTypeAndDimensions`); an array reached here has
+            // no name to follow, as the pointee of a pointer, so its dimensions
+            // follow the element type.
+            let (elementType, dimensions) = arrayElementTypeAndDimensions
+            elementType.semanticDecoded(level: level, context: context)
+            arrayDimensions(dimensions)
         case .pointer(let type):
             type.semanticDecoded(level: level, context: context)
             Space()

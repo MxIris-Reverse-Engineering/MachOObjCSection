@@ -493,8 +493,8 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
     /// that `stripSynthesizedMethods` can remove them.
     ///
     /// A property contributes its getter (its own name unless `G` overrides
-    /// it) and, unless read-only in practice, a `setName:` setter (unless `S`
-    /// overrides it).
+    /// it) and, unless read-only, a `setName:` setter (unless `S` overrides
+    /// it).
     private func collectAccessorSelectors(
         of property: ObjCPropertyInfo,
         intoClassMethods classMethods: inout Set<String>,
@@ -508,6 +508,13 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         } else {
             methods.insert(getterName)
         }
+
+        // A read-only property synthesizes no setter, so a `setFoo:` the class
+        // declares beside it was written by hand and is no accessor to strip.
+        // (A public read-only property redeclared read-write in a class
+        // extension carries no `R` in the metadata: clang emits the extension's
+        // attributes.)
+        guard !property.attributes.contains(.readonly) else { return }
 
         // The trailing colon is not cosmetic: these names are matched against
         // `ObjCMethodInfo.name`, which holds the full selector. A setter takes

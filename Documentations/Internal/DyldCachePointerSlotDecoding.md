@@ -98,5 +98,5 @@ dyld shared cache 的可写映射（`__DATA`、`__DATA_CONST`、`__AUTH`、`__AU
 
 ## 本轮不做的
 
-- **末尾带空片段的 selector 少打一个参数。** `-[NSUserScriptTaskRunner executeScript:interpreter:arguments:standardInput:standardOutput:standardError:showingProgress::]` 的最后一段没有名字，渲染时被打成 7 个参数。原因是 `ObjCDeclarationRendering/ObjCDump+SemanticString.swift:422` 用 `name.split(separator: ":")` 拆 selector，而 `split` 默认丢掉空片段；swift-objc-dump 的 `ObjCMethodInfo.swift:111` 也是同样写法。这个问题与本次修复无关：在本来就能正确读取的 15.4.1 上，修复前的输出也一样。
+- **末尾带空片段的 selector 少打一个参数。** `-[NSUserScriptTaskRunner executeScript:interpreter:arguments:standardInput:standardOutput:standardError:showingProgress::]` 的最后一段没有名字，渲染时被打成 7 个参数。原因是 `ObjCDeclarationRendering/ObjCDump+SemanticString.swift:422` 用 `name.split(separator: ":")` 拆 selector，而 `split` 默认丢掉空片段；swift-objc-dump 的 `ObjCMethodInfo.swift:111` 也是同样写法。这个问题与本次修复无关：在本来就能正确读取的 15.4.1 上，修复前的输出也一样。（2026-10-27 已修：两处都改为保留空片段、每个冒号取一个标签；swift-objc-dump 一侧随 0.8.102 发布。）
 - `extendedMethodTypes(in:)` 里沿用了原有的 `try!` 读取，没有动。

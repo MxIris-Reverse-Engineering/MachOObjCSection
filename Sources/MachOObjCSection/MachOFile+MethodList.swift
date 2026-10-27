@@ -51,12 +51,15 @@ extension MachOFile.ObjCMethodLists {
         }
 
         public mutating func next() -> Element? {
-            guard nextOffset < data.count else {
+            guard nextOffset + MemoryLayout<Element.Header>.size <= data.count else {
                 return nil
             }
-            let data = data.advanced(by: nextOffset)
+            // Named apart from `data`: the bounds checks below are against the
+            // whole section, which a shadowing copy starting at `nextOffset`
+            // would shorten by `nextOffset`, ending the walk halfway.
+            let listData = data.advanced(by: nextOffset)
 
-            guard let header: Element.Header = data.withUnsafeBytes({
+            guard let header: Element.Header = listData.withUnsafeBytes({
                 guard let baseAddress = $0.baseAddress else {
                     return nil
                 }
@@ -70,7 +73,7 @@ extension MachOFile.ObjCMethodLists {
                 return nil
             }
 
-            guard let list: Element = data.withUnsafeBytes({
+            guard let list: Element = listData.withUnsafeBytes({
                 guard let ptr = $0.baseAddress else {
                     return nil
                 }
@@ -86,8 +89,7 @@ extension MachOFile.ObjCMethodLists {
             }
 
             defer {
-                nextOffset += list.size
-                nextOffset += nextOffset % numericCast(power(2, align))
+                nextOffset = roundedUp(nextOffset + list.size, toAlignmentExponent: align)
             }
 
             return list

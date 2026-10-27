@@ -39,14 +39,52 @@ extension DyldCache {
     }
 }
 
+// MARK: - locate value
+extension DyldCache {
+    /// MachOKit's `locateValue(_:)`, except that a sub-cache file that cannot
+    /// be opened is passed over rather than ending the lookup.
+    ///
+    /// MachOKit's version throws at the first sub-cache file it fails to open,
+    /// and every lookup here wants only the value or `nil`: through `try?`, one
+    /// missing or unreadable file — a cache copied in part, say — made values
+    /// that sit in the files that are there come back as not found.
+    func locateValueSkippingUnreadableSubCaches<Value>(
+        _ resolver: (DyldCache) -> Value?
+    ) -> LocatedValue<Value>? {
+        do {
+            return try locateValue(resolver)
+        } catch {
+            // MachOKit has looked in this cache and the main one by the time it
+            // throws, which it does only while opening a sub-cache file.
+            guard let mainCache, let subCaches = mainCache.subCaches else {
+                return nil
+            }
+            for subCacheEntry in subCaches {
+                guard let subCache = try? subCacheEntry.subcache(for: mainCache),
+                      let value = resolver(subCache) else {
+                    continue
+                }
+                return LocatedValue(cache: subCache, value: value)
+            }
+            return nil
+        }
+    }
+
+    func locateValueSkippingUnreadableSubCaches<Value>(
+        _ keyPath: KeyPath<DyldCache, Value?>
+    ) -> LocatedValue<Value>? {
+        locateValueSkippingUnreadableSubCaches { $0[keyPath: keyPath] }
+    }
+}
+
 // MARK: - Objective-C
 extension DyldCache {
     var _objcOptimization: LocatedValue<ObjCOptimization>? {
-        try? locateValue(\.objcOptimization)
+        locateValueSkippingUnreadableSubCaches(\.objcOptimization)
     }
 
     var _oldObjcOptimization: LocatedValue<OldObjCOptimization>? {
-        try? locateValue(\.oldObjcOptimization)
+        locateValueSkippingUnreadableSubCaches(\.oldObjcOptimization)
     }
 }
 
@@ -76,11 +114,11 @@ extension DyldCache {
 
 extension DyldCache {
     var _headerOptimizationRO64: LocatedValue<ObjCHeaderOptimizationRO64>? {
-        try? locateValue(\.headerOptimizationRO64)
+        locateValueSkippingUnreadableSubCaches(\.headerOptimizationRO64)
     }
 
     var _headerOptimizationRO32: LocatedValue<ObjCHeaderOptimizationRO32>? {
-        try? locateValue(\.headerOptimizationRO32)
+        locateValueSkippingUnreadableSubCaches(\.headerOptimizationRO32)
     }
 }
 
@@ -96,7 +134,7 @@ extension DyldCache {
             ) else {
                 return nil
             }
-            return try? locateValue { header.machO(in: $0) }
+            return locateValueSkippingUnreadableSubCaches { header.machO(in: $0) }
         }
         if let located = _headerOptimizationRO32,
            located.value.contains(index: index) {
@@ -108,7 +146,7 @@ extension DyldCache {
             ) else {
                 return nil
             }
-            return try? locateValue { header.machO(in: $0) }
+            return locateValueSkippingUnreadableSubCaches { header.machO(in: $0) }
         }
         return nil
     }
@@ -124,24 +162,4 @@ extension DyldCache {
         }
         return nil
     }
-}
-
-@inline(__always)
-private func isEqual(_ lhs: uuid_t, _ rhs: uuid_t) -> Bool {
-    lhs.0 == rhs.0 &&
-    lhs.1 == rhs.1 &&
-    lhs.2 == rhs.2 &&
-    lhs.3 == rhs.3 &&
-    lhs.4 == rhs.4 &&
-    lhs.5 == rhs.5 &&
-    lhs.6 == rhs.6 &&
-    lhs.7 == rhs.7 &&
-    lhs.8 == rhs.8 &&
-    lhs.9 == rhs.9 &&
-    lhs.10 == rhs.10 &&
-    lhs.11 == rhs.11 &&
-    lhs.12 == rhs.12 &&
-    lhs.13 == rhs.13 &&
-    lhs.14 == rhs.14 &&
-    lhs.15 == rhs.15
 }

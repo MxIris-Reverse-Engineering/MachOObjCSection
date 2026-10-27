@@ -32,15 +32,17 @@ extension DyldCacheLoaded {
 }
 
 #if canImport(Darwin)
-import os
-
 /// Cache for MachOImage lookups by index to avoid repeated memory accesses
 /// Thread-safe with lock protection for atomic check-and-set operations
 private final class MachOImageCache: @unchecked Sendable {
     static let shared = MachOImageCache()
 
     private let cache = NSCache<NSNumber, MachOImageWrapper>()
-    private var _lock = os_unfair_lock()
+    /// An `NSLock` rather than an `os_unfair_lock` stored in the class: Swift
+    /// does not promise a stored property the stable address an unfair lock
+    /// needs, so passing `&property` to `os_unfair_lock_lock` was undefined
+    /// behavior that merely happened to work.
+    private let lock = NSLock()
 
     private init() {}
 
@@ -50,8 +52,8 @@ private final class MachOImageCache: @unchecked Sendable {
     ///   - compute: Closure to compute the MachOImage if not cached
     /// - Returns: The cached or newly computed MachOImage
     func machO(at index: Int, orCompute compute: () -> MachOImage?) -> MachOImage? {
-        os_unfair_lock_lock(&_lock)
-        defer { os_unfair_lock_unlock(&_lock) }
+        lock.lock()
+        defer { lock.unlock() }
 
         let key = NSNumber(value: index)
         if let cached = cache.object(forKey: key) {
@@ -65,8 +67,8 @@ private final class MachOImageCache: @unchecked Sendable {
     }
 
     func invalidate() {
-        os_unfair_lock_lock(&_lock)
-        defer { os_unfair_lock_unlock(&_lock) }
+        lock.lock()
+        defer { lock.unlock() }
         cache.removeAllObjects()
     }
 }

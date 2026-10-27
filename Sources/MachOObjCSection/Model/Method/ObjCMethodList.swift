@@ -326,14 +326,31 @@ extension ObjCMethodList {
         entryOffset: UInt64,
         fileOffset: UInt64
     ) -> ObjCMethod {
-        let namePointerOffset = resolvedOffset(
+        // The name is an offset to a selector reference: a pointer-sized slot
+        // that holds the selector's address in its rebase encoding, a chained
+        // fixup on disk. Like any pointer slot it is read at pointer width and
+        // decoded through its rebase; taken raw, the fixup's distance to the
+        // next one stays in the value, and in a 32-bit image the tag mask does
+        // not clear it, so no name resolved.
+        let selectorReferenceFileOffset = resolvedOffset(
             base: fileOffset,
             relative: relativeIndirect.name.offset
         ) ?? 0
-        let nameAddress: UInt64 = (try? fileHandle.read(
-            offset: numericCast(namePointerOffset),
-            as: UInt64.self
-        )) ?? 0
+        let selectorReferenceOffset = resolvedOffset(
+            base: entryOffset,
+            relative: relativeIndirect.name.offset
+        ) ?? 0
+        let selectorReference: UInt64 = if machO.is64Bit {
+            (try? fileHandle.read(
+                offset: numericCast(selectorReferenceFileOffset),
+                as: UInt64.self
+            )) ?? 0
+        } else {
+            numericCast((try? fileHandle.read(
+                offset: numericCast(selectorReferenceFileOffset),
+                as: UInt32.self
+            )) ?? 0)
+        }
         let types = resolvedOffset(
             base: fileOffset,
             relative: relativeIndirect.types.offset,
@@ -349,7 +366,10 @@ extension ObjCMethodList {
         return ObjCMethod(
             name: resolveString(
                 in: machO,
-                forAddress: nameAddress
+                slot: .init(
+                    fieldOffset: numericCast(selectorReferenceOffset),
+                    value: selectorReference
+                )
             ),
             types: fileHandle.readString(
                 offset: numericCast(types)
@@ -420,16 +440,6 @@ extension ObjCMethodList {
             return nil
         }
         return UInt64(resolved)
-    }
-
-    private func resolveString(
-        in machO: MachOFile,
-        forAddress address: UInt64
-    ) -> String {
-        guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forAddress: address) else {
-            return ""
-        }
-        return fileHandle.readString(offset: fileOffset) ?? ""
     }
 
     private func resolveString(

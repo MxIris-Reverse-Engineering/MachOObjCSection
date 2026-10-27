@@ -28,6 +28,7 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [0010](Evolutions/0010-remove-objc-section-cli.md) | 移除 objc-section 命令行（并入 swift-section） | Accepted |
 | [0011](Evolutions/0011-visibility-regions.md) | 标记模式：一次渲染全量声明，并标出每段内容受哪个开关控制 | Implemented |
 | [0012](Evolutions/0012-strip-protocol-conformance-members.md) | stripProtocolConformance 剥掉协议声明的全部成员，保留遵循列表 | Implemented |
+| [0013](Evolutions/0013-protocol-adoption-compatibility.md) | 协议新采纳另一个协议时按破坏性改动判定 | Implemented |
 | [draft](Evolutions/draft-host-supplied-classes.md) | 由宿主补充文件里没有 class object 的类 | Accepted |
 
 ## 使用指南
@@ -46,4 +47,6 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [ObjC 导出状态的判定 — 判据、边界与实测](Internal/ObjCExportStatusResolution.md) | 0008 的配套。为什么只有类和 ivar 能判（协议符号一律 private extern，分类无符号）、三处反直觉边界（per-image 语义与 NSArray、零导出算「无信息」、不用前缀搜索的正确性理由），以及建索引占 `prepare()` 0.085% 的实测数据 |
 | [dyld cache 里的指针槽位必须先解码](Internal/DyldCachePointerSlotDecoding.md) | 一次 bug 修复的记录，没有提案。cache 里的指针槽位存的是 slide info 编码（v5 起是相对 cache 起点的偏移，不是地址），必须先经 `resolveRebase` 解码。内容包括：macOS 14.4–15.3.2 上 `objc` 命令 SIGTRAP、11.x–14.3.1 上协议方法丢名的根因，各版本受影响的范围，为什么 CI 上测不到，以及验证数据 |
 | [指向本镜像导出符号的 bind 槽位](Internal/SelfBindPointerSlots.md) | 一次 bug 修复的记录，没有提案。用 `-interposable` 链接的 dylib（模拟器 runtime 的框架）以 bind 指向自己导出的类、metaclass 与 ivar offset，读取器原来只解 rebase，iOS 18.5 模拟器 UIKitCore 的 classlist 里 1,586 个条目因此丢失或读错。内容包括：`resolveRebase` 对四种槽位的答法与不要先判 `isBind` / 原值的规则，各版本模拟器的数量，修复前的症状与对 MachOSwiftSection 布局的影响，验证数据 |
+| [相对方法列表的选择器引用也是指针槽位](Internal/RelativeMethodListSelectorReferences.md) | 一次 bug 修复的记录，没有提案。磁盘上的相对方法列表里，方法名是到选择器引用槽位的偏移，槽位存的是链式修复编码，要按指针宽度读出再经 `resolveRebase` 解码。内容包括：arm64_32 镜像的方法名为什么全部读成空、64 位为什么只是碰巧读对、来历，以及钉住它的两个小样本 |
+| [代码审查的已裁决清单](Internal/CodeReviewAdjudications.md) | 审查报出、判定为不修或误报的问题，连同理由与推翻条件。每次审查先对照它，已裁决且理由仍成立的直接跳过 |
 | [relative list of lists 的列表不一定和镜像 header 在同一个文件](Internal/RelativeListsAcrossSubCacheFiles.md) | 一次 bug 修复的记录，没有提案，移植自上游 `10b3dd5`。macOS 26.4 起 cache 把每组镜像的数据单独放进 `.dylddata` 文件，类的属性表、协议表与 header 不在同一个文件；读取器只在 header 所在文件里找，离线读时被别的镜像加过 category 的类（NSView、NSWindow、NSString 等）丢掉全部实例属性和协议列表。内容包括：各版本 cache 的布局与修复前后的数字、受影响的范围、同 PR 的 `ff936fa`（同一镜像的多张列表全部读入）为什么当时没移植、后来随上游 0.8.2 合入（0.8.200），以及验证与耗时数据 |

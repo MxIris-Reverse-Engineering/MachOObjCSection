@@ -38,10 +38,18 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
             throw ObjCAPIEvolutionError.labelCountMismatch(labelCount: versions.count, versionCount: snapshots.count)
         }
         let keyCollisionsByVersion = snapshots.map { $0.keyCollisions() }
+        let requirementsByVersion = snapshots.map { ObjCProtocolRequirements(protocols: $0.protocols) }
         return ObjCAPIEvolution(
             versions: versions,
             classes: containerLineages(snapshots.map(\.classes)),
-            protocols: containerLineages(snapshots.map(\.protocols)),
+            protocols: containerLineages(snapshots.map(\.protocols)) { adoption, protocolName, versionIndex in
+                ObjCMemberRecord.adoptionCompatibilityOverride(
+                    adding: adoption,
+                    toProtocolNamed: protocolName,
+                    oldRequirements: requirementsByVersion[versionIndex - 1],
+                    newRequirements: requirementsByVersion[versionIndex]
+                )
+            },
             categories: containerLineages(snapshots.map(\.categories)),
             keyCollisionsByVersion: keyCollisionsByVersion.allSatisfy(\.isEmpty) ? nil : keyCollisionsByVersion
         )
@@ -51,7 +59,13 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
 
     /// One container bucket (classes, protocols, or categories) across all
     /// versions: `perVersionContainers[i]` is that bucket in version `i`.
-    private func containerLineages(_ perVersionContainers: [[ObjCContainerSnapshot]]) -> [ObjCContainerLineage] {
+    /// `addedAdoptionOverride` judges an adoption a container gains, given the
+    /// container's name and the version it appears in; only the protocol
+    /// bucket passes one.
+    private func containerLineages(
+        _ perVersionContainers: [[ObjCContainerSnapshot]],
+        addedAdoptionOverride: ((_ adoption: ObjCMemberRecord, _ containerName: String, _ versionIndex: Int) -> ObjCCompatibility?)? = nil
+    ) -> [ObjCContainerLineage] {
         let keyedPerVersion = perVersionContainers.map { keyedFirstWins($0, by: \.key) }
         let orderedKeys = unionOfKeys(keyedPerVersion)
 
@@ -60,11 +74,16 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
             let perVersion = keyedPerVersion.map { $0[containerKey] }
             let presence = perVersion.map { $0 != nil }
             let containerEvents = presenceTransitionEvents(presence)
-            let members = memberLineages(perVersionMembers: perVersion.map { $0?.members })
-            guard !containerEvents.isEmpty || !members.isEmpty else { continue }
             // Name/kind from the latest appearance, so a report shows the
             // most recent spelling of the container.
             let latest = perVersion.reversed().compactMap { $0 }.first!
+            let members = memberLineages(
+                perVersionMembers: perVersion.map { $0?.members },
+                addedAdoptionOverride: addedAdoptionOverride.map { override in
+                    { adoption, versionIndex in override(adoption, latest.name, versionIndex) }
+                }
+            )
+            guard !containerEvents.isEmpty || !members.isEmpty else { continue }
             lineages.append(ObjCContainerLineage(
                 key: containerKey,
                 name: latest.name,
@@ -86,7 +105,10 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
     /// container's own event, and enumerating members across the gap would
     /// diverge from the two-sided differ (which leaves an added/removed
     /// container's `memberChanges` empty).
-    private func memberLineages(perVersionMembers: [[ObjCMemberRecord]?]) -> [ObjCMemberLineage] {
+    private func memberLineages(
+        perVersionMembers: [[ObjCMemberRecord]?],
+        addedAdoptionOverride: ((_ adoption: ObjCMemberRecord, _ versionIndex: Int) -> ObjCCompatibility?)?
+    ) -> [ObjCMemberLineage] {
         let keyedPerVersion = perVersionMembers.map { members in
             members.map { keyedFirstWins($0, by: \.identityKey) }
         }
@@ -106,7 +128,12 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
                 let newRecord = perVersion[versionIndex]
                 switch (oldRecord, newRecord) {
                 case (nil, let newRecord?):
-                    events.append(ObjCLineageEvent(versionIndex: versionIndex, status: .added, newSignature: newRecord.signature, compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: nil, new: newRecord)))
+                    let compatibilityOverride: ObjCCompatibility? = if newRecord.kind == .protocolAdoption, let addedAdoptionOverride {
+                        addedAdoptionOverride(newRecord, versionIndex)
+                    } else {
+                        ObjCMemberRecord.compatibilityOverride(old: nil, new: newRecord)
+                    }
+                    events.append(ObjCLineageEvent(versionIndex: versionIndex, status: .added, newSignature: newRecord.signature, compatibilityOverride: compatibilityOverride))
                 case (let oldRecord?, nil):
                     events.append(ObjCLineageEvent(versionIndex: versionIndex, status: .removed, oldSignature: oldRecord.signature, compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: oldRecord, new: nil)))
                 case (let oldRecord?, let newRecord?) where oldRecord.payloadKey != newRecord.payloadKey:

@@ -1,5 +1,5 @@
 {
-  "originHash" : "473b3798203fbc3d334fbc0cc7e580a15a398790ef9fecf6227df692d6cc60ea",
+  "originHash" : "5287d6e8236b85177aa5b7e9de9ff3fd3f0fb954f33c06c4c508dfc1bc545fab",
   "pins" : [
     {
       "identity" : "associatedobject",
@@ -24,8 +24,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/MxIris-Reverse-Engineering/MachOKit",
       "state" : {
-        "revision" : "ecae5d19ab6d8771d589e6c45677e4ba86acd352",
-        "version" : "0.54.101"
+        "revision" : "ea5d7214e3335b9871ea73d36cec7b2c10d3dcc4",
+        "version" : "0.55.100"
       }
     },
     {
@@ -132,8 +132,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/MxIris-Reverse-Engineering/swift-objc-dump",
       "state" : {
-        "revision" : "641d257d60385b231a608ab8c4ecdf31348c779e",
-        "version" : "0.8.101"
+        "revision" : "255c8cca86479b093f7a1b083c73bfb82a111382",
+        "version" : "0.8.102"
       }
     },
     {

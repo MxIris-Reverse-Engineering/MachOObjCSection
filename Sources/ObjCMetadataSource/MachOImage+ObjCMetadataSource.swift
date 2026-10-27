@@ -57,10 +57,18 @@ extension MachOImage: ObjCMetadataSource {
     /// reports as an unslid virtual address — the spelling a disassembler
     /// shows. A value below the image start is not an implementation pointer
     /// at all and is rejected.
+    ///
+    /// On arm64e a method list in the pointer format holds each IMP signed,
+    /// its authentication code in the bits above the address, so those bits
+    /// come off first: left on, the difference overflowed `Int` and trapped,
+    /// or came out as an address nowhere in the image.
     public func objcResolvedIMPAddress(forRawValue rawValue: UInt64) -> UInt64? {
-        let value = UInt(rawValue)
+        let value = UInt(stripPointerTags(of: rawValue))
         let baseAddress = UInt(bitPattern: ptr)
-        guard value != 0, value >= baseAddress else { return nil }
-        return address(forOffset: Int(value &- baseAddress))
+        guard value != 0, value >= baseAddress,
+              let offset = Int(exactly: value - baseAddress) else {
+            return nil
+        }
+        return address(forOffset: offset)
     }
 }
