@@ -1,12 +1,13 @@
-# Draft - 由宿主补充文件里没有 class object 的类
+# 0014 - 由宿主补充文件里没有 class object 的类
 
-- **状态**: Accepted
+- **状态**: Implemented
 - **创建日期**: 2026-10-27
 - **最后更新**: 2026-10-27
 - **关联**: MachOSwiftSection [issue #137](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/issues/137)
   （`swift-section objc dump` 漏掉 Swift 定义的两类 ObjC 类）；MachOSwiftSection 侧在
   `ObjCInterfaceSession.make` 里从 Swift metadata 算出补充类并传入
 - **实现分支**: `feature/host-supplied-classes`
+- **配套文档**: [使用指南的库调用方一节](../Guides/ObjCSectionCommandLine.md#库调用方没有-class-object-的类由宿主补充)；[泛型化到 MachOFile 的实现说明](../Internal/ObjCMetadataSourceGenericization.md)里核心 target 例外的补记
 
 ## 摘要
 
@@ -119,17 +120,18 @@ public func suppliedClassGroup(forName name: String) -> ObjCSuppliedClassGroup?
 ### 文档
 
 README 的库用法一节（英文）、使用指南里面向库的一半补一节契约（偏移约定、跳过规则、两个查询入口的分工、偏移未知
-的 ivar），术语表登记「supplied class（补充类）」。实现说明在落地时判断是否需要。
+的 ivar、stub 上的 category），术语表登记「supplied class（补充类）」。不另写实现说明：核心 target 的例外补记进
+《泛型化到 MachOFile 的实现说明》讲边界的那一节。
 
 ### 落地步骤
 
-1. 核心 target 的追加 API 与一致性测试。
-2. `ObjCMetadataSource` 的新要求与两种模式的实现。
-3. 索引器：新类型、`init` 参数、`prepare()`（含 stub 上 category 的归属）、查询与文档注释，及其测试。
-4. 渲染层、builder、snapshot builder，及其测试。
-5. README、使用指南、术语表。
+1. 核心 target 的追加 API 与一致性测试。（已完成）
+2. `ObjCMetadataSource` 的新要求与两种模式的实现。（已完成）
+3. 索引器：新类型、`init` 参数、`prepare()`（含 stub 上 category 的归属）、查询与文档注释，及其测试。（已完成）
+4. 渲染层、builder、snapshot builder，及其测试。（已完成）
+5. README、使用指南、术语表。（已完成）
 6. 把分支告诉 MachOSwiftSection；拿到真实偏移后补上真实二进制测试。落地合入 `next` 后，发一个 fork 版本供
-   MachOSwiftSection 依赖（发版由用户决定）。
+   MachOSwiftSection 依赖（发版由用户决定）。（分支已告知，真实二进制测试已随第 3 步落地；合并与发版待用户）
 
 ## 决策日志
 
@@ -145,3 +147,12 @@ README 的库用法一节（英文）、使用指南里面向库的一半补一�
 | 2026-10-27 | `Kind` 多列一个 `swiftClassWithGenericAncestry` | Swift 编译器里不进 `__objc_classlist` 的带 ObjC 祖先的类恰好三种（`ClassMetadataStrategy` 为 Resilient 的泛型类、Resilient 的非泛型类、Singleton），后两种的 stub 都进 `__objc_stublist`（`GenMeta.cpp` `emitClassMetadata`）。宿主遍历 stub list 时两种都会遇到；一次列全，免得以后加 case 破坏穷尽 `switch`。MachOSwiftSection 确认三种都会提供；同时具有 resilient 与泛型祖先的类（如超类为 `SwiftUI.NSHostingView<MenuBarLabel>`）走 Resilient 策略，归第二种。 |
 | 2026-10-27 | 加 `classStubOffset`，把指向补充类 stub 的 category 归到补充类名下 | MachOSwiftSection 审阅接口时提出。stub 上的 category 今天在 strip 过的二进制里被整个丢掉，没 strip 时类名来自本地符号、可能与宿主给的名字对不上。只多一个可选字段，不传时行为不变。 |
 | 2026-10-27 | 用户批准，开始实现 | 用户批准本提案，包括在上游文件 `Support/ObjCDump.swift` 末尾追加函数、以一致性测试钉住与原逻辑不漂移。 |
+| 2026-10-27 | 读 RO 用 `ObjCClassRODataProtocol` 上的可失败构造器 `init?(offset:in:)`；只凭 RO 建类信息用 `classInfo(name:superClassName:metaclassData:in:options:)`，返回带标签的元组 `(info:ivarNamesWithUnknownOffset:)` | 上游文件里不新增类型；返回元组是该库已有的写法（`metaClass(in:)`、`stubClass(in:)`）。 |
+| 2026-10-27 | category 所指 stub 的偏移由 `ObjCMetadataSource.objcCategoryTargetClassStubOffset(of:)` 用上游已公开的 `stubClass(in:)` 取，核心 target 不为此追加代码；镜像模式下 stub 不在本镜像时返回 `nil` | 镜像模式的偏移从各自镜像的 header 算起，别的镜像里的 stub 可能与本镜像某个 stub 偏移相同；文件模式下 dyld cache 的偏移从主 cache 起点算，不会相撞。 |
+| 2026-10-27 | 只凭 RO 建出的 `version` 按 `ObjCClassProtocol.version(for:)` 的规则取（元类 7，其余 0），镜像模式的一致性测试不比较 `version` | 镜像模式下已实现的类的 `version` 来自运行时数据，由 `class_setVersion` 写入，`class_ro_t` 里没有这个值。 |
+| 2026-10-27 | 补充类的测试放进 `ObjCMetadataSourceTests`，真实二进制测试随第 3 步提前落地 | 这些测试要现编 C 与 Swift fixture，还要用 builder 和 snapshot builder，这个 target 已经依赖这几个模块，也已有现编 fixture 的先例（`SelfBindFixture`）；Xcode Service 的偏移在开工前已经拿到。 |
+| 2026-10-27 | 进度事件的总数在开始时去掉空名字与重名的补充类；名字被 class object 占用或 RO 读不出的补充类仍计入总数 | 这两种要走到它才知道；宿主按 Swift metadata 算出的补充类本不会撞上 class object，也都读得出，只有宿主出错时计数才到不了总数。 |
+| 2026-10-27 | 偏移未知的 ivar 不交给 `ivarOffsetCommentBuilder`，一律写 `offset: unknown` | 这个闭包只接收一个 `Int`，表达不了「未知」；交给它就只能传 0，读者会把 0 当成真实偏移。 |
+| 2026-10-27 | 不另写实现说明；核心 target 的例外补记进《泛型化到 MachOFile 的实现说明》，术语表登记「supplied class（补充类）」 | 维护者会踩到、代码里看不出的只有一件事：上游文件末尾那段是 fork 的、为什么放那里、靠什么防漂移，它属于那篇文档讲核心目录边界的一节。其余取舍都已在本提案的决策日志里。 |
+| 2026-10-27 | 实现完成，待合并 | 第 1–5 步都已落在 `feature/host-supplied-classes`；`swift test --skip MachOObjCSectionTests`（与 CI 相同）220 个测试全部通过，退出码 0。合并、编号与 fork 发版留给用户。 |
+| 2026-10-27 | In Progress → Implemented，落地编号 0014 | 用户批准收尾，合进 `next` 并随 0.8.201 发布。与方案的出入都已记在上面各行：第 1、2 步合成一个提交；补充类的测试放进 `ObjCMetadataSourceTests`；真实二进制测试随第 3 步提前落地；另加了 strip 过的二进制里 stub 上 category 的测试。文档：使用指南补了库调用方一节，不另写实现说明（核心 target 的例外补记进《泛型化到 MachOFile 的实现说明》），术语表登记「supplied class（补充类）」，README 补了库用法；没有未做的后续项。 |

@@ -29,20 +29,20 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [0011](Evolutions/0011-visibility-regions.md) | 标记模式：一次渲染全量声明，并标出每段内容受哪个开关控制 | Implemented |
 | [0012](Evolutions/0012-strip-protocol-conformance-members.md) | stripProtocolConformance 剥掉协议声明的全部成员，保留遵循列表 | Implemented |
 | [0013](Evolutions/0013-protocol-adoption-compatibility.md) | 协议新采纳另一个协议时按破坏性改动判定 | Implemented |
-| [draft](Evolutions/draft-host-supplied-classes.md) | 由宿主补充文件里没有 class object 的类 | Accepted |
+| [0014](Evolutions/0014-host-supplied-classes.md) | 由宿主补充文件里没有 class object 的类 | Implemented |
 
 ## 使用指南
 
 | 文档 | 说明 |
 |---|---|
-| [objc-section 使用指南](Guides/ObjCSectionCommandLine.md) | 0002、0006 与 0007 的配套。安装（Releases 上的预编译二进制或源码构建）与命令行用法（含 snapshot / diff / evolution），以及六条从签名和帮助文本里看不出来的契约：文件模式超类链截断、RW data 不在泛型接口上、分析 cache 需要 MachOKit 0.52.101+、纯 Swift 类的 ivar 记录对不上、baseline 的 formatVersion 契约、dump 的空结果只写 stderr 不改退出码 |
+| [objc-section 使用指南](Guides/ObjCSectionCommandLine.md) | 0002、0006、0007 与 0014 的配套。安装（Releases 上的预编译二进制或源码构建）与命令行用法（含 snapshot / diff / evolution），以及六条从签名和帮助文本里看不出来的契约：文件模式超类链截断、RW data 不在泛型接口上、分析 cache 需要 MachOKit 0.52.101+、纯 Swift 类的 ivar 记录对不上、baseline 的 formatVersion 契约、dump 的空结果只写 stderr 不改退出码。库调用方另有一节：由宿主补充的类的偏移约定、跳过规则、两个查询入口的分工、偏移未知的 ivar 与 stub 上的 category |
 
 ## 实现说明
 
 | 文档 | 说明 |
 |---|---|
 | [ObjC 渲染层与索引层的实现说明](Internal/ObjCRenderingAndIndexingImplementation.md) | 0001 的配套，已按 0005 订正。三个新 target 的分层与依赖方向、Linux 为什么其实早就断了、锁为什么改用 `@Mutex`、事件通道合并，以及与提案不一致之处 |
-| [泛型化到 MachOFile 的实现说明](Internal/ObjCMetadataSourceGenericization.md) | 0002 的配套。`ResolvedSource` 这个 associatedtype 为什么是被逼出来的、IMP 地址抽象边界为何前移、渲染层为何选泛型而非 existential，以及落地时发现的两个上游缺陷 |
+| [泛型化到 MachOFile 的实现说明](Internal/ObjCMetadataSourceGenericization.md) | 0002 的配套。`ResolvedSource` 这个 associatedtype 为什么是被逼出来的、IMP 地址抽象边界为何前移、渲染层为何选泛型而非 existential，以及落地时发现的两个上游缺陷。2026-10-27 补记核心 target 唯一的例外：0014 的补充类读取追加在上游文件 `Support/ObjCDump.swift` 末尾 |
 | [ObjC API Diff — 设计与已知局限](Internal/ObjCAPIDiffDesignAndLimitations.md) | 0006 的配套。双键设计与键格局（即持久化格式）、与 SwiftDiffing 的五处有意语义差异（method 换签名报 modified、superclass 伪成员等）、六条已知局限（无访问控制之别、ivar 布局变化不可见等） |
 | [ObjC 导出状态的判定 — 判据、边界与实测](Internal/ObjCExportStatusResolution.md) | 0008 的配套。为什么只有类和 ivar 能判（协议符号一律 private extern，分类无符号）、三处反直觉边界（per-image 语义与 NSArray、零导出算「无信息」、不用前缀搜索的正确性理由），以及建索引占 `prepare()` 0.085% 的实测数据 |
 | [dyld cache 里的指针槽位必须先解码](Internal/DyldCachePointerSlotDecoding.md) | 一次 bug 修复的记录，没有提案。cache 里的指针槽位存的是 slide info 编码（v5 起是相对 cache 起点的偏移，不是地址），必须先经 `resolveRebase` 解码。内容包括：macOS 14.4–15.3.2 上 `objc` 命令 SIGTRAP、11.x–14.3.1 上协议方法丢名的根因，各版本受影响的范围，为什么 CI 上测不到，以及验证数据 |

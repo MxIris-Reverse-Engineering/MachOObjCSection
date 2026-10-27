@@ -68,6 +68,10 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
 
     /// The rendered `@interface` for the class named `name`, or `nil` when the
     /// indexed image has no such class.
+    ///
+    /// A class the host supplied (``ObjCIndexing/ObjCSuppliedClass``) renders
+    /// under a comment line saying why the image keeps no class object for
+    /// it, whatever the options.
     public func classInterface(
         named name: String,
         options: ObjCGenerationOptions = .default,
@@ -116,17 +120,29 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?,
         marksOptionalContent: Bool
     ) -> SemanticString? {
-        guard let classGroup = indexer.classGroup(forName: name),
-              let currentClassInfo = classGroup.info.first
-        else { return nil }
+        // A supplied class has no class object, so the indexer keeps it
+        // apart; it renders as the others do.
+        let classInfos: [ObjCClassInfo]
+        let suppliedClassGroup: ObjCSuppliedClassGroup?
+        if let classGroup = indexer.classGroup(forName: name) {
+            classInfos = classGroup.info
+            suppliedClassGroup = nil
+        } else if let group = indexer.suppliedClassGroup(forName: name) {
+            classInfos = group.info
+            suppliedClassGroup = group
+        } else {
+            return nil
+        }
+        guard let currentClassInfo = classInfos.first else { return nil }
 
         let context = makeContext(
             options: options,
             cTypeReplacements: cTypeReplacements,
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder
         )
+        context.ivarNamesWithUnknownOffset = suppliedClassGroup?.ivarNamesWithUnknownOffset ?? []
 
-        let strippedMembersByOption = strippedMembers(ofClass: currentClassInfo, superclassInfos: classGroup.info.dropFirst())
+        let strippedMembersByOption = strippedMembers(ofClass: currentClassInfo, superclassInfos: classInfos.dropFirst())
 
         let finalClassInfo: ObjCClassInfo
         if marksOptionalContent {
@@ -161,7 +177,30 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
             }
         }
 
-        return finalClassInfo.semanticString(using: context)
+        let declaration = finalClassInfo.semanticString(using: context)
+        guard let suppliedClassGroup else { return declaration }
+        return Self.declaration(declaration, under: Self.comment(describing: suppliedClassGroup.suppliedClass.kind))
+    }
+
+    /// Why the image keeps no class object for a supplied class. Always
+    /// rendered, with no switch to turn it off: without it a class the
+    /// runtime makes reads like one the image lists.
+    private static func comment(describing kind: ObjCSuppliedClass.Kind) -> String {
+        switch kind {
+        case .genericSwiftClass:
+            "Generic Swift class, instantiated at runtime"
+        case .swiftClassWithResilientAncestry:
+            "Swift class with resilient ancestry, registered through __objc_stublist"
+        case .swiftClassWithGenericAncestry:
+            "Swift class with generic ancestry, registered through __objc_stublist"
+        }
+    }
+
+    @SemanticStringBuilder
+    private static func declaration(_ declaration: SemanticString, under comment: String) -> SemanticString {
+        Comment(comment)
+        BreakLine()
+        declaration
     }
 
     /// The members each strip switch removes from a class, switch by switch,

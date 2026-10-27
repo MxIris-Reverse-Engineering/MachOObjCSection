@@ -12,8 +12,10 @@ import ObjCMetadataSource
 /// `ObjCAPIModule` the differ freezes. Only each class's own declaration
 /// (`ObjCClassGroup.info.first`) is included — the rest of the group is the
 /// superclass chain, whose members belong to the superclasses' own
-/// containers. Names are walked in sorted order so the assembled module (and
-/// therefore the frozen snapshot) is deterministic across runs.
+/// containers. The classes a host supplied to the indexer are included the
+/// same way, through `ObjCSuppliedClassGroup`. Names are walked in sorted
+/// order so the assembled module (and therefore the frozen snapshot) is
+/// deterministic across runs.
 public struct ObjCAPISnapshotBuilder<MachO: ObjCMetadataSource> {
     private let indexer: ObjCInterfaceIndexer<MachO>
 
@@ -25,6 +27,7 @@ public struct ObjCAPISnapshotBuilder<MachO: ObjCMetadataSource> {
         ObjCAPIModule(
             classes: indexer.classNames.sorted().compactMap { className in
                 indexer.classGroup(forName: className)?.info.first
+                    ?? indexer.suppliedClassGroup(forName: className)?.info.first
             },
             protocols: indexer.protocolNames.sorted().compactMap { protocolName in
                 indexer.protocolGroup(forName: protocolName)?.info

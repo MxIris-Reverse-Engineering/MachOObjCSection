@@ -83,6 +83,22 @@ MachOObjCSection 专有名词与约定用法。
 
 - **主要出现在**：`ObjCMemberRecord.makeSuperclass(superclassName:)`
 
+### supplied class（补充类）
+
+镜像里没有 class object、由宿主补充给 `ObjCInterfaceIndexer` 的类（`ObjCSuppliedClass`）。
+带 ObjC 祖先的 Swift 类里有三种不进 `__objc_classlist`：泛型类（镜像里只有 generic metadata
+pattern 中的 `class_ro_t` 模板，`name` 为 NULL、ivar 偏移槽为空）、超类在开了 library evolution
+的别的模块里的类、超类是泛型的类（后两种经 `__objc_stublist` 的 class stub 注册）。找它们的
+`class_ro_t` 要读 Swift metadata，归宿主（MachOSwiftSection），本库只按宿主给的偏移、名字与超类名
+读。补充类进 `classNames`、事件、渲染与 API snapshot，但只能经 `suppliedClassGroup(forName:)` 查，
+`classGroup(forName:)` 对它返回 `nil`。不要与 class stub 本身混淆：stub 是 `__objc_stublist`
+里那个不带元数据的占位记录，补充类是索引里的一个类。
+
+- **主要出现在**：`Sources/ObjCIndexing/ObjCSuppliedClass.swift`、`ObjCInterfaceIndexer.swift`、
+  `Sources/MachOObjCSection/Support/ObjCDump.swift` 末尾
+- **延伸阅读**：[提案 0014](Evolutions/0014-host-supplied-classes.md)、
+  [使用指南](Guides/ObjCSectionCommandLine.md#库调用方没有-class-object-的类由宿主补充)
+
 ### uniqueName
 
 category 的索引与显示身份：`ClassName(CategoryName)`（如 `NSString(MyAdditions)`）。

@@ -719,10 +719,65 @@ Two properties of that stream are worth knowing before you rely on it:
   no record of inheritance or adoption in any form. Omitting it while expecting relationships
   fails silently — the code compiles, the walk runs, the relationships are simply gone.
 - **Emission order is deterministic.** Every class-phase event precedes every category-phase
-  event, classes follow the `__objc_classlist` walk, and each class reports its superclass
-  before its adopted protocols. Accumulating in arrival order therefore reproduces the
-  binary's declaration order. Changing that order would be a breaking change; the execution
-  context the handler runs on, by contrast, is deliberately not promised.
+  event, classes follow the `__objc_classlist` walk and then the
+  [supplied classes](#classes-with-no-class-object) in the order given, and each class
+  reports its superclass before its adopted protocols. Accumulating in arrival order
+  therefore reproduces the binary's declaration order. Changing that order would be a
+  breaking change; the execution context the handler runs on, by contrast, is deliberately
+  not promised.
+
+#### Classes with no class object
+
+Three kinds of Swift class with an Objective-C ancestor are missing from `__objc_classlist`:
+generic classes, whose image keeps only a `class_ro_t` template in the generic metadata
+pattern, and the classes registered through `__objc_stublist` — those whose superclass lives
+in a module built for library evolution, or is generic. Finding their `class_ro_t` takes
+Swift metadata, which this package does not read. A host that does
+([MachOSwiftSection](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection))
+supplies them:
+
+```swift
+let indexer = ObjCInterfaceIndexer(
+    machO: machOFile,
+    imagePath: machOFile.imagePath,
+    suppliedClasses: [
+        ObjCSuppliedClass(
+            name: "Module.MenuBarPanelWindow<A>",
+            superClassName: "NSPanel",
+            readOnlyDataOffset: 0x711F8,
+            metaclassReadOnlyDataOffset: 0x71240,
+            kind: .genericSwiftClass
+        ),
+    ]
+)
+try await indexer.prepare()
+
+indexer.suppliedClassGroup(forName: "Module.MenuBarPanelWindow<A>")  // classGroup(forName:) is nil
+
+let builder = ObjCInterfaceBuilder(indexer: indexer, machO: machOFile)
+print(builder.classInterface(named: "Module.MenuBarPanelWindow<A>")?.string ?? "")
+```
+
+A supplied class renders under a line naming its kind, whatever the options:
+
+```objc
+// Generic Swift class, instantiated at runtime
+@interface Module.MenuBarPanelWindow<A> : NSPanel
+…
+```
+
+- **Offsets follow `ObjCClassRODataProtocol.offset`**: a file offset within the slice for a
+  standalone binary, the unslid address less `sharedRegionStart` for an image in a dyld
+  shared cache, the distance from the image's header for a `MachOImage`.
+- **Supplied classes are indexed after the listed ones**, in the order given, and appear in
+  `classNames`, the events and API snapshots. One whose name is empty or already taken, or
+  whose `class_ro_t` cannot be read, is skipped without a diagnostic.
+- **A generic class's template records no ivar offsets.** Those ivars are kept with an
+  offset of 0, named in `ivarNamesWithUnknownOffset`, and rendered `// offset: unknown`.
+- **Give a stub-registered class its `classStubOffset`**, the address its `__objc_stublist`
+  entry holds. Swift points the class's `@objc` extensions at the stub, so their categories
+  name no class; with the stub supplied they are indexed under the supplied name, where a
+  stripped binary would otherwise drop them.
 
 ### ObjCDeclarationRendering
 

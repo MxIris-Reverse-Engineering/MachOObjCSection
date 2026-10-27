@@ -48,6 +48,12 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
     /// with `VisibilityRegion`s instead. `options` is then not consulted.
     public var optionalContentMarking: ObjCOptionalContentMarking?
 
+    /// The ivars of the type being rendered whose offset the image does not
+    /// record — those of a generic Swift class's template. Their offset
+    /// comment reads `offset: unknown` rather than going through
+    /// `ivarOffsetCommentBuilder`.
+    public var ivarNamesWithUnknownOffset: Set<String>
+
     public init(
         machO: MachO,
         options: ObjCGenerationOptions = .default,
@@ -56,7 +62,8 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
         methodIMPs: [String: UInt64] = [:],
         classMethodIMPs: [String: UInt64] = [:],
         isExpandHandler: @escaping (_ name: String?, _ isStruct: Bool) -> Bool = { _, _ in true },
-        optionalContentMarking: ObjCOptionalContentMarking? = nil
+        optionalContentMarking: ObjCOptionalContentMarking? = nil,
+        ivarNamesWithUnknownOffset: Set<String> = []
     ) {
         self.machO = machO
         self.options = options
@@ -66,6 +73,7 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
         self.classMethodIMPs = classMethodIMPs
         self.isExpandHandler = isExpandHandler
         self.optionalContentMarking = optionalContentMarking
+        self.ivarNamesWithUnknownOffset = ivarNamesWithUnknownOffset
     }
 }
 
@@ -283,7 +291,9 @@ extension ObjCIvarInfo {
 
         context.optionalContent(.addIvarOffsetComments) {
             Space()
-            if let ivarOffsetCommentBuilder = context.ivarOffsetCommentBuilder {
+            if context.ivarNamesWithUnknownOffset.contains(name) {
+                Comment("offset: unknown")
+            } else if let ivarOffsetCommentBuilder = context.ivarOffsetCommentBuilder {
                 Comment(ivarOffsetCommentBuilder(offset))
             } else {
                 Comment("offset: \(offset)")

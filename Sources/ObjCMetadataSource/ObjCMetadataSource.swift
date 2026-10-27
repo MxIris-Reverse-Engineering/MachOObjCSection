@@ -99,6 +99,44 @@ public protocol ObjCMetadataSource: MachOObjCSectionRepresentable, MachORepresen
         of objcCategory: Category
     ) -> (ResolvedSource, Category.ObjCClass)?
 
+    /// The class information read from the `class_ro_t` at
+    /// `readOnlyDataOffset` alone, for a class this Mach-O keeps no class
+    /// object for, with the names of the ivars whose offset is unknown.
+    ///
+    /// `name` and `superClassName` are used as given; class properties and
+    /// class methods come from the metaclass's `class_ro_t` at
+    /// `metaclassReadOnlyDataOffset`, and are empty when there is none or it
+    /// cannot be read. The offsets follow this source's convention, the one
+    /// `ObjCClassRODataProtocol.offset` reads back. `nil` when no `class_ro_t`
+    /// can be read at `readOnlyDataOffset`. See
+    /// `ObjCClassRODataProtocol.classInfo(name:superClassName:metaclassData:in:options:)`.
+    func objcClassInfo(
+        readOnlyDataOffset: Int,
+        metaclassReadOnlyDataOffset: Int?,
+        name: String,
+        superClassName: String?,
+        options: ObjCInfoOptions
+    ) -> (info: ObjCClassInfo, ivarNamesWithUnknownOffset: Set<String>)?
+
+    /// The full category information for `objcCategory`, attributed to the
+    /// class named `className` rather than to a name read off its class
+    /// pointer, or `nil` when the record cannot be decoded.
+    func objcCategoryInfo<Category: ObjCCategoryProtocol>(
+        of objcCategory: Category,
+        className: String,
+        options: ObjCInfoOptions
+    ) -> ObjCCategoryInfo?
+
+    /// The offset of the class stub `objcCategory` extends, in this source's
+    /// offset convention, or `nil` when its class is not a stub in this
+    /// Mach-O.
+    ///
+    /// Swift points a category of a class registered through
+    /// `__objc_stublist` at the class's stub rather than at a class object.
+    func objcCategoryTargetClassStubOffset<Category: ObjCCategoryProtocol>(
+        of objcCategory: Category
+    ) -> Int?
+
     /// Resolves the raw `imp` field of a method record into a virtual address,
     /// or `nil` when the field holds no usable implementation pointer.
     ///
@@ -131,5 +169,29 @@ extension ObjCMetadataSource {
     /// protocols recursively.
     public func objcCategoryInfo<Category: ObjCCategoryProtocol>(of objcCategory: Category) -> ObjCCategoryInfo? {
         objcCategoryInfo(of: objcCategory, options: .recursive)
+    }
+
+    /// The class information read from the `class_ro_t` at
+    /// `readOnlyDataOffset` alone, expanding referenced protocols
+    /// recursively.
+    public func objcClassInfo(
+        readOnlyDataOffset: Int,
+        metaclassReadOnlyDataOffset: Int?,
+        name: String,
+        superClassName: String?
+    ) -> (info: ObjCClassInfo, ivarNamesWithUnknownOffset: Set<String>)? {
+        objcClassInfo(
+            readOnlyDataOffset: readOnlyDataOffset,
+            metaclassReadOnlyDataOffset: metaclassReadOnlyDataOffset,
+            name: name,
+            superClassName: superClassName,
+            options: .recursive
+        )
+    }
+
+    /// The full category information for `objcCategory`, attributed to the
+    /// class named `className`, expanding referenced protocols recursively.
+    public func objcCategoryInfo<Category: ObjCCategoryProtocol>(of objcCategory: Category, className: String) -> ObjCCategoryInfo? {
+        objcCategoryInfo(of: objcCategory, className: className, options: .recursive)
     }
 }

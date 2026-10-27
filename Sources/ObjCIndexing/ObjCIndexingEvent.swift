@@ -15,16 +15,17 @@ import Foundation
 /// protocol adoption leave this library — an indexer constructed without an
 /// `eventHandler` keeps no record of them whatsoever. Callers that need the
 /// relationships accumulate them from this stream into whatever shape suits
-/// them. See ``ObjCInterfaceIndexer/init(machO:imagePath:eventHandler:)``.
+/// them. See ``ObjCInterfaceIndexer/init(machO:imagePath:suppliedClasses:eventHandler:)``.
 ///
 /// ## Emission order is guaranteed; the execution context is not
 ///
 /// For one image and one version of this library, two `prepare()` runs emit
 /// exactly the same sequence of events. The order is: every class-phase event
 /// precedes every category-phase event; within the class phase classes follow
-/// the `__objc_classlist` walk, each class emitting its `subclassIndexed`
-/// before its `conformanceIndexed` events in declaration order; the category
-/// phase walks the category list the same way.
+/// the `__objc_classlist` walk, then the supplied classes in the order the
+/// indexer was given them, each class emitting its `subclassIndexed` before
+/// its `conformanceIndexed` events in declaration order; the category phase
+/// walks the category list the same way.
 ///
 /// Callers may rely on that — accumulating this stream into an ordered
 /// collection reproduces the binary's declaration order, which is what the

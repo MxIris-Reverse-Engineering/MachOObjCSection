@@ -51,6 +51,49 @@ extension MachOImage: ObjCMetadataSource {
         return resolved
     }
 
+    public func objcClassInfo(
+        readOnlyDataOffset: Int,
+        metaclassReadOnlyDataOffset: Int?,
+        name: String,
+        superClassName: String?,
+        options: ObjCInfoOptions = .recursive
+    ) -> (info: ObjCClassInfo, ivarNamesWithUnknownOffset: Set<String>)? {
+        func classInfo<ReadOnlyData: ObjCClassRODataProtocol>(
+            _: ReadOnlyData.Type
+        ) -> (info: ObjCClassInfo, ivarNamesWithUnknownOffset: Set<String>)? {
+            guard let readOnlyData = ReadOnlyData(offset: readOnlyDataOffset, in: self) else { return nil }
+            let metaclassReadOnlyData = metaclassReadOnlyDataOffset.flatMap { ReadOnlyData(offset: $0, in: self) }
+            return readOnlyData.classInfo(
+                name: name,
+                superClassName: superClassName,
+                metaclassData: metaclassReadOnlyData,
+                in: self,
+                options: options
+            )
+        }
+        return is64Bit ? classInfo(ObjCClassROData64.self) : classInfo(ObjCClassROData32.self)
+    }
+
+    public func objcCategoryInfo<Category: ObjCCategoryProtocol>(
+        of objcCategory: Category,
+        className: String,
+        options: ObjCInfoOptions = .recursive
+    ) -> ObjCCategoryInfo? {
+        objcCategory.info(in: self, className: className, options: options)
+    }
+
+    /// A stub in another image is left out: its offset counts from that
+    /// image's header, and could equal one of this image's.
+    public func objcCategoryTargetClassStubOffset<Category: ObjCCategoryProtocol>(
+        of objcCategory: Category
+    ) -> Int? {
+        guard let (stubImage, stubClass) = objcCategory.stubClass(in: self),
+              stubImage.ptr == ptr else {
+            return nil
+        }
+        return stubClass.offset
+    }
+
     /// In image mode the raw `imp` is the live function pointer: an absolute
     /// runtime address that includes the slide. Rebasing it onto the image's
     /// own start turns it into an offset, which `address(forOffset:)` then
