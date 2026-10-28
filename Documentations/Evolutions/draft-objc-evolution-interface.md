@@ -62,18 +62,18 @@ public struct ObjCEvolutionInterface: Sendable {
 - `modified` 的新旧两边是两个版本各自渲染出的那一行，多行的渲染（内联展开的匿名 struct）合成一行。两边渲染相同时只写 `modified in X`；
   协议成员只在 `@required` 与 `@optional` 之间移动时写 `@required → @optional`。
 - superclass 和采纳的协议（`superclass`、`adopts:P` 两种 lineage）都在容器头部那一行上，所以各自写成头部上方的一行注释，
-  例如 `// [●●○] adopts <NSFoo>: removed in 14.0`、`// [●●●] superclass modified in 13.0: NSObject → NSResponder`；
+  例如 `// [●●○] adopts <NSFoo> removed in 14.0`、`// [●●●] superclass modified in 13.0: NSObject → NSResponder`；
   容器自己的标注仍挂在头部行末。
 - 某个版本有 identity key 冲突时，文件末尾照 `ObjCAPIEvolutionReporter` 的措辞列出。
 
 示意（不是真实输出）：
 
 ```objc
-// Objective-C API evolution across 3 versions: 12.0.1 → 13.0 → 14.0
+// ObjC API evolution across 3 versions: 12.0.1 → 13.0 → 14.0
 // Bitmap positions: [1] 12.0.1  [2] 13.0  [3] 14.0
-// API_AVAILABLE / API_OBSOLETED versions are axis points, not necessarily the releases that …
+// API_AVAILABLE and API_OBSOLETED versions are axis points: … not necessarily the releases that really introduced or removed it.
 
-// [●●○] adopts <NSFoo>: removed in 14.0
+// [●●○] adopts <NSFoo> removed in 14.0
 @interface NSExampleView : NSView <NSAnimatablePropertyContainer, NSFoo> {
     struct __EVFlags _flags;            // [●●●] modified in 13.0
 }
@@ -125,7 +125,7 @@ API_AVAILABLE(macos(13.0))
 每一步都能单独构建、测试通过：
 
 1. 渲染层开口：成员渲染函数改为 `package`，头部行抽成共用的 `package` 函数；`objc dump` 的输出不变，现有测试照常通过。（已完成）
-2. 标注格式层：位图、事件措辞、可用性宏、列对齐、文件头与警告尾，配纯值测试。
+2. 标注格式层：位图、事件措辞、可用性宏、列对齐、文件头与警告尾，配纯值测试。（已完成）
 3. 合并渲染器：`ObjCEvolutionInterfaceBuilder` 与 `ObjCEvolutionInterface`；进程内 Foundation 交两次，正文与 `objc dump` 逐字节相同。
 4. 归档 cache 测试：AppKit 12.0.1 → 13.0，核对 SDK 标了 13.0 的类，以及 lineage 与标注一一对应。
 5. 文档：使用指南的库调用方一节、术语表、提案的收尾记录。
