@@ -111,10 +111,21 @@ extension ObjCMethod {
             fatalError("Unsupported Platform")
         }
 #else
-        let base = unsafeBitCast(
-            NSSelectorFromString("🤯"),
-            to: UnsafeRawPointer.self
-        )
+        // A list that names selectors directly lies in the shared cache, and
+        // the one in this process is the one its runtime reads: objc4-838
+        // (macOS 12, iOS 15) on counts a name from `@selector(🤯)`, the
+        // selector the cache builder picked as the base; objc4-818 before it,
+        // like every other relative offset, from the name field itself. There
+        // `NSSelectorFromString("🤯")` registers a selector the cache lacks.
+        let base: UnsafeRawPointer
+        if #available(macOS 12, iOS 15, tvOS 15, watchOS 8, *) {
+            base = unsafeBitCast(
+                NSSelectorFromString("🤯"),
+                to: UnsafeRawPointer.self
+            )
+        } else {
+            base = pointer
+        }
 #endif
 
         let typeBase: UnsafeRawPointer = if isRelativeDirectType {

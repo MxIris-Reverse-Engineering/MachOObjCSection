@@ -205,12 +205,16 @@ extension MachOFile {
 
 // MARK: - Objective-C
 extension MachOFile {
-    var relativeMethodSelectorBaseAddressOffset: UInt64? {
+    /// What a method name in a relative method list of the image's dyld cache
+    /// counts from; `nil` for an image outside a cache, whose lists never name
+    /// selectors directly, and for a cache whose Objective-C optimization data
+    /// cannot be read.
+    var relativeMethodNameBase: RelativeMethodNameBase? {
         if let cache {
             if let fullCache = cache._cachedFullCache {
-                return fullCache.relativeMethodSelectorBaseAddressOffset
+                return fullCache.relativeMethodNameBase
             }
-            return cache.locateValueSkippingUnreadableSubCaches(\.relativeMethodSelectorBaseAddressOffset)?.value
+            return cache.locateValueSkippingUnreadableSubCaches(\.relativeMethodNameBase)?.value
         }
 
         return nil
