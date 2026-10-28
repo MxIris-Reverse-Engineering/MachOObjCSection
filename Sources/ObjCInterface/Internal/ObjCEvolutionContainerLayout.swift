@@ -237,15 +237,17 @@ struct ObjCEvolutionContainerAssembler {
         if let suppliedClassKind = renderings.suppliedClassKind {
             lines.append(Self.commentLine("// " + suppliedClassKind.declarationComment))
         }
+        // No local here may share a name with a method it calls: Swift 6.3
+        // resolves the call to the local being declared and crashes.
         if let superclassLineage = lineagesOfMembers[Self.superclassKey],
-           let annotation = superclassAnnotation(superclassLineage) {
-            lines.append(Self.commentLine(ObjCEvolutionMarking.annotationText(for: annotation, versions: versions)))
+           let superclassLineageAnnotation = superclassAnnotation(superclassLineage) {
+            lines.append(Self.commentLine(ObjCEvolutionMarking.annotationText(for: superclassLineageAnnotation, versions: versions)))
         }
         for adoptionKey in adoptionKeys {
             guard let adoptionLineage = lineagesOfMembers[adoptionKey],
-                  let annotation = annotation(of: adoptionLineage, subject: "adopts <\(Self.protocolName(ofAdoptionKey: adoptionKey))>", renderings: renderings, layout: layout)
+                  let adoptionLineageAnnotation = annotation(of: adoptionLineage, subject: "adopts <\(Self.protocolName(ofAdoptionKey: adoptionKey))>", renderings: renderings, layout: layout)
             else { continue }
-            lines.append(Self.commentLine(ObjCEvolutionMarking.annotationText(for: annotation, versions: versions)))
+            lines.append(Self.commentLine(ObjCEvolutionMarking.annotationText(for: adoptionLineageAnnotation, versions: versions)))
         }
         if let availabilityPlatform, let containerLineage,
            let macro = ObjCEvolutionMarking.availabilityMacro(presence: containerLineage.presence, versions: versions, platform: availabilityPlatform) {
@@ -345,12 +347,12 @@ struct ObjCEvolutionContainerAssembler {
             let macro = ObjCEvolutionMarking.availabilityMacro(presence: lineage.presence, versions: versions, platform: availabilityPlatform)
             declaration = ObjCEvolutionMarking.declaration(declaration, withAvailabilityMacro: macro)
         }
-        let annotation = lineage.flatMap { annotation(of: $0, subject: nil, renderings: renderings, layout: layout) }
+        let memberAnnotation = lineage.flatMap { annotation(of: $0, subject: nil, renderings: renderings, layout: layout) }
         return ObjCEvolutionMarking.lines(of: declaration).enumerated().map { lineIndex, line in
             ObjCEvolutionLine(
                 content: line,
                 indentLevel: lineIndex == 0 ? indentLevel : 0,
-                annotation: lineIndex == 0 ? annotation : nil
+                annotation: lineIndex == 0 ? memberAnnotation : nil
             )
         }
     }
