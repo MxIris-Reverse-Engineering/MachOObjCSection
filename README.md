@@ -667,6 +667,12 @@ library product (`ObjCAPIDiffer` / `ObjCAPIEvolutionBuilder` /
 `ObjCAPISnapshotDocument`), usable directly from Swift via
 `ObjCAPISnapshotBuilder` in `ObjCInterface`.
 
+To read N versions as one header instead of a list of changes, `ObjCEvolutionInterfaceBuilder`
+in `ObjCInterface` merges their declarations as `dump` writes them and marks each one that
+changed with its presence across the versions and the version it was added, removed or
+modified in, optionally with `API_AVAILABLE` / `API_OBSOLETED`. It takes one version's
+indexer at a time, so the versions never have to be in memory together.
+
 Baselines carry a `formatVersion` header. The identity/payload key scheme is the de-facto
 persistence format, so a baseline written by a different format version is rejected with a
 clear error instead of being silently mis-compared — regenerate it with the current tool.

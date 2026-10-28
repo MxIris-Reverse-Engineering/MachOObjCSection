@@ -1,7 +1,7 @@
 # objc-section 使用指南
 
-- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）、[0014](../Evolutions/0014-host-supplied-classes.md)（由宿主补充的类，库调用方）
-- **最后更新**: 2026-10-27
+- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）、[0014](../Evolutions/0014-host-supplied-classes.md)（由宿主补充的类，库调用方）、[draft-objc-evolution-interface](../Evolutions/draft-objc-evolution-interface.md)（合并多个版本、带演进标注的头文件，库调用方）
+- **最后更新**: 2026-10-28
 
 这份文档写给两类人：用 `objc-section` 命令行导出 ObjC 头的人，以及直接调用
 `ObjCInterfaceIndexer` / `ObjCInterfaceBuilder` 处理磁盘上二进制的人。
@@ -326,6 +326,43 @@ func makeIndexer() -> ObjCInterfaceIndexer<MachOImage>
   在 `__objc_catlist` 里，`cls` 指向类自己的 metadata 而不是 stub（它的 stub 只有私有符号
   `CMt`，没有 `CMs`）。所以这些 category 按 `class_ro_t` 里的名字（`_TtC…`）归位，strip 过
   也一样，`classStubOffset` 用不上；补充类换了别的写法，类和它的 category 就分在两个名字下。
+
+## 库调用方：把 N 个版本合并成一份带演进标注的头文件
+
+`ObjCEvolutionInterfaceBuilder`（`ObjCInterface`）把同一个二进制 N ≥ 2 个版本的头文件按声明合并成一份：外观与
+`objc dump` 相同，有变化的声明带 `// [○●●] added in 13.0` 这样的注释，传了平台名时再补上 `API_AVAILABLE` /
+`API_OBSOLETED`，术语见 [evolution interface](../Glossary.md#evolution-interface演进合并头文件)。`objc-section`
+命令行不提供它，把它接到命令行上的是 MachOSwiftSection 的 `swift-section objc evolution --interface`。
+
+```swift
+var builder = ObjCEvolutionInterfaceBuilder()
+for (label, image) in imagesOldestFirst {
+    let indexer = ObjCInterfaceIndexer(machO: image, imagePath: image.imagePath)
+    try await indexer.prepare()
+    builder.addVersion(indexer: indexer, machO: image, version: ObjCAPIVersionDescriptor(label: label))
+}
+let merged = try builder.build(availabilityPlatform: "macos")
+// merged.interface 是合并后的头文件，merged.evolution 是标注依据的 ObjCAPIEvolution
+```
+
+下面几条在签名里看不出来：
+
+- **调用顺序就是版本轴，旧的在前。** 少于两个版本时 `build` 抛 `fewerThanTwoVersions`。版本的 label 原样写进标注和可用性宏。
+- **索引器要先 `prepare()`，补充类在创建索引器时传。** 与取快照的要求相同，`addVersion` 不会替你准备。
+- **`addVersion` 返回后就不再引用索引器和 MachO。** 宿主可以逐个版本加载，加完就释放。builder 留下的是每个版本的快照、
+  每个声明最新的渲染，以及渲染变过的那几版。在 M3 Ultra 上合并 macOS 11.0.1 到 15.0 的 8 个 AppKit：每个版本 6–8 秒，
+  每加一个版本进程占用涨 25–35 MB，`build` 之后共 451 MB。
+- **用 `ObjCGenerationOptions.default` 渲染，十个生成开关都不适用。** 剥掉的成员没有行可以挂标注，地址和偏移注释每版都不同。
+  `cTypeReplacements` 在 `init` 里给，对每个版本都生效。
+- **没有标注就是整条轴上都在、从没变过。** 加入或删掉的容器只在它那一行标注，成员不再各自标注，它们跟着容器存在。
+  superclass 和采纳的协议都写在 `@interface` 那一行里，它们的变化写成那一行上方的注释行。
+- **同一个容器里 identity 相同的成员只写第一条。** 快照只比较第一条，合并结果跟着只写第一条，其余的连同签名列在文件末尾的
+  identity key 冲突警告里。所以同一个镜像交两次时，正文是 `objc dump` 的输出少掉这些重复行。
+- **可用性宏只在一个宏能说完整个生命周期时才写。** 平台名原样写进宏，label 必须是 1–3 段数字。引入后一直在：
+  `API_AVAILABLE(macos(13.0))`；引入后又删掉：`API_OBSOLETED("Removed", macos(12.0.1, 13.0, 13.0))`。从轴起点就在、
+  后来删掉的不写：`API_OBSOLETED` 必须带引入版本，而版本轴不知道它，这一点与 Swift 一侧的 `@available(macOS, obsoleted:)`
+  不同。删了又加回的、只被修改过的也不写；ivar、采纳的协议和 superclass 从来不写。
+- **C struct 与 union 不参与追踪。** 它们放在最后，每个取自定义它的最新版本，前面一行注释说明这一点。
 
 ## 不建议 conform `ObjCMetadataSource`
 

@@ -72,9 +72,8 @@ extension ObjCMemberRecord {
     /// an ObjC method's entry point *is* its selector, so an encoding change
     /// at the same selector reports `.modified` (old → new side by side).
     public static func make(_ methodInfo: ObjCMethodInfo, isOptionalRequirement: Bool? = nil) -> ObjCMemberRecord {
-        let selectorPrefix = methodInfo.isClassMethod ? "+" : "-"
-        return ObjCMemberRecord(
-            identityKey: ObjCAPIKey(rawValue: "method:\(selectorPrefix)\(methodInfo.name)"),
+        ObjCMemberRecord(
+            identityKey: identityKey(of: methodInfo),
             payloadKey: ObjCAPIKey(rawValue: "enc:\(methodInfo.typeEncoding)" + optionalitySuffix(isOptionalRequirement)),
             kind: methodInfo.isClassMethod ? .classMethod : .instanceMethod,
             signature: methodInfo.headerString,
@@ -88,7 +87,6 @@ extension ObjCMemberRecord {
     /// changes the ivar axis already reports, and folding it in would turn
     /// every backing-ivar rename into property noise.
     public static func make(_ propertyInfo: ObjCPropertyInfo, isOptionalRequirement: Bool? = nil) -> ObjCMemberRecord {
-        let propertyPrefix = propertyInfo.isClassProperty ? "+" : "-"
         let normalizedAttributes = propertyInfo.attributes
             .filter { attribute in
                 if case .ivar = attribute { return false }
@@ -97,7 +95,7 @@ extension ObjCMemberRecord {
             .map { $0.encoded() }
             .joined(separator: ",")
         return ObjCMemberRecord(
-            identityKey: ObjCAPIKey(rawValue: "property:\(propertyPrefix)\(propertyInfo.name)"),
+            identityKey: identityKey(of: propertyInfo),
             payloadKey: ObjCAPIKey(rawValue: "attr:\(normalizedAttributes)" + optionalitySuffix(isOptionalRequirement)),
             kind: propertyInfo.isClassProperty ? .classProperty : .instanceProperty,
             signature: propertyInfo.headerString,
@@ -109,11 +107,28 @@ extension ObjCMemberRecord {
     /// deliberately not folded in (see the type doc).
     public static func make(_ ivarInfo: ObjCIvarInfo) -> ObjCMemberRecord {
         ObjCMemberRecord(
-            identityKey: ObjCAPIKey(rawValue: "ivar:\(ivarInfo.name)"),
+            identityKey: identityKey(of: ivarInfo),
             payloadKey: ObjCAPIKey(rawValue: "enc:\(ivarInfo.typeEncoding)"),
             kind: .ivar,
             signature: ivarInfo.headerString
         )
+    }
+
+    /// The identity key of a method's record, without the rest of the record:
+    /// `method:` with `+` or `-` and the selector.
+    package static func identityKey(of methodInfo: ObjCMethodInfo) -> ObjCAPIKey {
+        ObjCAPIKey(rawValue: "method:\(methodInfo.isClassMethod ? "+" : "-")\(methodInfo.name)")
+    }
+
+    /// The identity key of a property's record: `property:` with `+` or `-`
+    /// and the name.
+    package static func identityKey(of propertyInfo: ObjCPropertyInfo) -> ObjCAPIKey {
+        ObjCAPIKey(rawValue: "property:\(propertyInfo.isClassProperty ? "+" : "-")\(propertyInfo.name)")
+    }
+
+    /// The identity key of an ivar's record: `ivar:` and the name.
+    package static func identityKey(of ivarInfo: ObjCIvarInfo) -> ObjCAPIKey {
+        ObjCAPIKey(rawValue: "ivar:\(ivarInfo.name)")
     }
 
     /// A directly adopted protocol. Identity equals payload — an adoption can

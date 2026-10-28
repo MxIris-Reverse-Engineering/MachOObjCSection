@@ -49,8 +49,25 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         cTypeReplacements: [ObjCPrimitiveTypePattern: String],
         ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?
     ) -> ObjCRenderingContext<MachO> {
-        let indexer = self.indexer
-        return ObjCRenderingContext(
+        Self.makeContext(
+            indexer: indexer,
+            machO: machO,
+            options: options,
+            cTypeReplacements: cTypeReplacements,
+            ivarOffsetCommentBuilder: ivarOffsetCommentBuilder
+        )
+    }
+
+    /// The context ``makeContext(options:cTypeReplacements:ivarOffsetCommentBuilder:)``
+    /// builds, for a renderer that holds no `ObjCInterfaceBuilder`.
+    static func makeContext(
+        indexer: ObjCInterfaceIndexer<MachO>,
+        machO: MachO,
+        options: ObjCGenerationOptions,
+        cTypeReplacements: [ObjCPrimitiveTypePattern: String],
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?
+    ) -> ObjCRenderingContext<MachO> {
+        ObjCRenderingContext(
             machO: machO,
             options: options,
             cTypeReplacements: cTypeReplacements,
@@ -179,21 +196,7 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
 
         let declaration = finalClassInfo.semanticString(using: context)
         guard let suppliedClassGroup else { return declaration }
-        return Self.declaration(declaration, under: Self.comment(describing: suppliedClassGroup.suppliedClass.kind))
-    }
-
-    /// Why the image keeps no class object for a supplied class. Always
-    /// rendered, with no switch to turn it off: without it a class the
-    /// runtime makes reads like one the image lists.
-    private static func comment(describing kind: ObjCSuppliedClass.Kind) -> String {
-        switch kind {
-        case .genericSwiftClass:
-            "Generic Swift class, instantiated at runtime"
-        case .swiftClassWithResilientAncestry:
-            "Swift class with resilient ancestry, registered through __objc_stublist"
-        case .swiftClassWithGenericAncestry:
-            "Swift class with generic ancestry, registered through __objc_stublist"
-        }
+        return Self.declaration(declaration, under: suppliedClassGroup.suppliedClass.kind.declarationComment)
     }
 
     @SemanticStringBuilder
@@ -567,6 +570,22 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
             classMethods.insert(setterName)
         } else {
             methods.insert(setterName)
+        }
+    }
+}
+
+extension ObjCSuppliedClass.Kind {
+    /// Why the image keeps no class object for a supplied class, written above
+    /// its `@interface`. Always rendered, with no switch to turn it off:
+    /// without it a class the runtime makes reads like one the image lists.
+    var declarationComment: String {
+        switch self {
+        case .genericSwiftClass:
+            "Generic Swift class, instantiated at runtime"
+        case .swiftClassWithResilientAncestry:
+            "Swift class with resilient ancestry, registered through __objc_stublist"
+        case .swiftClassWithGenericAncestry:
+            "Swift class with generic ancestry, registered through __objc_stublist"
         }
     }
 }

@@ -77,23 +77,59 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
     }
 }
 
-extension ObjCClassInfo {
+/// The first line of a rendered declaration on its own, for a renderer that
+/// lays out the members itself (the evolution interface in `ObjCInterface`)
+/// and must still write the line the declaration renderers below write.
+package enum ObjCDeclarationHeader {
+    /// `@interface Name : Superclass <Protocol, …>`.
     @SemanticStringBuilder
-    public func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
+    package static func classInterface(name: String, superclassName: String?, protocolNames: [String]) -> SemanticString {
         Keyword("@interface")
         Space()
         TypeDeclaration(kind: .class, name)
 
-        if let superClassName {
+        if let superclassName {
             " : "
-            TypeName(kind: .class, superClassName)
+            TypeName(kind: .class, superclassName)
         }
 
+        adoptedProtocols(protocolNames)
+    }
+
+    /// `@protocol Name <Protocol, …>`.
+    @SemanticStringBuilder
+    package static func protocolDeclaration(name: String, protocolNames: [String]) -> SemanticString {
+        Keyword("@protocol")
+        Space()
+        TypeDeclaration(kind: .protocol, name)
+        adoptedProtocols(protocolNames)
+    }
+
+    /// `@interface ClassName (CategoryName) <Protocol, …>`.
+    @SemanticStringBuilder
+    package static func categoryInterface(className: String, categoryName: String, protocolNames: [String]) -> SemanticString {
+        Keyword("@interface")
+        Space()
+        TypeName(kind: .class, className)
+        Space()
+        "(\(categoryName))"
+        adoptedProtocols(protocolNames)
+    }
+
+    @SemanticStringBuilder
+    private static func adoptedProtocols(_ protocolNames: [String]) -> SemanticString {
         Joined(separator: ", ", prefix: " <", suffix: ">") {
-            for `protocol` in protocols {
-                TypeName(kind: .protocol, `protocol`.name)
+            for protocolName in protocolNames {
+                TypeName(kind: .protocol, protocolName)
             }
         }
+    }
+}
+
+extension ObjCClassInfo {
+    @SemanticStringBuilder
+    public func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
+        ObjCDeclarationHeader.classInterface(name: name, superclassName: superClassName, protocolNames: protocols.map(\.name))
 
         Joined {
             MemberList(level: 1) {
@@ -140,15 +176,7 @@ extension ObjCClassInfo {
 extension ObjCProtocolInfo {
     @SemanticStringBuilder
     public func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
-        Keyword("@protocol")
-        Space()
-        TypeDeclaration(kind: .protocol, name)
-
-        Joined(separator: ", ", prefix: " <", suffix: ">") {
-            for `protocol` in protocols {
-                TypeName(kind: .protocol, `protocol`.name)
-            }
-        }
+        ObjCDeclarationHeader.protocolDeclaration(name: name, protocolNames: protocols.map(\.name))
 
         BreakLine()
 
@@ -213,17 +241,7 @@ extension ObjCProtocolInfo {
 extension ObjCCategoryInfo {
     @SemanticStringBuilder
     public func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
-        Keyword("@interface")
-        Space()
-        TypeName(kind: .class, className)
-        Space()
-        "(\(name))"
-
-        Joined(separator: ", ", prefix: " <", suffix: ">") {
-            for `protocol` in protocols {
-                TypeName(kind: .protocol, `protocol`.name)
-            }
-        }
+        ObjCDeclarationHeader.categoryInterface(className: className, categoryName: name, protocolNames: protocols.map(\.name))
 
         BreakLine()
 
@@ -259,7 +277,7 @@ extension ObjCCategoryInfo {
 
 extension ObjCIvarInfo {
     @SemanticStringBuilder
-    func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
+    package func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
         if let type, case .bitField(let width) = type {
             ObjCField(type: .int, name: name, bitWidth: width)
                 .semanticString(fallbackName: name, context: context)
@@ -304,7 +322,7 @@ extension ObjCIvarInfo {
 
 extension ObjCPropertyInfo {
     @SemanticStringBuilder
-    func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
+    package func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
         Keyword("@property")
 
         Joined(separator: ", ", prefix: " (", suffix: ")") {
@@ -401,7 +419,7 @@ extension ObjCPropertyInfo {
 
 extension ObjCMethodInfo {
     @SemanticStringBuilder
-    func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
+    package func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
         if isClassMethod {
             "+"
         } else {
