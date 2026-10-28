@@ -13,7 +13,9 @@
 写法与指针格式的方法列表一致：用条目相对 Mach-O header 的偏移加上 `name` 的相对偏移算出槽位的 `fieldOffset`，
 构造 `UnresolvedValue(fieldOffset:value:)`，交给 `resolveString(in:slot:)`。
 
-dyld shared cache 里的相对方法列表不受影响：cache 里的 `name` 是相对选择器基址的偏移（`relativeDirectSelectors`），没有引用槽位。
+dyld shared cache 里的相对方法列表不受影响：cache builder 写的 `name` 直接指向选择器字符串（`relativeDirectSelectors`），没有引用槽位。
+它从哪里算起随 cache 的版本而变（macOS 12 起是选择器基址，macOS 11 是字段自身），见
+[dyld cache 里相对方法名的起算点随版本而变](DyldCacheRelativeMethodNameBase.md)。
 
 ## 为什么原值不是地址
 

@@ -235,7 +235,7 @@ extension ObjCMethodList {
             )
 
             let size = MemoryLayout<ObjCMethod.RelativeDirect>.size
-            let nameOffsetInCache = machO.relativeMethodSelectorBaseAddressOffset ?? 0
+            let nameBase = machO.relativeMethodNameBase
             return sequence.enumerated()
                 .map {
                     let offset = numericCast(offset) + $0 * size
@@ -243,8 +243,8 @@ extension ObjCMethodList {
                         $1,
                         in: machO,
                         entryOffset: numericCast(offset),
-                        nameBaseOffset: nameOffsetInCache,
-                        typeBaseOffset: nil
+                        nameBaseOffset: nameBase?.offset(forNameFieldAt: numericCast(offset)),
+                        typesFromNameBase: false
                     )
                 }
 
@@ -256,7 +256,7 @@ extension ObjCMethodList {
             )
 
             let size = MemoryLayout<ObjCMethod.RelativeDirect>.size
-            let nameOffsetInCache = machO.relativeMethodSelectorBaseAddressOffset ?? 0
+            let nameBase = machO.relativeMethodNameBase
             return sequence.enumerated()
                 .map {
                     let offset = numericCast(offset) + $0 * size
@@ -264,8 +264,8 @@ extension ObjCMethodList {
                         $1,
                         in: machO,
                         entryOffset: numericCast(offset),
-                        nameBaseOffset: nameOffsetInCache,
-                        typeBaseOffset: nameOffsetInCache // NOTE: offset from selector
+                        nameBaseOffset: nameBase?.offset(forNameFieldAt: numericCast(offset)),
+                        typesFromNameBase: true // NOTE: offset from selector
                     )
                 }
         }
@@ -378,30 +378,42 @@ extension ObjCMethodList {
         )
     }
 
+    /// - Parameters:
+    ///   - nameBaseOffset: What the name counts from, as the cache's
+    ///     `RelativeMethodNameBase` places it. `nil` when the cache does not
+    ///     say, which leaves the name empty rather than read from a guess: the
+    ///     cache start, taken for one before, turned every macOS 11 name into
+    ///     whatever bytes it landed on.
+    ///   - typesFromNameBase: Whether the types count from the same base as
+    ///     the name rather than from their own field.
     private func directMethod(
         _ relativeDirect: ObjCMethod.RelativeDirect,
         in machO: MachOFile,
         entryOffset: UInt64,
-        nameBaseOffset: UInt64,
-        typeBaseOffset: UInt64?
+        nameBaseOffset: UInt64?,
+        typesFromNameBase: Bool
     ) -> ObjCMethod {
-        let nameOffset = resolvedOffset(
-            base: nameBaseOffset,
-            relative: relativeDirect.name.offset
-        ) ?? 0
+        let nameOffset = nameBaseOffset.flatMap {
+            resolvedOffset(
+                base: $0,
+                relative: relativeDirect.name.offset
+            )
+        }
 
-        let typesOffset: UInt64
-        if let typeBaseOffset {
-            typesOffset = resolvedOffset(
-                base: typeBaseOffset,
-                relative: relativeDirect.types.offset
-            ) ?? 0
+        let typesOffset: UInt64?
+        if typesFromNameBase {
+            typesOffset = nameBaseOffset.flatMap {
+                resolvedOffset(
+                    base: $0,
+                    relative: relativeDirect.types.offset
+                )
+            }
         } else {
             typesOffset = resolvedOffset(
                 base: entryOffset,
                 relative: relativeDirect.types.offset,
                 adjustment: 4
-            ) ?? 0
+            )
         }
 
         let imp = resolvedOffset(
@@ -411,14 +423,12 @@ extension ObjCMethodList {
         ) ?? 0
 
         return ObjCMethod(
-            name: resolveString(
-                in: machO,
-                forOffset: nameOffset
-            ),
-            types: resolveString(
-                in: machO,
-                forOffset: typesOffset
-            ),
+            name: nameOffset.map {
+                resolveString(in: machO, forOffset: $0)
+            } ?? "",
+            types: typesOffset.map {
+                resolveString(in: machO, forOffset: $0)
+            } ?? "",
             imp: imp
         )
     }
