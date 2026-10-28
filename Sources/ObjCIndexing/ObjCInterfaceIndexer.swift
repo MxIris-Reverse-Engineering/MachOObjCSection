@@ -509,11 +509,12 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
             totalCount: objcCategories.count
         ))
 
-        // Swift points the `@objc` extensions of a class registered through
-        // `__objc_stublist` at the class's stub, which names no class: such
-        // a category goes under the supplied class's name, the one the class
-        // is indexed by. Where two supplied classes give the same stub, the
-        // first keeps it.
+        // Swift points the `@objc` extensions of a class with resilient
+        // ancestry at the class's stub, which names no class: such a category
+        // goes under the supplied class's name, the one the class is indexed
+        // by. (Those of a class with generic ancestry point at its metadata,
+        // which names it, and need nothing here.) Where two supplied classes
+        // give the same stub, the first keeps it.
         var suppliedClassNameByStubOffset: [Int: String] = [:]
         for reading in suppliedClassReadings {
             guard let classStubOffset = reading.suppliedClass.classStubOffset,

@@ -35,7 +35,7 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 
 | 文档 | 说明 |
 |---|---|
-| [objc-section 使用指南](Guides/ObjCSectionCommandLine.md) | 0002、0006、0007 与 0014 的配套。安装（Releases 上的预编译二进制或源码构建）与命令行用法（含 snapshot / diff / evolution），以及六条从签名和帮助文本里看不出来的契约：文件模式超类链截断、RW data 不在泛型接口上、分析 cache 需要 MachOKit 0.52.101+、纯 Swift 类的 ivar 记录对不上、baseline 的 formatVersion 契约、dump 的空结果只写 stderr 不改退出码。库调用方另有一节：由宿主补充的类的偏移约定、跳过规则、两个查询入口的分工、偏移未知的 ivar 与 stub 上的 category |
+| [objc-section 使用指南](Guides/ObjCSectionCommandLine.md) | 0002、0006、0007 与 0014 的配套。安装（Releases 上的预编译二进制或源码构建）与命令行用法（含 snapshot / diff / evolution），以及六条从签名和帮助文本里看不出来的契约：文件模式超类链截断、RW data 不在泛型接口上、分析 cache 需要 MachOKit 0.52.101+、纯 Swift 类的 ivar 记录对不上、baseline 的 formatVersion 契约、dump 的空结果只写 stderr 不改退出码。库调用方另有一节：由宿主补充的类的偏移约定、跳过规则、两个查询入口的分工、偏移未知的 ivar，以及经 stub 注册的两种类的 category 各怎么归位 |
 
 ## 实现说明
 

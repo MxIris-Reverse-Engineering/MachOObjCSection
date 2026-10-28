@@ -317,10 +317,15 @@ func makeIndexer() -> ObjCInterfaceIndexer<MachOImage>
 - **偏移未知的 ivar 的 `offset` 是 0，不是真实偏移。** 泛型类模板的 ivar 偏移由运行时按特化填，
   这些 ivar 列在 `ivarNamesWithUnknownOffset` 里；渲染时偏移注释写 `offset: unknown`，
   不经过 `ivarOffsetCommentBuilder`。自己读 `ObjCClassInfo.ivars` 的调用方要先查这个集合。
-- **stub 上的 category 靠 `classStubOffset`。** Swift 把 stub 注册类的 `@objc` 扩展编成
-  category，`cls` 指向 class stub（`__objc_stublist` 条目里存的地址，即 stub 的 isa 字，
-  `CMs` 符号所在处）。给了这个偏移，这些 category 就记在补充类的名字下，
-  `targetIsSwiftStable` 为 `true`；不给，strip 过的二进制里它们会被整个丢掉。
+- **超类在别的模块里的类，category 要靠 `classStubOffset` 归位。** 超类在开了 library
+  evolution 的别的模块里时，Swift 把类的 `@objc` 扩展编成 category，`cls` 指向 class stub
+  （`__objc_stublist` 条目里存的地址，即 stub 的 isa 字，`CMs` 符号所在处）。给了这个偏移，
+  这些 category 就记在补充类的名字下，`targetIsSwiftStable` 为 `true`；不给，strip 过的
+  二进制里它们会被整个丢掉。
+- **超类是泛型的类，要用运行时名字补充。** 这种类也登记在 `__objc_stublist`，但它的 category
+  在 `__objc_catlist` 里，`cls` 指向类自己的 metadata 而不是 stub（它的 stub 只有私有符号
+  `CMt`，没有 `CMs`）。所以这些 category 按 `class_ro_t` 里的名字（`_TtC…`）归位，strip 过
+  也一样，`classStubOffset` 用不上；补充类换了别的写法，类和它的 category 就分在两个名字下。
 
 ## 不建议 conform `ObjCMetadataSource`
 

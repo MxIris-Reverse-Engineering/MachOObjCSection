@@ -166,6 +166,64 @@ struct SuppliedClassIndexingTests {
         #expect(indexer.suppliedClassGroup(forName: StubCategoryFixture.suppliedClassName) != nil)
     }
 
+    // MARK: - Categories on a Class with Generic Ancestry
+
+    /// The class has a stub too, but its category points at the class's
+    /// metadata, which names the class: the category goes under that name,
+    /// stripped or not, and a class supplied under it needs no stub.
+    @Test("A category on a class with generic ancestry goes under the class's runtime name", arguments: [false, true])
+    func genericAncestryCategory(stripped: Bool) async throws {
+        let libraries = try GenericAncestryCategoryFixture.libraries()
+        let machO = try SuppliedClassFixture.loadMachOFile(at: stripped ? libraries.strippedURL : libraries.unstrippedURL)
+        let runtimeName = GenericAncestryCategoryFixture.runtimeName
+
+        // The premises: the image lists no class object for `Gadget` and
+        // registers its stub, yet the one category is on `__objc_catlist` and
+        // points at no stub.
+        #expect((machO.objc.classes64 ?? []).isEmpty)
+        #expect(machO.sections64.first { $0.sectionName == "__objc_stublist" }?.size == 8)
+        #expect((machO.objc.categories2_64 ?? []).isEmpty)
+        let categories = machO.objc.categories64 ?? []
+        try #require(categories.count == 1, "the category is not on __objc_catlist")
+        #expect(machO.objcCategoryTargetClassStubOffset(of: categories[0]) == nil)
+
+        let events = EventRecorder()
+        let indexer = ObjCInterfaceIndexer(
+            machO: machO,
+            imagePath: machO.imagePath,
+            suppliedClasses: [try GenericAncestryCategoryFixture.suppliedClass()],
+            eventHandler: events.record
+        )
+        try await indexer.prepare()
+        let categoryName = try #require(indexer.categoryNames.first)
+        #expect(indexer.categoryNames.count == 1)
+        let categoryInfo = try #require(indexer.categoryGroup(forName: categoryName)?.info)
+        #expect(categoryInfo.className == runtimeName)
+        #expect(categoryInfo.methods.map(\.name).contains("extensionMethod"))
+        #expect(events.categoryConformances == [
+            .init(targetClassName: runtimeName, protocolName: "GenericAncestryCategoryFixtureProtocol", targetIsSwiftStable: true),
+        ])
+
+        let classInfo = try #require(indexer.suppliedClassGroup(forName: runtimeName)?.info.first)
+        #expect(classInfo.methods.map(\.name).contains("ownMethod"))
+        #expect(!classInfo.methods.map(\.name).contains("extensionMethod"))
+    }
+
+    @Test("A class with generic ancestry supplied under another name parts from its category")
+    func genericAncestryCategoryUnderAnotherName() async throws {
+        let machO = try SuppliedClassFixture.loadMachOFile(at: try GenericAncestryCategoryFixture.libraries().unstrippedURL)
+        let suppliedClassName = "GenericAncestryCategoryFixture.Gadget"
+        let indexer = ObjCInterfaceIndexer(
+            machO: machO,
+            imagePath: machO.imagePath,
+            suppliedClasses: [try GenericAncestryCategoryFixture.suppliedClass(named: suppliedClassName)]
+        )
+        try await indexer.prepare()
+        #expect(indexer.suppliedClassGroup(forName: suppliedClassName) != nil)
+        let categoryName = try #require(indexer.categoryNames.first)
+        #expect(indexer.categoryGroup(forName: categoryName)?.info.className == GenericAncestryCategoryFixture.runtimeName)
+    }
+
     // MARK: - Xcode Service
 
     @Test(

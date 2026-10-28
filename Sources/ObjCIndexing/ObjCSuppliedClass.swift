@@ -32,6 +32,10 @@ public struct ObjCSuppliedClass: Sendable, Hashable {
 
     /// The name the class is indexed and rendered under, as the host chooses
     /// to spell it.
+    ///
+    /// The categories of a class with generic ancestry go under the name its
+    /// `class_ro_t` carries, so supply such a class under that name to keep
+    /// them on it.
     public var name: String
 
     /// The Objective-C name of the superclass.
@@ -52,7 +56,11 @@ public struct ObjCSuppliedClass: Sendable, Hashable {
     /// The offset of the class stub, the address the class's `__objc_stublist`
     /// entry holds. A category whose class pointer holds that address is
     /// attributed to this class: Swift points the `@objc` extensions of a
-    /// stub-registered class at its stub. A generic class has none.
+    /// class with resilient ancestry at its stub.
+    ///
+    /// The other kinds need none. A generic class has no stub, and Swift
+    /// points the `@objc` extensions of a class with generic ancestry at the
+    /// class's own metadata, which names it.
     public var classStubOffset: Int?
 
     public var kind: Kind

@@ -774,10 +774,14 @@ A supplied class renders under a line naming its kind, whatever the options:
   whose `class_ro_t` cannot be read, is skipped without a diagnostic.
 - **A generic class's template records no ivar offsets.** Those ivars are kept with an
   offset of 0, named in `ivarNamesWithUnknownOffset`, and rendered `// offset: unknown`.
-- **Give a stub-registered class its `classStubOffset`**, the address its `__objc_stublist`
-  entry holds. Swift points the class's `@objc` extensions at the stub, so their categories
-  name no class; with the stub supplied they are indexed under the supplied name, where a
-  stripped binary would otherwise drop them.
+- **Give a `.swiftClassWithResilientAncestry` class its `classStubOffset`**, the address its
+  `__objc_stublist` entry holds. Swift points the class's `@objc` extensions at the stub, so
+  their categories name no class; with the stub supplied they are indexed under the supplied
+  name, where a stripped binary would otherwise drop them.
+- **Supply a `.swiftClassWithGenericAncestry` class under its runtime name** (`_TtC…`). Swift
+  points its `@objc` extensions at the class's own metadata, not at its stub, so their
+  categories go under the name the class's `class_ro_t` carries, and a stub offset changes
+  nothing.
 
 ### ObjCDeclarationRendering
 

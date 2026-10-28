@@ -131,8 +131,9 @@ public protocol ObjCMetadataSource: MachOObjCSectionRepresentable, MachORepresen
     /// offset convention, or `nil` when its class is not a stub in this
     /// Mach-O.
     ///
-    /// Swift points a category of a class registered through
-    /// `__objc_stublist` at the class's stub rather than at a class object.
+    /// Swift points a category of a class whose superclass lives in another
+    /// module built for library evolution at the class's stub rather than at
+    /// a class object.
     func objcCategoryTargetClassStubOffset<Category: ObjCCategoryProtocol>(
         of objcCategory: Category
     ) -> Int?

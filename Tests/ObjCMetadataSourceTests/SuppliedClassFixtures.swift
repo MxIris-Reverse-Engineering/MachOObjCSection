@@ -15,6 +15,12 @@ enum SuppliedClassFixture {
         var description: String { "\(command.joined(separator: " ")) failed:\n\(diagnostics)" }
     }
 
+    /// A compiled image, and a copy of it stripped of its local symbols.
+    struct Libraries {
+        let unstrippedURL: URL
+        let strippedURL: URL
+    }
+
     private enum WorkingDirectoryCleanup {
         nonisolated(unsafe) static var directories: [URL] = []
         static let registration: Void = {
@@ -185,12 +191,7 @@ enum StubCategoryFixture {
     /// the image's symbols carry.
     static let suppliedClassName = "StubCategoryFixture.Widget"
 
-    struct Libraries {
-        let unstrippedURL: URL
-        let strippedURL: URL
-    }
-
-    private static let compilation = Result { () throws -> Libraries in
+    private static let compilation = Result { () throws -> SuppliedClassFixture.Libraries in
         let workingDirectory = try SuppliedClassFixture.makeWorkingDirectory(named: "StubCategoryFixture")
         let baseSourceURL = workingDirectory.appendingPathComponent("ResilientBase.swift")
         let sourceURL = workingDirectory.appendingPathComponent("StubCategoryFixture.swift")
@@ -216,10 +217,10 @@ enum StubCategoryFixture {
         // Takes the local symbols, the category's among them, as a release
         // build's strip does; leaves every section where it was.
         try SuppliedClassFixture.run(["strip", "-x", unstrippedURL.path, "-o", strippedURL.path])
-        return Libraries(unstrippedURL: unstrippedURL, strippedURL: strippedURL)
+        return SuppliedClassFixture.Libraries(unstrippedURL: unstrippedURL, strippedURL: strippedURL)
     }
 
-    static func libraries() throws -> Libraries {
+    static func libraries() throws -> SuppliedClassFixture.Libraries {
         try compilation.get()
     }
 
@@ -241,6 +242,72 @@ enum StubCategoryFixture {
             metaclassReadOnlyDataOffset: try SuppliedClassFixture.fileOffset(ofSymbolNamed: metaclassReadOnlyDataSymbolName, in: machO),
             classStubOffset: includingStub ? try SuppliedClassFixture.fileOffset(ofSymbolNamed: stubSymbolName, in: machO) : nil,
             kind: .swiftClassWithResilientAncestry
+        )
+    }
+}
+
+// MARK: - A Category on a Class with Generic Ancestry
+
+/// A Swift class whose superclass is generic has no class object either, and
+/// the image registers it through a stub in `__objc_stublist` too. The
+/// category its `@objc` extension becomes points elsewhere: at the class's own
+/// metadata (`__objc_catlist`), which the runtime initializes before use and
+/// which carries the class's `class_ro_t`.
+enum GenericAncestryCategoryFixture {
+    static let source = """
+    import Foundation
+
+    @objc(GenericAncestryCategoryFixtureProtocol)
+    public protocol GenericAncestryCategoryFixtureProtocol {
+        func protocolMethod()
+    }
+
+    open class GenericBase<Element>: NSObject {}
+
+    public final class Gadget: GenericBase<Int> {
+        @objc public var size: Int = 0
+        @objc public func ownMethod() {}
+    }
+
+    extension Gadget: GenericAncestryCategoryFixtureProtocol {
+        @objc public func extensionMethod() {}
+        public func protocolMethod() {}
+    }
+    """
+
+    /// The Objective-C name `Gadget`'s `class_ro_t` carries.
+    static let runtimeName = "_TtC30GenericAncestryCategoryFixture6Gadget"
+
+    private static let compilation = Result { () throws -> SuppliedClassFixture.Libraries in
+        let workingDirectory = try SuppliedClassFixture.makeWorkingDirectory(named: "GenericAncestryCategoryFixture")
+        let sourceURL = workingDirectory.appendingPathComponent("GenericAncestryCategoryFixture.swift")
+        let unstrippedURL = workingDirectory.appendingPathComponent("libGenericAncestryCategoryFixture.dylib")
+        let strippedURL = workingDirectory.appendingPathComponent("libGenericAncestryCategoryFixtureStripped.dylib")
+        try source.write(to: sourceURL, atomically: true, encoding: .utf8)
+        try SuppliedClassFixture.run([
+            "swiftc", "-emit-library",
+            "-module-name", "GenericAncestryCategoryFixture",
+            sourceURL.path, "-o", unstrippedURL.path,
+        ])
+        try SuppliedClassFixture.run(["strip", "-x", unstrippedURL.path, "-o", strippedURL.path])
+        return SuppliedClassFixture.Libraries(unstrippedURL: unstrippedURL, strippedURL: strippedURL)
+    }
+
+    static func libraries() throws -> SuppliedClassFixture.Libraries {
+        try compilation.get()
+    }
+
+    /// `Gadget` as a host supplies it, under `name` and without a stub, its
+    /// offsets read off the unstripped image's `_DATA_` and `_METACLASS_DATA_`
+    /// symbols. Stripping leaves the offsets as they are.
+    static func suppliedClass(named name: String = runtimeName) throws -> ObjCSuppliedClass {
+        let machO = try SuppliedClassFixture.loadMachOFile(at: try libraries().unstrippedURL)
+        return ObjCSuppliedClass(
+            name: name,
+            superClassName: "GenericAncestryCategoryFixture.GenericBase<Swift.Int>",
+            readOnlyDataOffset: try SuppliedClassFixture.fileOffset(ofSymbolNamed: "__DATA_" + runtimeName, in: machO),
+            metaclassReadOnlyDataOffset: try SuppliedClassFixture.fileOffset(ofSymbolNamed: "__METACLASS_DATA_" + runtimeName, in: machO),
+            kind: .swiftClassWithGenericAncestry
         )
     }
 }

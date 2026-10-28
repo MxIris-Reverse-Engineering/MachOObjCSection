@@ -784,12 +784,12 @@ fileprivate extension ObjCClassRODataProtocol {
 // classes with an Objective-C ancestor have no class object in the image: a
 // generic class keeps only a `class_ro_t` template in its generic metadata
 // pattern, and a class registered through `__objc_stublist` keeps its
-// `class_ro_t` in its resilient metadata pattern. Finding either takes Swift
-// metadata, which a host reads; given the offsets, the functions below read
-// such a class from its `class_ro_t` alone, and read a category whose class
-// pointer is such a class's stub under the name the host gives the class.
-// They assemble the information as `info(in:options:)` above does, and tests
-// hold the two equal.
+// `class_ro_t` in its resilient metadata pattern or in metadata the runtime
+// initializes before use. Finding either takes Swift metadata, which a host
+// reads; given the offsets, the functions below read such a class from its
+// `class_ro_t` alone, and read a category whose class pointer is such a
+// class's stub under the name the host gives the class. They assemble the
+// information as `info(in:options:)` above does, and tests hold the two equal.
 
 extension ObjCClassRODataProtocol {
     /// The `class_ro_t` at `offset`, or `nil` when no record fits there.
@@ -988,11 +988,12 @@ extension ObjCCategoryProtocol {
     /// The information of this category, attributed to the class named
     /// `className` rather than to a name read off its class pointer.
     ///
-    /// Swift points a category of a class registered through
-    /// `__objc_stublist` at the class's stub, which records no name:
-    /// `className(in:)` then falls back on a local symbol, and a stripped
-    /// image has none, so `info(in:options:)` returns `nil`. Given the name
-    /// of the class whose stub it is, the category reads all the same.
+    /// Swift points a category of a class whose superclass lives in another
+    /// module built for library evolution at the class's stub, which records
+    /// no name: `className(in:)` then falls back on a local symbol, and a
+    /// stripped image has none, so `info(in:options:)` returns `nil`. Given
+    /// the name of the class whose stub it is, the category reads all the
+    /// same.
     public func info(
         in machO: MachOFile,
         className: String,
