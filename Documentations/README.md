@@ -30,7 +30,7 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [0012](Evolutions/0012-strip-protocol-conformance-members.md) | stripProtocolConformance 剥掉协议声明的全部成员，保留遵循列表 | Implemented |
 | [0013](Evolutions/0013-protocol-adoption-compatibility.md) | 协议新采纳另一个协议时按破坏性改动判定 | Implemented |
 | [0014](Evolutions/0014-host-supplied-classes.md) | 由宿主补充文件里没有 class object 的类 | Implemented |
-| [draft](Evolutions/draft-objc-evolution-interface.md) | 带演进标注的合并 ObjC 头文件 | Accepted |
+| [draft](Evolutions/draft-objc-evolution-interface.md) | 带演进标注的合并 ObjC 头文件 | In Progress |
 
 ## 使用指南
 

@@ -1,6 +1,6 @@
 # Draft - 带演进标注的合并 ObjC 头文件
 
-- **状态**: Accepted
+- **状态**: In Progress
 - **创建日期**: 2026-10-28
 - **最后更新**: 2026-10-28
 - **实现分支**: `feature/objc-evolution-interface`
@@ -124,7 +124,7 @@ API_AVAILABLE(macos(13.0))
 
 每一步都能单独构建、测试通过：
 
-1. 渲染层开口：成员渲染函数改为 `package`，头部行抽成共用的 `package` 函数；`objc dump` 的输出不变，现有测试照常通过。
+1. 渲染层开口：成员渲染函数改为 `package`，头部行抽成共用的 `package` 函数；`objc dump` 的输出不变，现有测试照常通过。（已完成）
 2. 标注格式层：位图、事件措辞、可用性宏、列对齐、文件头与警告尾，配纯值测试。
 3. 合并渲染器：`ObjCEvolutionInterfaceBuilder` 与 `ObjCEvolutionInterface`；进程内 Foundation 交两次，正文与 `objc dump` 逐字节相同。
 4. 归档 cache 测试：AppKit 12.0.1 → 13.0，核对 SDK 标了 13.0 的类，以及 lineage 与标注一一对应。
