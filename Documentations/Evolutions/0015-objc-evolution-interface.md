@@ -6,8 +6,8 @@
 - **实现分支**: `feature/objc-evolution-interface`
 - **配套文档**: [使用指南的库调用方一节](../Guides/ObjCSectionCommandLine.md#库调用方把-n-个版本合并成一份带演进标注的头文件)；
   [术语表的 evolution interface](../Glossary.md#evolution-interface演进合并头文件)
-- **关联**: MachOSwiftSection 的 `Documentations/Evolutions/draft-objc-evolution-interface.md`
-  （`swift-section objc evolution --interface` 的 CLI、SwiftSectionKit 请求、集成测试与文档由那边做）；
+- **关联**: MachOSwiftSection 的[提案 0080](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/0080-objc-evolution-interface.md)
+  （`swift-section objc evolution --interface` 的 CLI、SwiftSectionKit 请求、集成测试与文档由那边做，依赖下限 0.8.204）；
   Swift 一侧的同一种视图是 MachOSwiftSection 提案 0013（Swift evolution interface）
 
 ## 摘要
