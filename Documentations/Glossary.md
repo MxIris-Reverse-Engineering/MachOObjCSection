@@ -21,7 +21,7 @@ lineage，没有注释就是整条轴上都在、从没变过。与 lineage 报�
 报告逐条列变化，这一份把变化摆回声明原处。MachOSwiftSection 的 `evolution --interface` 是 Swift 一侧的同名视图。
 
 - **主要出现在**：`Sources/ObjCInterface/ObjCEvolutionInterfaceBuilder.swift`、`Sources/ObjCInterface/Internal/`
-- **延伸阅读**：[提案 draft-objc-evolution-interface](Evolutions/draft-objc-evolution-interface.md)、
+- **延伸阅读**：[提案 0015](Evolutions/0015-objc-evolution-interface.md)、
   [使用指南](Guides/ObjCSectionCommandLine.md#库调用方把-n-个版本合并成一份带演进标注的头文件)
 
 ### fork numbering（fork 版本号）

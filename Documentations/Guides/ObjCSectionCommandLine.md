@@ -1,6 +1,6 @@
 # objc-section 使用指南
 
-- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）、[0014](../Evolutions/0014-host-supplied-classes.md)（由宿主补充的类，库调用方）、[draft-objc-evolution-interface](../Evolutions/draft-objc-evolution-interface.md)（合并多个版本、带演进标注的头文件，库调用方）
+- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）、[0014](../Evolutions/0014-host-supplied-classes.md)（由宿主补充的类，库调用方）、[0015](../Evolutions/0015-objc-evolution-interface.md)（合并多个版本、带演进标注的头文件，库调用方）
 - **最后更新**: 2026-10-28
 
 这份文档写给两类人：用 `objc-section` 命令行导出 ObjC 头的人，以及直接调用

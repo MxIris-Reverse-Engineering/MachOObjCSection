@@ -1,8 +1,8 @@
-# Draft - 带演进标注的合并 ObjC 头文件
+# 0015 - 带演进标注的合并 ObjC 头文件
 
-- **状态**: In Progress
+- **状态**: Implemented
 - **创建日期**: 2026-10-28
-- **最后更新**: 2026-10-28
+- **最后更新**: 2026-10-29
 - **实现分支**: `feature/objc-evolution-interface`
 - **配套文档**: [使用指南的库调用方一节](../Guides/ObjCSectionCommandLine.md#库调用方把-n-个版本合并成一份带演进标注的头文件)；
   [术语表的 evolution interface](../Glossary.md#evolution-interface演进合并头文件)
@@ -152,3 +152,4 @@ API_AVAILABLE(macos(13.0))
 | 2026-10-28 | 归档 cache 测试用 11.0.1 → 12.0.1 → 13.0 三个版本，不是方案写的两个 | 三个版本才有「中间版本加入又删掉」的生命周期，`API_OBSOLETED` 才测得到；这三个 cache 也正是现有测试用的三种方法列表布局 |
 | 2026-10-28 | 实现完成，待用户看过后收尾 | 全量测试 245 个通过（原有 224 个加新增 21 个）；`objc dump` 对 macOS 27.2 的 AppKit、Foundation 输出与 0.8.202 逐字节相同；在 M3 Ultra 上合并 8 个 AppKit 版本，每版 6–8 秒，每加一版进程占用涨 25–35 MB，`build` 后共 451 MB，照此推算 51 个版本约 2 GB |
 | 2026-10-28 | 文档：使用指南加库调用方一节，术语表登记 evolution interface，公开 README 补一段；不另写实现说明 | 调用方要遵守的约定（版本顺序、何时释放索引器、重复成员、可用性宏的条件）进使用指南；维护者要知道的取舍都在本提案的决策日志和代码注释里，单写一份实现说明只会复述它们 |
+| 2026-10-29 | 落地为 0015，状态改 Implemented，随 0.8.203 发布 | 用户在 MachOSwiftSection 一侧验收了 `swift-section objc evolution --interface` 的输出，并在本仓库确认收尾发版；那边要等这个版本发出才能抬依赖下限。没有未完成的项 |
