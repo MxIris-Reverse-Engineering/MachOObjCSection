@@ -4,6 +4,8 @@
 - **创建日期**: 2026-10-28
 - **最后更新**: 2026-10-28
 - **实现分支**: `feature/objc-evolution-interface`
+- **配套文档**: [使用指南的库调用方一节](../Guides/ObjCSectionCommandLine.md#库调用方把-n-个版本合并成一份带演进标注的头文件)；
+  [术语表的 evolution interface](../Glossary.md#evolution-interface演进合并头文件)
 - **关联**: MachOSwiftSection 的 `Documentations/Evolutions/draft-objc-evolution-interface.md`
   （`swift-section objc evolution --interface` 的 CLI、SwiftSectionKit 请求、集成测试与文档由那边做）；
   Swift 一侧的同一种视图是 MachOSwiftSection 提案 0013（Swift evolution interface）
@@ -61,7 +63,8 @@ public struct ObjCEvolutionInterface: Sendable {
 
 - 照 Swift 的写法：文件头两行写版本轴，以及位图每一位对应的版本；有事件的声明在行尾加 `// [●○●] added in X`、`removed in X` 或
   `modified in X: 旧 → 新`，多个事件用 ` · ` 连接。同一个容器里的标注按列对齐，列位置最多到 72，代码超过这一列时标注另起一行。
-  没有标注就表示整条轴上都在、从没变过。
+  没有标注就表示整条轴上都在、从没变过。加入或删掉的容器只在它那一行标注，成员不再各自标注：lineage 只在容器两边都在时
+  比较成员，成员跟着容器存在。
 - `modified` 的新旧两边是两个版本各自渲染出的那一行，多行的渲染（内联展开的匿名 struct）合成一行。两边渲染相同时只写 `modified in X`；
   协议成员只在 `@required` 与 `@optional` 之间移动时写 `@required → @optional`。
 - superclass 和采纳的协议（`superclass`、`adopts:P` 两种 lineage）都在容器头部那一行上，所以各自写成头部上方的一行注释，
@@ -133,7 +136,7 @@ API_AVAILABLE(macos(13.0))
 2. 标注格式层：位图、事件措辞、可用性宏、列对齐、文件头与警告尾，配纯值测试。（已完成）
 3. 合并渲染器：`ObjCEvolutionInterfaceBuilder` 与 `ObjCEvolutionInterface`；进程内 Foundation 交两次，正文与 `objc dump` 逐行相同（重复的成员除外）。（已完成）
 4. 归档 cache 测试：AppKit 11.0.1 → 12.0.1 → 13.0，核对 SDK 标了 13.0 的类，以及 lineage 与标注一一对应。（已完成）
-5. 文档：使用指南的库调用方一节、术语表、提案的收尾记录。
+5. 文档：使用指南的库调用方一节、术语表、提案的收尾记录。（已完成）
 
 ## 决策日志
 
@@ -147,3 +150,5 @@ API_AVAILABLE(macos(13.0))
 | 2026-10-28 | identity 相同的成员只写第一条，与 `objc dump` 不再逐字节相同 | 对照测试发现 Foundation 有 6 个类把同一个属性列了两次（头文件里只读、类扩展里可写）。快照只比较第一条，合并视图跟着只写第一条，每一行就都有确定的 lineage；丢掉的那条连同签名列在文件末尾的冲突警告里 |
 | 2026-10-28 | 删掉的成员前面没有成员时，插在它后面那个成员之前 | 方案只说了「插在前一个成员之后」，没有覆盖它原本排在第一位的情况 |
 | 2026-10-28 | 归档 cache 测试用 11.0.1 → 12.0.1 → 13.0 三个版本，不是方案写的两个 | 三个版本才有「中间版本加入又删掉」的生命周期，`API_OBSOLETED` 才测得到；这三个 cache 也正是现有测试用的三种方法列表布局 |
+| 2026-10-28 | 实现完成，待用户看过后收尾 | 全量测试 245 个通过（原有 224 个加新增 21 个）；`objc dump` 对 macOS 27.2 的 AppKit、Foundation 输出与 0.8.202 逐字节相同；在 M3 Ultra 上合并 8 个 AppKit 版本，每版 6–8 秒，每加一版进程占用涨 25–35 MB，`build` 后共 451 MB，照此推算 51 个版本约 2 GB |
+| 2026-10-28 | 文档：使用指南加库调用方一节，术语表登记 evolution interface，公开 README 补一段；不另写实现说明 | 调用方要遵守的约定（版本顺序、何时释放索引器、重复成员、可用性宏的条件）进使用指南；维护者要知道的取舍都在本提案的决策日志和代码注释里，单写一份实现说明只会复述它们 |

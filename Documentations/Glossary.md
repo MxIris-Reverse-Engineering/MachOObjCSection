@@ -13,6 +13,17 @@ MachOObjCSection 专有名词与约定用法。
 
 按英文名 / 标识符字母序排列。
 
+### evolution interface（演进合并头文件）
+
+同一个二进制 N ≥ 2 个版本的头文件按声明合并成的一份：外观与 `objc dump` 相同，有变化的声明带存在位图和
+「在哪一版加入、删除、修改」的注释，删掉的声明留在它最后出现的位置。每条注释都是 `ObjCAPIEvolution` 里的一条
+lineage，没有注释就是整条轴上都在、从没变过。与 lineage 报告（`objc evolution` 的输出）是同一份事实的两种视图：
+报告逐条列变化，这一份把变化摆回声明原处。MachOSwiftSection 的 `evolution --interface` 是 Swift 一侧的同名视图。
+
+- **主要出现在**：`Sources/ObjCInterface/ObjCEvolutionInterfaceBuilder.swift`、`Sources/ObjCInterface/Internal/`
+- **延伸阅读**：[提案 draft-objc-evolution-interface](Evolutions/draft-objc-evolution-interface.md)、
+  [使用指南](Guides/ObjCSectionCommandLine.md#库调用方把-n-个版本合并成一份带演进标注的头文件)
+
 ### fork numbering（fork 版本号）
 
 本仓库是 `p-x9/MachOObjCSection` 的 fork，自己的发布版本号写作 `<上游 major>.<上游 minor>.<P>NN`：前两段跟随所基于的上游版本；第三段是百位不为 0 的三位数，百位 `P` 跟着合入的上游补丁号走，后两位逐次递增。合入上游 0.8.0、0.8.1 期间发的是 `0.8.100`–`0.8.111`，合入上游 0.8.2 后从 `0.8.200` 起编。三位数的第三段与上游自己的一两位补丁号（`0.8.2` 之类）永不相撞。这个号同时是 SwiftPM 的包版本（下游 `from:` / `exact:` 依赖的就是它）和 `objc-section --version` 的输出。发布流水线**只认这个形状**：`release.yml` 的 tag 过滤只匹配它，所以同步过来的上游 tag 不会触发发布；`version-check.yml` 拒绝不符合它的 `BundledVersion.value`，免得打了 tag 却没有任何报错地不发布。
