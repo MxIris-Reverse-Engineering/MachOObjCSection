@@ -1,6 +1,6 @@
-# Draft - ObjC 演进按 image 组比较，并报出搬家
+# 0016 - ObjC 演进按 image 组比较，并报出搬家
 
-- **状态**: In Progress
+- **状态**: Implemented
 - **创建日期**: 2026-10-29
 - **最后更新**: 2026-10-29
 - **实现分支**: `feature/objc-evolution-image-groups`
@@ -8,7 +8,7 @@
   [实现说明的 image 组一节](../Internal/ObjCAPIDiffDesignAndLimitations.md#image-组几个-image-当作一个-api-面)；
   术语表的 [image group](../Glossary.md#image-groupimage-组) 与 [image move](../Glossary.md#image-move搬家)
 - **关联**: MachOSwiftSection 同步做 Swift 一侧（SwiftDiffing / SwiftInterface）和两库的集成测试，模型与报告文案两边一致；
-  那边的提案落地后在这里补链接
+  那边的提案 slug 是 `image-group-evolution`，落地后在这里补链接。ObjC 的两个集成测试要求依赖下限 0.8.205
 
 ## 摘要
 
@@ -178,3 +178,5 @@ extension ObjCEvolutionInterfaceBuilder {
 | 2026-10-29 | 只有搬家的成员，签名放在成员 lineage 的 `latestSignature` 上，搬家记录不再带 `signature` | 与 Swift 一侧对齐：那边的成员 lineage 已经有同名字段，语义相同（没有事件时填最新一版的渲染，有事件时为 nil） |
 | 2026-10-29 | 归档测试只固定 13.0 那次搬家，用 12.0.1 与 13.0 两个 cache | 这两个 cache 现有归档测试已经依赖，不新增前提；那一次有两个去向，其中 CollectionViewCore 是中途加入的 image |
 | 2026-10-29 | 实现完成，待用户看过后收尾 | 五个落地步骤都已完成；文档同步了使用指南、实现说明、术语表、README、文档索引与已裁决清单。与方案的偏离只有 `latestSignature` 那一处，见上 |
+| 2026-10-29 | 与 Swift 一侧逐项核对之后，ObjC 一侧不改 | 模型、合并与搬家规则、报告与接口文案逐项对过。不一致的三处都在 Swift 一侧，已由那边修好：搬家按顺序比较 image 列表（ObjC 按集合比较）、合并接口的 collision 警告不写 image、image 名与签名数量对不上时少列签名。Swift 一侧公开了 image 在场表与搬家短语，ObjC 一侧的对应物保持 `package`：下游只用成品报告、JSON 与合并头文件 |
+| 2026-10-29 | In Progress → Implemented，落地编号 0016，随 0.8.205 发布 | 用户看过后同意收尾。0.8.205 只推 tag，objc-section 从这一版起不再发布（见 [0010](0010-remove-objc-section-cli.md) 的决策日志）。文档判断：使用指南、实现说明与术语表已在实现时写好，不另写；术语 image group、image move 已登记，没有新术语 |

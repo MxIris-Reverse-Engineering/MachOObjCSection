@@ -38,7 +38,7 @@ lineage，没有注释就是整条轴上都在、从没变过。与 lineage 报�
 自带的 protocol 副本去重。组里的 image 可以在轴上中途加入；一个版本的组为空，就是这个版本什么都没有。
 
 - **主要出现在**：`Sources/ObjCDiffing/ObjCAPIImageGroup.swift`、`ObjCAPIEvolutionBuilder.swift`
-- **延伸阅读**：[提案](Evolutions/draft-objc-evolution-image-groups.md)、
+- **延伸阅读**：[提案 0016](Evolutions/0016-objc-evolution-image-groups.md)、
   [实现说明的 image 组一节](Internal/ObjCAPIDiffDesignAndLimitations.md#image-组几个-image-当作一个-api-面)
 
 ### image move（搬家）
@@ -47,7 +47,7 @@ image 组演进里的一种记录：声明在一次跳变两侧都在，所在�
 `> moved in 14.0: AppKit → UIFoundation`。成员只在换法与所属容器不同时才单独记；protocol 不记；搬家不影响兼容性判定。
 
 - **主要出现在**：`Sources/ObjCDiffing/ObjCAPIEvolution.swift`、`ObjCAPIEvolutionBuilder.swift`
-- **延伸阅读**：[提案](Evolutions/draft-objc-evolution-image-groups.md)
+- **延伸阅读**：[提案 0016](Evolutions/0016-objc-evolution-image-groups.md)
 
 ### key namespace（键命名空间）
 
