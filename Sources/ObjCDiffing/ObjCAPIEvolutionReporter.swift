@@ -62,7 +62,7 @@ public struct ObjCAPIEvolutionReporter: Sendable {
     private func header(_ evolution: ObjCAPIEvolution) -> String {
         let axis = evolution.versions.map(\.label).joined(separator: " → ")
         var lines = ["ObjC API evolution across \(evolution.versions.count) versions: \(axis)"]
-        if let imageGroupPresence = evolution.imageGroupPresence {
+        if let imageGroupPresence = evolution.versions.imageGroupPresence {
             lines.append("Image group:")
             for image in imageGroupPresence {
                 lines.append("  \(bitmap(image.presence)) \(image.imageName)")

@@ -1,7 +1,7 @@
 # objc-section 使用指南
 
-- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）、[0014](../Evolutions/0014-host-supplied-classes.md)（由宿主补充的类，库调用方）、[0015](../Evolutions/0015-objc-evolution-interface.md)（合并多个版本、带演进标注的头文件，库调用方）
-- **最后更新**: 2026-10-28
+- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）、[0014](../Evolutions/0014-host-supplied-classes.md)（由宿主补充的类，库调用方）、[0015](../Evolutions/0015-objc-evolution-interface.md)（合并多个版本、带演进标注的头文件，库调用方）、[image 组](../Evolutions/draft-objc-evolution-image-groups.md)（几个 image 当作一个 API 面，库调用方）
+- **最后更新**: 2026-10-29
 
 这份文档写给两类人：用 `objc-section` 命令行导出 ObjC 头的人，以及直接调用
 `ObjCInterfaceIndexer` / `ObjCInterfaceBuilder` 处理磁盘上二进制的人。
@@ -363,6 +363,56 @@ let merged = try builder.build(availabilityPlatform: "macos")
   后来删掉的不写：`API_OBSOLETED` 必须带引入版本，而版本轴不知道它，这一点与 Swift 一侧的 `@available(macOS, obsoleted:)`
   不同。删了又加回的、只被修改过的也不写；ivar、采纳的协议和 superclass 从来不写。
 - **C struct 与 union 不参与追踪。** 它们放在最后，每个取自定义它的最新版本，前面一行注释说明这一点。
+- **声明会在几个 image 之间搬家的，一个版本交一组 image。** 见下一节。
+
+## 库调用方：几个 image 当作一个 API 面
+
+AppKit 的声明这些年陆续搬进 UIFoundation、CollectionViewCore，SwiftUI 的搬进 SwiftUICore。每个版本只读一个 image 时，
+搬走的报成 removed、搬来的报成 added。把每个版本的一组 image（[image 组](../Glossary.md#image-groupimage-组)）交给演进，
+它们就被当作同一个 API 面来比，搬家单独记成 `ObjCImageMove`，报告写成 `> moved in 14.0: AppKit → UIFoundation`，
+合并头文件写成 `// [●●●] moved in 14.0: AppKit → UIFoundation`。`objc-section` 命令行不提供这个功能。
+
+```swift
+// The lineage report: each version's images, the primary first
+let evolution = try ObjCAPIEvolutionBuilder().evolution(
+    ofImageGroups: [
+        [ObjCAPIImageSnapshot(imageName: "AppKit", snapshot: appKit13), ObjCAPIImageSnapshot(imageName: "UIFoundation", snapshot: uiFoundation13)],
+        [ObjCAPIImageSnapshot(imageName: "AppKit", snapshot: appKit14), ObjCAPIImageSnapshot(imageName: "UIFoundation", snapshot: uiFoundation14),
+         ObjCAPIImageSnapshot(imageName: "CollectionViewCore", snapshot: collectionViewCore14)],
+    ],
+    versions: [ObjCAPIVersionDescriptor(label: "13.0"), ObjCAPIVersionDescriptor(label: "14.0")]
+)
+print(ObjCAPIEvolutionReporter().report(evolution))
+
+// The merged header: one addVersion(images:version:) per version
+var builder = ObjCEvolutionInterfaceBuilder()
+builder.addVersion(
+    images: [
+        ObjCEvolutionInterfaceImage(imageName: "AppKit", indexer: appKitIndexer, machO: appKit),
+        ObjCEvolutionInterfaceImage(imageName: "UIFoundation", indexer: uiFoundationIndexer, machO: uiFoundation),
+    ],
+    version: ObjCAPIVersionDescriptor(label: "13.0")
+)
+```
+
+下面几条在签名里看不出来：
+
+- **image 名由你给，不从快照推。** provenance 的 `binaryPath` 对 cache 里的 image 写的是 `<cache 路径> (AppKit)`，推不准。
+  每个版本的 `imageNames` 由演进按组填好；单 image 演进里它是 nil，JSON 与报告都与以前逐字节相同。
+- **只交这个版本里在场的 image，主 image 在前。** image 可以在轴上中途加入，还没有它的版本不交它；
+  组为空就是这个版本什么都没有。组的顺序决定同名的类比较哪一份，换顺序本身不算搬家。
+- **一个版本里的几个 image 怎么合并**：同名的类比较第一个 image 的那份，其余的列进 key collision 警告；同名的 category
+  合成一个，成员按组顺序拼接；各 image 自带的 protocol 副本，相同的去重，不同的比较第一份、其余的进警告。警告里被丢的
+  那份后面用括号注明 image。合并头文件的渲染跟着同一套规则：类和协议取被比较的那一份，category 成员取第一个声明它的 image，
+  C struct 与 union 取第一个定义它的 image。
+- **搬家只在两侧都在场时记，成员只在换法与所属容器不同时才记。** 整个类搬走时方法不逐条记；category 拆到两个 image 后，
+  换了 image 的方法单独记。protocol 不属于任何 image，从不搬家。只有搬家的成员在报告里取 `latestSignature` 显示签名。
+- **搬家不影响 `hasBreakingChange`。** 旧 install name 下的符号还在不在，取决于旧 image 有没有 re-export 新 image，快照里
+  没有这个事实，所以只报不判。
+- **`addVersion(images:version:)` 一次交齐一个版本的全部 image。** 这几个索引器在调用期间要同时在内存里，返回后就可以释放；
+  版本之间仍可加完一版就放掉。同一个 builder 不能混用两种 `addVersion`，混用时 `build` 抛
+  `ObjCEvolutionInterfaceError.singleImageVersionsMixedWithImageGroups`。
+- **合并头文件的开头多几行 Image group 图例。** 每个 image 一行存在位图，按它在轴上首次出现的顺序排，与报告头部相同。
 
 ## 不建议 conform `ObjCMetadataSource`
 

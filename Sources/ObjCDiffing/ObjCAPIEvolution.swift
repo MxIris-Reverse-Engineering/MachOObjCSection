@@ -222,21 +222,21 @@ public struct ObjCAPIEvolution: Sendable, Codable, Equatable {
     }
 }
 
-extension ObjCAPIEvolution {
-    /// Each image of an evolution of image groups with the versions holding
-    /// it, in the order the images first appear along the axis — oldest
-    /// version first, then group order. `nil` for an evolution of one image
-    /// per version.
+extension [ObjCAPIVersionDescriptor] {
+    /// Each image of an axis of image groups with the versions holding it, in
+    /// the order the images first appear along the axis — oldest version
+    /// first, then group order. `nil` for an axis of one image per version.
+    /// The reporter and the evolution interface both list the group this way.
     package var imageGroupPresence: [(imageName: String, presence: [Bool])]? {
-        guard versions.contains(where: { $0.imageNames != nil }) else { return nil }
+        guard contains(where: { $0.imageNames != nil }) else { return nil }
         var imageNames: [String] = []
-        for version in versions {
+        for version in self {
             for imageName in version.imageNames ?? [] where !imageNames.contains(imageName) {
                 imageNames.append(imageName)
             }
         }
         return imageNames.map { imageName in
-            (imageName, versions.map { $0.imageNames?.contains(imageName) == true })
+            (imageName, map { $0.imageNames?.contains(imageName) == true })
         }
     }
 }

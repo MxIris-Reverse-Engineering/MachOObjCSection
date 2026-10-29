@@ -37,7 +37,7 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 
 | 文档 | 说明 |
 |---|---|
-| [objc-section 使用指南](Guides/ObjCSectionCommandLine.md) | 0002、0006、0007、0014 与 0015 的配套。安装（Releases 上的预编译二进制或源码构建）与命令行用法（含 snapshot / diff / evolution），以及六条从签名和帮助文本里看不出来的契约：文件模式超类链截断、RW data 不在泛型接口上、分析 cache 需要 MachOKit 0.52.101+、纯 Swift 类的 ivar 记录对不上、baseline 的 formatVersion 契约、dump 的空结果只写 stderr 不改退出码。库调用方另有两节：由宿主补充的类的偏移约定、跳过规则、两个查询入口的分工、偏移未知的 ivar，以及经 stub 注册的两种类的 category 各怎么归位；把 N 个版本合并成带演进标注的头文件时的版本顺序、索引器何时可以释放与实测内存、没有标注的含义、重复成员只写第一条，以及可用性宏什么时候写 |
+| [objc-section 使用指南](Guides/ObjCSectionCommandLine.md) | 0002、0006、0007、0014 与 0015 的配套。安装（Releases 上的预编译二进制或源码构建）与命令行用法（含 snapshot / diff / evolution），以及六条从签名和帮助文本里看不出来的契约：文件模式超类链截断、RW data 不在泛型接口上、分析 cache 需要 MachOKit 0.52.101+、纯 Swift 类的 ivar 记录对不上、baseline 的 formatVersion 契约、dump 的空结果只写 stderr 不改退出码。库调用方另有两节：由宿主补充的类的偏移约定、跳过规则、两个查询入口的分工、偏移未知的 ivar，以及经 stub 注册的两种类的 category 各怎么归位；把 N 个版本合并成带演进标注的头文件时的版本顺序、索引器何时可以释放与实测内存、没有标注的含义、重复成员只写第一条，以及可用性宏什么时候写；把每个版本的一组 image 当作一个 API 面时，image 名谁给、组的顺序与中途加入、一个版本内怎么合并、搬家什么时候记、为什么不影响判定，以及两种 `addVersion` 不能混用 |
 
 ## 实现说明
 

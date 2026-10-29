@@ -181,4 +181,55 @@ struct ObjCEvolutionMarkingTests {
         )
         #expect(ObjCEvolutionMarking.warningsLines(for: ObjCAPIEvolution(versions: Self.twoVersions)) == nil)
     }
+
+    // MARK: - Image groups
+
+    @Test("A move names each side's images, and follows an event at its version")
+    func movePhrase() {
+        let annotation = ObjCEvolutionAnnotation(
+            subject: nil,
+            presence: [true, true, true],
+            events: [
+                Event(versionIndex: 1, change: .modified(old: nil, new: nil)),
+                Event(versionIndex: 1, change: .moved(ObjCImageMove(versionIndex: 1, oldImageNames: ["AppKit"], newImageNames: ["AppKit", "UIFoundation"]))),
+            ]
+        )
+        #expect(
+            ObjCEvolutionMarking.annotationText(for: annotation, versions: Self.threeVersions)
+                == "// [●●●] modified in 13.0 · moved in 13.0: AppKit → AppKit + UIFoundation"
+        )
+    }
+
+    @Test("The legend lists each image of a group under the bitmap positions, before the availability note")
+    func imageGroupLegend() {
+        let versions = [
+            ObjCAPIVersionDescriptor(label: "12.0", imageNames: ["AppKit", "UIFoundation"]),
+            ObjCAPIVersionDescriptor(label: "13.0", imageNames: ["AppKit", "UIFoundation", "CollectionViewCore"]),
+        ]
+        let legend = ObjCEvolutionMarking.legendLines(versions: versions, availabilityPlatform: "macos").string
+        #expect(legend.hasPrefix("""
+        // ObjC API evolution across 2 versions: 12.0 → 13.0
+        // Bitmap positions: [1] 12.0  [2] 13.0
+        // Image group:
+        //   [●●] AppKit
+        //   [●●] UIFoundation
+        //   [○●] CollectionViewCore
+        // API_AVAILABLE and API_OBSOLETED versions are axis points
+        """))
+    }
+
+    @Test("A collision in an image group names the image of each dropped record")
+    func imageGroupCollisionWarnings() {
+        let evolution = ObjCAPIEvolution(
+            versions: Self.twoVersions,
+            keyCollisionsByVersion: [
+                [],
+                [ObjCAPIKeyCollision(key: ObjCAPIKey(rawValue: "class:Duplicate"), containerName: nil, droppedSignatures: ["Duplicate"], droppedImageNames: ["UIFoundation"])],
+            ]
+        )
+        #expect(
+            ObjCEvolutionMarking.warningsLines(for: evolution)?.string
+                == "// Warnings — identity-key collisions (first record kept, later ones not compared):\n//   13.0 · dropped: Duplicate (UIFoundation)"
+        )
+    }
 }

@@ -152,7 +152,7 @@ extension ObjCEvolutionInterfaceBuilder {
 - [x] 2. `ObjCDiffing` 的模型与计算：`ObjCAPIImageSnapshot`、`evolution(ofImageGroups:versions:)`、`imageNames`、
   合并规则、`ObjCImageMove` 与 `imageMoves`、`droppedImageNames`；单元测试；设计说明与术语表。
 - [x] 3. 报告：Image group、`> moved` 行、`N moved`、collision 警告里的 image；报告测试。
-- [ ] 4. 合并头文件：`ObjCEvolutionInterfaceImage`、`addVersion(images:version:)`、混用报错、搬家标注与图例；测试；
+- [x] 4. 合并头文件：`ObjCEvolutionInterfaceImage`、`addVersion(images:version:)`、混用报错、搬家标注与图例；测试；
   使用指南与 README。
 - [ ] 5. 探本机归档 cache 里有没有真实的搬家，有就加归档测试，结论写进本提案。
 
