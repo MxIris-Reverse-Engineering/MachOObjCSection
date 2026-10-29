@@ -357,8 +357,10 @@ let merged = try builder.build(availabilityPlatform: "macos")
   `cTypeReplacements` 在 `init` 里给，对每个版本都生效。
 - **没有标注就是整条轴上都在、从没变过。** 加入或删掉的容器只在它那一行标注，成员不再各自标注，它们跟着容器存在。
   superclass 和采纳的协议都写在 `@interface` 那一行里，它们的变化写成那一行上方的注释行。
-- **同一个容器里 identity 相同的成员只写第一条。** 快照只比较第一条，合并结果跟着只写第一条，其余的连同签名列在文件末尾的
-  identity key 冲突警告里。所以同一个镜像交两次时，正文是 `objc dump` 的输出少掉这些重复行。
+- **同一个容器里 identity 相同的成员只写比较的那一条。** 系统框架的类里这很常见：链接器把 category 并进类，category 所采纳
+  协议的属性跟着重复好几份（[协议副本](../Glossary.md#protocol-copy协议副本)）。比较时先跳过协议副本，取类或 category 自己写的
+  第一条，合并头文件写的就是这一条，写在它原来的位置。其余的里，只有不是协议副本、内容又和比较的那条不同的，才连同签名列在
+  文件末尾的 identity key 冲突警告里。所以同一个镜像交两次时，正文是 `objc dump` 的输出少掉这些重复行。
 - **可用性宏只在一个宏能说完整个生命周期时才写。** 平台名原样写进宏，label 必须是 1–3 段数字。引入后一直在：
   `API_AVAILABLE(macos(13.0))`；引入后又删掉：`API_OBSOLETED("Removed", macos(12.0.1, 13.0, 13.0))`。从轴起点就在、
   后来删掉的不写：`API_OBSOLETED` 必须带引入版本，而版本轴不知道它，这一点与 Swift 一侧的 `@available(macOS, obsoleted:)`
@@ -403,9 +405,11 @@ builder.addVersion(
 - **只交这个版本里在场的 image，主 image 在前。** image 可以在轴上中途加入，还没有它的版本不交它；
   组为空就是这个版本什么都没有。组的顺序决定同名的类比较哪一份，换顺序本身不算搬家。
 - **一个版本里的几个 image 怎么合并**：同名的类比较第一个 image 的那份，其余的列进 key collision 警告；同名的 category
-  合成一个，成员按组顺序拼接；各 image 自带的 protocol 副本，相同的去重，不同的比较第一份、其余的进警告。警告里被丢的
-  那份后面用括号注明 image。合并头文件的渲染跟着同一套规则：类和协议取被比较的那一份，category 成员取第一个声明它的 image，
-  C struct 与 union 取第一个定义它的 image。
+  合成一个，成员按组顺序拼接，同一个 selector 在几个 image 里各有一份时按上一节的规则取一份，内容不同才进警告；各 image
+  自带的 protocol 副本，相同的去重，不同的比较第一份、其余的进警告。警告先写保留的那份、再写被丢的，各自在后面用括号
+  注明 image：`14.0 · kept: NSFoo (AppKit) · dropped: NSFoo (UIFoundation)`。
+  合并头文件的渲染跟着同一套规则：类和协议取被比较的那一份，category 成员取比较时取的那个 image 的，C struct 与 union 取
+  第一个定义它的 image。
 - **搬家只在两侧都在场时记，成员只在换法与所属容器不同时才记。** 整个类搬走时方法不逐条记；category 拆到两个 image 后，
   换了 image 的方法单独记。protocol 不属于任何 image，从不搬家。只有搬家的成员在报告里取 `latestSignature` 显示签名。
 - **搬家不影响 `hasBreakingChange`。** 旧 install name 下的符号还在不在，取决于旧 image 有没有 re-export 新 image，快照里

@@ -24,16 +24,14 @@ struct ObjCEvolutionContainerRenderings: Sendable {
     var suppliedClassKind: ObjCSuppliedClass.Kind?
     private var generationsByMember: [ObjCAPIKey: [ObjCEvolutionRenderedGeneration]] = [:]
 
-    /// Records `rendering` for the member `memberKey` in `versionIndex`,
-    /// unless the version already rendered a member with that key — the
-    /// snapshot keeps the first record of a key, and so does the rendering.
+    /// Records `rendering` for the member `memberKey` in `versionIndex`. The
+    /// caller records one rendering per member and version: the one of the
+    /// record the comparison takes.
     mutating func record(
         _ rendering: SemanticString,
         for memberKey: ObjCAPIKey,
-        at versionIndex: Int,
-        renderedKeys: inout Set<ObjCAPIKey>
+        at versionIndex: Int
     ) {
-        guard renderedKeys.insert(memberKey).inserted else { return }
         if let newestGeneration = generationsByMember[memberKey]?.last,
            newestGeneration.rendering.string == rendering.string {
             return
@@ -100,24 +98,35 @@ enum ObjCEvolutionMemberGroup: Hashable, Sendable {
 /// so a protocol requirement that became optional is listed under
 /// `@optional` only.
 struct ObjCEvolutionMemberLayout {
-    /// Each version's records of the container, the first record of each
-    /// identity kept as the snapshot keeps it; `nil` where the container is
-    /// absent.
+    /// Each version's records of the container, of an identity held more than
+    /// once the record the comparison takes, where it stands; `nil` where the
+    /// container is absent.
     let recordsByVersion: [[ObjCAPIKey: ObjCMemberRecord]?]
     private let mergedKeysByGroup: [ObjCEvolutionMemberGroup: [ObjCAPIKey]]
 
-    init(perVersion containers: [ObjCContainerSnapshot?]) {
+    /// - Parameters:
+    ///   - containers: The container in each version, `nil` where absent.
+    ///   - keptOccurrencesByVersion: For each version, which record of each
+    ///     identity the container holds more than once the comparison takes
+    ///     (`ObjCAPISnapshot.keptMemberOccurrences()`); an identity left out,
+    ///     or a version, takes its first record.
+    init(perVersion containers: [ObjCContainerSnapshot?], keptOccurrencesByVersion: [[ObjCAPIKey: Int]] = []) {
         var recordsByVersion: [[ObjCAPIKey: ObjCMemberRecord]?] = []
         var ordersByVersion: [[ObjCEvolutionMemberGroup: [ObjCAPIKey]]] = []
-        for container in containers {
+        for (versionIndex, container) in containers.enumerated() {
             guard let container else {
                 recordsByVersion.append(nil)
                 ordersByVersion.append([:])
                 continue
             }
+            let keptOccurrences = keptOccurrencesByVersion.indices.contains(versionIndex) ? keptOccurrencesByVersion[versionIndex] : [:]
             var records: [ObjCAPIKey: ObjCMemberRecord] = [:]
             var orders: [ObjCEvolutionMemberGroup: [ObjCAPIKey]] = [:]
-            for record in container.members where records[record.identityKey] == nil {
+            var occurrenceCounts: [ObjCAPIKey: Int] = [:]
+            for record in container.members {
+                let occurrence = occurrenceCounts[record.identityKey, default: 0]
+                occurrenceCounts[record.identityKey] = occurrence + 1
+                guard occurrence == keptOccurrences[record.identityKey, default: 0] else { continue }
                 records[record.identityKey] = record
                 orders[ObjCEvolutionMemberGroup(record), default: []].append(record.identityKey)
             }
@@ -225,13 +234,17 @@ struct ObjCEvolutionContainerAssembler {
         self.memberLineages = memberLineages
     }
 
+    /// - Parameter keptOccurrencesByVersion: For each version, which record of
+    ///   each identity the container holds more than once the comparison
+    ///   takes; see ``ObjCEvolutionMemberLayout``.
     func lines(
         forContainer containerKey: ObjCAPIKey,
         kind: ObjCContainerKind,
         perVersion containers: [ObjCContainerSnapshot?],
+        keptOccurrencesByVersion: [[ObjCAPIKey: Int]],
         renderings: ObjCEvolutionContainerRenderings
     ) -> [ObjCEvolutionLine] {
-        let layout = ObjCEvolutionMemberLayout(perVersion: containers)
+        let layout = ObjCEvolutionMemberLayout(perVersion: containers, keptOccurrencesByVersion: keptOccurrencesByVersion)
         let lineagesOfMembers = memberLineages[containerKey] ?? [:]
         let containerLineage = containerLineages[containerKey]
         let adoptionKeys = layout.mergedKeys(of: .adoptions)

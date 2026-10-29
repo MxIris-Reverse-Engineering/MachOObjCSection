@@ -172,12 +172,18 @@ struct ObjCEvolutionMarkingTests {
             versions: Self.twoVersions,
             keyCollisionsByVersion: [
                 [],
-                [ObjCAPIKeyCollision(key: ObjCAPIKey(rawValue: "class:Duplicate"), containerName: nil, droppedSignatures: ["Duplicate"])],
+                [ObjCAPIKeyCollision(
+                    key: ObjCAPIKey(rawValue: "property:-stringValue"),
+                    containerName: "Badge",
+                    droppedSignatures: ["@property(readonly) NSString *stringValue;"],
+                    keptSignature: "@property(copy) NSString *stringValue;"
+                )],
             ]
         )
         #expect(
             ObjCEvolutionMarking.warningsLines(for: evolution)?.string
-                == "// Warnings — identity-key collisions (first record kept, later ones not compared):\n//   13.0 · dropped: Duplicate"
+                == "// Warnings — identity-key collisions (only the kept record was compared):\n"
+                + "//   13.0 · Badge · kept: @property(copy) NSString *stringValue; · dropped: @property(readonly) NSString *stringValue;"
         )
         #expect(ObjCEvolutionMarking.warningsLines(for: ObjCAPIEvolution(versions: Self.twoVersions)) == nil)
     }
@@ -218,18 +224,25 @@ struct ObjCEvolutionMarkingTests {
         """))
     }
 
-    @Test("A collision in an image group names the image of each dropped record")
+    @Test("A collision in an image group names the image of the kept record and of each dropped one")
     func imageGroupCollisionWarnings() {
         let evolution = ObjCAPIEvolution(
             versions: Self.twoVersions,
             keyCollisionsByVersion: [
                 [],
-                [ObjCAPIKeyCollision(key: ObjCAPIKey(rawValue: "class:Duplicate"), containerName: nil, droppedSignatures: ["Duplicate"], droppedImageNames: ["UIFoundation"])],
+                [ObjCAPIKeyCollision(
+                    key: ObjCAPIKey(rawValue: "class:Duplicate"),
+                    containerName: nil,
+                    droppedSignatures: ["Duplicate"],
+                    droppedImageNames: ["UIFoundation"],
+                    keptSignature: "Duplicate",
+                    keptImageName: "AppKit"
+                )],
             ]
         )
         #expect(
             ObjCEvolutionMarking.warningsLines(for: evolution)?.string
-                == "// Warnings — identity-key collisions (first record kept, later ones not compared):\n//   13.0 · dropped: Duplicate (UIFoundation)"
+                == "// Warnings — identity-key collisions (only the kept record was compared):\n//   13.0 · kept: Duplicate (AppKit) · dropped: Duplicate (UIFoundation)"
         )
     }
 }

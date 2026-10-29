@@ -45,11 +45,11 @@ public struct ObjCAPIEvolutionReporter: Sendable {
     /// quietly weaker than reported (a dropped record was not compared
     /// there).
     private func collisionWarningsSection(_ keyCollisionsByVersion: [[ObjCAPIKeyCollision]], _ evolution: ObjCAPIEvolution) -> String {
-        var lines = ["Warnings — identity-key collisions (first record kept, later ones not compared):"]
+        var lines = [ObjCAPIKeyCollision.warningsHeading]
         for (versionIndex, collisions) in keyCollisionsByVersion.enumerated() {
             for collision in collisions {
                 let scope = collision.containerName.map { "\($0) · " } ?? ""
-                lines.append("  \(evolution.versions[versionIndex].label) · \(scope)dropped: \(collision.droppedRecordsDescription)")
+                lines.append("  \(evolution.versions[versionIndex].label) · \(scope)\(collision.recordsDescription)")
             }
         }
         return lines.joined(separator: "\n")

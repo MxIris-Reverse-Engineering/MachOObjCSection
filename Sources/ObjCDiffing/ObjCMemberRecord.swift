@@ -214,4 +214,14 @@ extension ObjCMemberRecord {
         guard let isOptionalRequirement else { return "" }
         return "|optional:" + (isOptionalRequirement ? "1" : "0")
     }
+
+    /// The payload without the required/optional part a protocol member's
+    /// carries: the payload the same declaration has in a class or category.
+    var payloadKeyWithoutOptionality: ObjCAPIKey {
+        let optionalitySuffix = Self.optionalitySuffix(isOptionalRequirement)
+        guard !optionalitySuffix.isEmpty, payloadKey.rawValue.hasSuffix(optionalitySuffix) else {
+            return payloadKey
+        }
+        return ObjCAPIKey(rawValue: String(payloadKey.rawValue.dropLast(optionalitySuffix.count)))
+    }
 }

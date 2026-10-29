@@ -172,19 +172,31 @@ struct ObjCAPIDifferTests {
         #expect(diagnostics.oldSideKeyCollisions.count == 1)
         #expect(diagnostics.newSideKeyCollisions.isEmpty)
         #expect(diagnostics.oldSideKeyCollisions[0].droppedSignatures == ["Twin"])
+        #expect(diagnostics.oldSideKeyCollisions[0].keptSignature == "Twin")
     }
 
-    @Test func duplicateMemberSurfacesAsKeyCollisionScopedToContainer() {
+    @Test func differingDuplicateMemberSurfacesAsKeyCollisionScopedToContainer() {
         let snapshot = ObjCAPISnapshot(classes: [
             Fixtures.containerSnapshot(key: "class:Widget", name: "Widget", members: [
-                Fixtures.record(identity: "method:-run", signature: "- (void)run; (first)"),
-                Fixtures.record(identity: "method:-run", signature: "- (void)run; (second)"),
+                Fixtures.record(identity: "method:-run", payload: "enc:v16@0:8", signature: "- (void)run;"),
+                Fixtures.record(identity: "method:-run", payload: "enc:@16@0:8", signature: "- (id)run;"),
             ]),
         ])
         let collisions = snapshot.keyCollisions()
         #expect(collisions.count == 1)
         #expect(collisions[0].containerName == "Widget")
-        #expect(collisions[0].droppedSignatures == ["- (void)run; (second)"])
+        #expect(collisions[0].keptSignature == "- (void)run;")
+        #expect(collisions[0].droppedSignatures == ["- (id)run;"])
+    }
+
+    @Test func identicalDuplicateMemberIsNoKeyCollision() {
+        let snapshot = ObjCAPISnapshot(classes: [
+            Fixtures.containerSnapshot(key: "class:Widget", name: "Widget", members: [
+                Fixtures.record(identity: "method:-run", payload: "enc:v16@0:8", signature: "- (void)run;"),
+                Fixtures.record(identity: "method:-run", payload: "enc:v16@0:8", signature: "- (void)run;"),
+            ]),
+        ])
+        #expect(snapshot.keyCollisions().isEmpty)
     }
 
     @Test func outputOrderingIsDeterministic() {

@@ -13,10 +13,12 @@ import Testing
 @Suite("ObjCEvolutionInterfaceBuilder")
 struct ObjCEvolutionInterfaceBuilderTests {
     /// `objc dump` is the reference. The one place the merged header may
-    /// differ is a member the image lists twice under one identity — a
-    /// property a class extension redeclares, say: the snapshot compares only
-    /// the first, so the merged header writes only the first, and names the
-    /// others among the identity-key collisions at its end.
+    /// differ is a member the image lists more than once under one identity —
+    /// a property a category merged into its class repeats from an adopted
+    /// protocol, say: the comparison takes one record, the merged header
+    /// writes that one where it stands, and leaves out the others. Of those,
+    /// the ones that differ from it and copy no adopted protocol are named
+    /// among the identity-key collisions at the end.
     @Test("The same image twice reads as objc dump writes it, with no annotation")
     func sameImageTwiceReadsAsTheDump() async throws {
         let (indexer, machO) = try await ObjCInterfaceTests.SharedFixture.shared.load()
@@ -58,16 +60,23 @@ struct ObjCEvolutionInterfaceBuilderTests {
             }
         }
 
-        let droppedRecordCount = merged.evolution.keyCollisionsByVersion?.first?.reduce(0) { $0 + $1.droppedSignatures.count } ?? 0
-        #expect(leftOutLines.count == droppedRecordCount, "left out: \(leftOutLines.prefix(5))")
+        // Every record beyond one per identity among the members a line
+        // renders: methods, properties and ivars.
+        let snapshot = ObjCAPISnapshotBuilder(indexer: indexer).snapshot()
+        let lineMemberKinds: Set<ObjCMemberKind> = [.instanceMethod, .classMethod, .instanceProperty, .classProperty, .ivar]
+        let repeatedRecordCount = (snapshot.classes + snapshot.protocols + snapshot.categories).reduce(0) { count, container in
+            let lineMembers = container.members.filter { lineMemberKinds.contains($0.kind) }
+            return count + lineMembers.count - Set(lineMembers.map(\.identityKey)).count
+        }
+        #expect(leftOutLines.count == repeatedRecordCount, "left out: \(leftOutLines.prefix(5))")
         #expect(leftOutLines.allSatisfy { $0.hasPrefix("@property ") || $0.hasPrefix("- (") || $0.hasPrefix("+ (") || $0.hasPrefix("    ") })
 
         let trailingLines = Array(mergedLines[mergedLineIndex...])
-        if droppedRecordCount == 0 {
+        if merged.evolution.keyCollisionsByVersion == nil {
             #expect(trailingLines.isEmpty)
         } else {
             #expect(trailingLines.first == "")
-            #expect(trailingLines.dropFirst().first == "// Warnings — identity-key collisions (first record kept, later ones not compared):")
+            #expect(trailingLines.dropFirst().first == "// Warnings — identity-key collisions (only the kept record was compared):")
         }
     }
 
@@ -112,9 +121,9 @@ struct ObjCEvolutionInterfaceBuilderTests {
 
         let lines = imageGroup.interface.string.components(separatedBy: "\n")
         #expect(lines.contains("//   [●●] Copy"))
-        // The class `objc dump` checks its strip switches on, dropped from the second image.
-        #expect(lines.contains("//   1.0 · dropped: NSError (Copy)"))
-        #expect(!lines.contains { $0.hasPrefix("//   1.0 · dropped: NSCopying") })
+        // The class `objc dump` checks its strip switches on, kept from the first image and dropped from the second.
+        #expect(lines.contains("//   1.0 · kept: NSError (Foundation) · dropped: NSError (Copy)"))
+        #expect(!lines.contains { $0.hasPrefix("//   1.0 · kept: NSCopying") })
     }
 
     @Test("A class or category that moves to another image carries the move, and its members do not repeat it")
@@ -202,5 +211,27 @@ struct ObjCEvolutionInterfaceBuilderTests {
         #expect(layout.isOptionalRequirement(Self.key("method:-moved"), atVersion: 0) == false)
         #expect(layout.isOptionalRequirement(Self.key("method:-moved"), atVersion: 1) == nil)
         #expect(layout.isOptionalRequirement(Self.key("method:-moved"), atVersion: 2) == true)
+    }
+
+    @Test("Of an identity held twice, the record the comparison takes stands where it is")
+    func keptRecordStandsWhereItIs() {
+        func property(_ name: String, attributes: String) -> ObjCMemberRecord {
+            ObjCMemberRecord(
+                identityKey: Self.key("property:-\(name)"),
+                payloadKey: Self.key("attr:\(attributes)"),
+                kind: .instanceProperty,
+                signature: "@property \(name);"
+            )
+        }
+        // A protocol's read-only copy of `frame` ahead of the class's own.
+        let view = ObjCContainerSnapshot(key: Self.key("class:NSView"), name: "NSView", kind: .class, members: [
+            property("frame", attributes: "T{CGRect=dddd},R"),
+            property("alphaValue", attributes: "Td"),
+            property("frame", attributes: "T{CGRect=dddd}"),
+        ])
+        let layout = ObjCEvolutionMemberLayout(perVersion: [view], keptOccurrencesByVersion: [[Self.key("property:-frame"): 1]])
+
+        #expect(layout.mergedKeys(of: .properties) == [Self.key("property:-alphaValue"), Self.key("property:-frame")])
+        #expect(layout.recordsByVersion[0]?[Self.key("property:-frame")]?.payloadKey == Self.key("attr:T{CGRect=dddd}"))
     }
 }

@@ -90,6 +90,45 @@ struct ObjCEvolutionInterfaceArchivedCacheTests {
             }
         }
     }
+
+    /// The property lines of the class whose `@interface` line starts with
+    /// `interfacePrefix` that declare one of `propertyNames`, in order.
+    private static func propertyLines(
+        ofInterfaceStartingWith interfacePrefix: String,
+        named propertyNames: [String],
+        in lines: [String]
+    ) throws -> [String] {
+        let interfaceLineIndex = try #require(lines.firstIndex { $0.hasPrefix(interfacePrefix) })
+        let endLineIndex = try #require(lines[interfaceLineIndex...].firstIndex(of: "@end"))
+        return lines[interfaceLineIndex ..< endLineIndex].filter { line in
+            line.hasPrefix("@property ") && propertyNames.contains { line.contains(" \($0);") || line.contains("*\($0);") }
+        }
+    }
+
+    /// AppKit's NSView.h declares `@property NSRect frame;` and `bounds` alike.
+    /// From macOS 13 a category the linker merges into NSView adopts
+    /// `NSLayoutItem`, whose read-only `frame` and `bounds` it puts ahead of
+    /// the class's own; neither declaration of NSView changed.
+    @Test("A property a protocol copies ahead of the class's own declaration reads as the class declares it, unchanged")
+    func ownDeclarationOutranksProtocolCopy() async throws {
+        let lines = try await Self.lines()
+        let geometryLines = try Self.propertyLines(ofInterfaceStartingWith: "@interface NSView : NSResponder", named: ["frame", "bounds"], in: lines)
+        #expect(geometryLines == ["@property struct CGRect frame;", "@property struct CGRect bounds;"])
+    }
+
+    /// AppKit's NSMenuItem.h declares `@property (nullable) SEL action;` and
+    /// `@property NSInteger tag;`, NSWindow.h `@property (nullable, strong)
+    /// __kindof NSView *contentView;`. Categories the linker merges into each
+    /// class adopt protocols declaring the same properties read-only, and on
+    /// every version of the axis those copies come first.
+    @Test("A protocol's copy ahead of the class's own declaration on the whole axis does not replace it")
+    func ownDeclarationOutranksProtocolCopyAlongTheAxis() async throws {
+        let lines = try await Self.lines()
+        let menuItemLines = try Self.propertyLines(ofInterfaceStartingWith: "@interface NSMenuItem : NSObject", named: ["action", "tag"], in: lines)
+        #expect(menuItemLines == ["@property SEL action;", "@property long long tag;"])
+        let windowLines = try Self.propertyLines(ofInterfaceStartingWith: "@interface NSWindow : NSResponder", named: ["contentView"], in: lines)
+        #expect(windowLines == ["@property (strong) NSView *contentView;"])
+    }
 }
 
 /// AppKit's image group across macOS 12.0.1 and 13.0, the release that moved

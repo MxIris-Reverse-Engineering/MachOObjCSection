@@ -1,3 +1,4 @@
+import Foundation
 import Testing
 @testable import ObjCDiffing
 
@@ -28,9 +29,16 @@ struct ObjCAPIReporterTests {
             ],
             diagnostics: ObjCAPIDiffDiagnostics(
                 oldSideKeyCollisions: [
-                    ObjCAPIKeyCollision(key: ObjCAPIKey(rawValue: "class:Twin"), containerName: nil, droppedSignatures: ["Twin"]),
+                    ObjCAPIKeyCollision(key: ObjCAPIKey(rawValue: "class:Twin"), containerName: nil, droppedSignatures: ["Twin"], keptSignature: "Twin"),
                 ],
-                newSideKeyCollisions: []
+                newSideKeyCollisions: [
+                    ObjCAPIKeyCollision(
+                        key: ObjCAPIKey(rawValue: "property:-stringValue"),
+                        containerName: "Badge",
+                        droppedSignatures: ["@property(readonly) NSString *stringValue;"],
+                        keptSignature: "@property(copy, nonatomic) NSString *stringValue;"
+                    ),
+                ]
             )
         )
         let report = ObjCAPIDiffReporter().report(diff)
@@ -43,10 +51,26 @@ struct ObjCAPIReporterTests {
         Protocols:
           - Gone
 
-        Warnings — identity-key collisions (first record kept, later ones not compared):
-          old · dropped: Twin
+        Warnings — identity-key collisions (only the kept record was compared):
+          old · kept: Twin · dropped: Twin
+          new · Badge · kept: @property(copy, nonatomic) NSString *stringValue; · dropped: @property(readonly) NSString *stringValue;
         """
         #expect(report == expected)
+    }
+
+    @Test("A collision recorded without its kept record lists the dropped ones alone")
+    func collisionWithoutKeptRecordListsDroppedOnly() throws {
+        // An evolution encoded before collisions named the record they kept.
+        let json = """
+        {"versions": [{"label": "1.0"}, {"label": "2.0"}], "classes": [], "protocols": [], "categories": [],
+         "keyCollisionsByVersion": [[], [{"key": "class:Twin", "droppedSignatures": ["Twin"]}]]}
+        """
+        let evolution = try JSONDecoder().decode(ObjCAPIEvolution.self, from: Data(json.utf8))
+        let report = ObjCAPIEvolutionReporter().report(evolution)
+        #expect(report.hasSuffix("""
+        Warnings — identity-key collisions (only the kept record was compared):
+          2.0 · dropped: Twin
+        """))
     }
 
     @Test func emptyDiffReportsNoChanges() {
@@ -161,8 +185,10 @@ struct ObjCAPIReporterTests {
                 [ObjCAPIKeyCollision(
                     key: ObjCAPIKey(rawValue: "method:-draw"),
                     containerName: "NSString(Drawing)",
-                    droppedSignatures: ["- (void)draw;"],
-                    droppedImageNames: ["CollectionViewCore"]
+                    droppedSignatures: ["- (BOOL)draw;"],
+                    droppedImageNames: ["CollectionViewCore"],
+                    keptSignature: "- (void)draw;",
+                    keptImageName: "AppKit"
                 )],
             ]
         )
@@ -198,8 +224,8 @@ struct ObjCAPIReporterTests {
               [●●●] - (void)measure;
                   > moved in 15.0: UIFoundation → CollectionViewCore
 
-        Warnings — identity-key collisions (first record kept, later ones not compared):
-          15.0 · NSString(Drawing) · dropped: - (void)draw; (CollectionViewCore)
+        Warnings — identity-key collisions (only the kept record was compared):
+          15.0 · NSString(Drawing) · kept: - (void)draw; (AppKit) · dropped: - (BOOL)draw; (CollectionViewCore)
         """
         #expect(ObjCAPIEvolutionReporter().report(Self.imageGroupEvolution()) == expected)
     }

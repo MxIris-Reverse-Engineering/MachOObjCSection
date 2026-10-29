@@ -4,8 +4,9 @@
 /// re-added in v4") natural products rather than join special-cases, while
 /// every per-transition comparison uses exactly the two-sided differ's
 /// semantics (identity match on `identityKey`, change detection on
-/// `payloadKey`, first-wins key collisions), so for N == 2 the events are
-/// the two-sided `ObjCAPIDiff` verbatim.
+/// `payloadKey`, the record `ObjCMemberSelection` takes for an identity held
+/// more than once, the first container for a container key held twice), so
+/// for N == 2 the events are the two-sided `ObjCAPIDiff` verbatim.
 ///
 /// `evolution(ofImageGroups:versions:)` tracks several images per version as
 /// one API surface instead, merging each version's images before the matrix
@@ -100,11 +101,12 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
         imageGroups: [ObjCAPIImageGroupMerge]?
     ) -> ObjCAPIEvolution {
         let requirementsByVersion = snapshots.map { ObjCProtocolRequirements(protocols: $0.protocols) }
+        let propertyDeclarationsByVersion = snapshots.map { ObjCProtocolPropertyDeclarations(protocols: $0.protocols) }
         return ObjCAPIEvolution(
             versions: versions,
-            classes: containerLineages(snapshots.map(\.classes), imageGroups: imageGroups),
+            classes: containerLineages(snapshots.map(\.classes), propertyDeclarationsByVersion: propertyDeclarationsByVersion, imageGroups: imageGroups),
             // No image owns a protocol, so protocols never move.
-            protocols: containerLineages(snapshots.map(\.protocols), imageGroups: nil) { adoption, protocolName, versionIndex in
+            protocols: containerLineages(snapshots.map(\.protocols), propertyDeclarationsByVersion: propertyDeclarationsByVersion, imageGroups: nil) { adoption, protocolName, versionIndex in
                 ObjCMemberRecord.adoptionCompatibilityOverride(
                     adding: adoption,
                     toProtocolNamed: protocolName,
@@ -112,7 +114,7 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
                     newRequirements: requirementsByVersion[versionIndex]
                 )
             },
-            categories: containerLineages(snapshots.map(\.categories), imageGroups: imageGroups),
+            categories: containerLineages(snapshots.map(\.categories), propertyDeclarationsByVersion: propertyDeclarationsByVersion, imageGroups: imageGroups),
             keyCollisionsByVersion: keyCollisionsByVersion.allSatisfy(\.isEmpty) ? nil : keyCollisionsByVersion
         )
     }
@@ -120,13 +122,16 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
     // MARK: - Container axis
 
     /// One container bucket (classes, protocols, or categories) across all
-    /// versions: `perVersionContainers[i]` is that bucket in version `i`.
-    /// `imageGroups`, when given, holds each version's merged group, which the
-    /// bucket's moves are computed from. `addedAdoptionOverride` judges an
-    /// adoption a container gains, given the container's name and the version
-    /// it appears in; only the protocol bucket passes one.
+    /// versions: `perVersionContainers[i]` is that bucket in version `i`,
+    /// whose members' protocol copies `propertyDeclarationsByVersion[i]`
+    /// tells apart. `imageGroups`, when given, holds each version's merged
+    /// group, which the bucket's moves are computed from.
+    /// `addedAdoptionOverride` judges an adoption a container gains, given the
+    /// container's name and the version it appears in; only the protocol
+    /// bucket passes one.
     private func containerLineages(
         _ perVersionContainers: [[ObjCContainerSnapshot]],
+        propertyDeclarationsByVersion: [ObjCProtocolPropertyDeclarations],
         imageGroups: [ObjCAPIImageGroupMerge]?,
         addedAdoptionOverride: ((_ adoption: ObjCMemberRecord, _ containerName: String, _ versionIndex: Int) -> ObjCCompatibility?)? = nil
     ) -> [ObjCContainerLineage] {
@@ -147,7 +152,14 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
                 }
             } ?? []
             let members = memberLineages(
-                perVersionMembers: perVersion.map { $0?.members },
+                perVersionKeyedMembers: perVersion.enumerated().map { versionIndex, container in
+                    container.map { container in
+                        ObjCMemberSelection(
+                            members: container.members,
+                            protocolPropertyDeclarations: propertyDeclarationsByVersion[versionIndex]
+                        ).keptMembersByKey
+                    }
+                },
                 containerKey: containerKey,
                 imageGroups: imageGroups,
                 addedAdoptionOverride: addedAdoptionOverride.map { override in
@@ -170,8 +182,9 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
 
     // MARK: - Member axis
 
-    /// Member lifelines across versions. `perVersionMembers[i] == nil` means
-    /// the owning container is absent in version `i`. Member events are
+    /// Member lifelines across versions. `perVersionKeyedMembers[i]` is the
+    /// record the container takes for each identity in version `i`, `nil`
+    /// when the owning container is absent there. Member events are
     /// computed only for transitions where both adjacent versions have the
     /// container — a container-level appearance/disappearance is the
     /// container's own event, and enumerating members across the gap would
@@ -180,14 +193,11 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
     /// present on both sides of a transition moves there when its images
     /// change otherwise than those of `containerKey`, its container.
     private func memberLineages(
-        perVersionMembers: [[ObjCMemberRecord]?],
+        perVersionKeyedMembers keyedPerVersion: [[ObjCAPIKey: ObjCMemberRecord]?],
         containerKey: ObjCAPIKey,
         imageGroups: [ObjCAPIImageGroupMerge]?,
         addedAdoptionOverride: ((_ adoption: ObjCMemberRecord, _ versionIndex: Int) -> ObjCCompatibility?)?
     ) -> [ObjCMemberLineage] {
-        let keyedPerVersion = perVersionMembers.map { members in
-            members.map { keyedFirstWins($0, by: \.identityKey) }
-        }
         let orderedKeys = unionOfKeys(keyedPerVersion.map { $0 ?? [:] })
 
         var lineages: [ObjCMemberLineage] = []

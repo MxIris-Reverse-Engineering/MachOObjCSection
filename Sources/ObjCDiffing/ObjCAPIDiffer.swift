@@ -49,9 +49,13 @@ public struct ObjCAPIDiffer: Sendable {
         let diagnostics = candidateDiagnostics.isEmpty ? nil : candidateDiagnostics
         let oldRequirements = ObjCProtocolRequirements(protocols: old.protocols)
         let newRequirements = ObjCProtocolRequirements(protocols: new.protocols)
+        let propertyDeclarations = (
+            old: ObjCProtocolPropertyDeclarations(protocols: old.protocols),
+            new: ObjCProtocolPropertyDeclarations(protocols: new.protocols)
+        )
         return ObjCAPIDiff(
-            classes: diffContainerSnapshots(old.classes, new.classes),
-            protocols: diffContainerSnapshots(old.protocols, new.protocols) { adoption, protocolName in
+            classes: diffContainerSnapshots(old.classes, new.classes, propertyDeclarations: propertyDeclarations),
+            protocols: diffContainerSnapshots(old.protocols, new.protocols, propertyDeclarations: propertyDeclarations) { adoption, protocolName in
                 ObjCMemberRecord.adoptionCompatibilityOverride(
                     adding: adoption,
                     toProtocolNamed: protocolName,
@@ -59,7 +63,7 @@ public struct ObjCAPIDiffer: Sendable {
                     newRequirements: newRequirements
                 )
             },
-            categories: diffContainerSnapshots(old.categories, new.categories),
+            categories: diffContainerSnapshots(old.categories, new.categories, propertyDeclarations: propertyDeclarations),
             oldProvenance: oldProvenance,
             newProvenance: newProvenance,
             diagnostics: diagnostics
@@ -154,14 +158,18 @@ public struct ObjCAPIDiffer: Sendable {
     /// Match container snapshots by key, then diff each matched pair's
     /// members. One helper serves every axis — classes, protocols, and
     /// categories — since they are all `[ObjCContainerSnapshot]` once frozen.
-    /// `addedAdoptionOverride` judges an adoption a container gains, given the
-    /// container's name; only the protocol axis passes one.
+    /// A container key held twice takes its first container. Each side's
+    /// `propertyDeclarations` tell its members' protocol copies apart (see
+    /// `ObjCMemberSelection`). `addedAdoptionOverride` judges an adoption a
+    /// container gains, given the container's name; only the protocol axis
+    /// passes one.
     private func diffContainerSnapshots(
         _ old: [ObjCContainerSnapshot],
         _ new: [ObjCContainerSnapshot],
+        propertyDeclarations: (old: ObjCProtocolPropertyDeclarations, new: ObjCProtocolPropertyDeclarations),
         addedAdoptionOverride: ((_ adoption: ObjCMemberRecord, _ containerName: String) -> ObjCCompatibility?)? = nil
     ) -> [ObjCContainerChange] {
-        let matched = threeWayMatch(old: old, new: new) { $0.key }
+        let matched = threeWayMatch(oldByKey: keyedFirstWins(old, by: \.key), newByKey: keyedFirstWins(new, by: \.key))
 
         var changes: [ObjCContainerChange] = []
         changes.append(contentsOf: matched.removed.map {
@@ -172,8 +180,8 @@ public struct ObjCAPIDiffer: Sendable {
         })
         for (oldContainer, newContainer) in matched.common {
             let memberChanges = diffMembers(
-                old: oldContainer.members,
-                new: newContainer.members,
+                oldByKey: ObjCMemberSelection(members: oldContainer.members, protocolPropertyDeclarations: propertyDeclarations.old).keptMembersByKey,
+                newByKey: ObjCMemberSelection(members: newContainer.members, protocolPropertyDeclarations: propertyDeclarations.new).keptMembersByKey,
                 addedAdoptionOverride: addedAdoptionOverride.map { override in
                     { adoption in override(adoption, newContainer.name) }
                 }
@@ -196,18 +204,29 @@ public struct ObjCAPIDiffer: Sendable {
     /// Three-way set difference over member records, keyed by `identityKey`.
     /// Public so it can be unit-tested on hand-built records without any
     /// Mach-O or runtime involvement.
+    ///
+    /// An identity held more than once on a side takes its first record.
+    /// ``diff(old:new:oldProvenance:newProvenance:)`` passes over copies of
+    /// adopted protocols' declarations first, which takes the snapshot's
+    /// protocol table that bare records do not carry.
     public func diffMembers(old: [ObjCMemberRecord], new: [ObjCMemberRecord]) -> [ObjCMemberChange] {
-        diffMembers(old: old, new: new, addedAdoptionOverride: nil)
+        let noProtocols = ObjCProtocolPropertyDeclarations(protocols: [])
+        return diffMembers(
+            oldByKey: ObjCMemberSelection(members: old, protocolPropertyDeclarations: noProtocols).keptMembersByKey,
+            newByKey: ObjCMemberSelection(members: new, protocolPropertyDeclarations: noProtocols).keptMembersByKey,
+            addedAdoptionOverride: nil
+        )
     }
 
-    /// ``diffMembers(old:new:)``, with `addedAdoptionOverride` judging each
-    /// adoption the container gains in place of the record-level rule.
+    /// The member changes between the records each side takes per identity
+    /// key, with `addedAdoptionOverride` judging each adoption the container
+    /// gains in place of the record-level rule.
     func diffMembers(
-        old: [ObjCMemberRecord],
-        new: [ObjCMemberRecord],
+        oldByKey: [ObjCAPIKey: ObjCMemberRecord],
+        newByKey: [ObjCAPIKey: ObjCMemberRecord],
         addedAdoptionOverride: ((_ adoption: ObjCMemberRecord) -> ObjCCompatibility?)?
     ) -> [ObjCMemberChange] {
-        let matched = threeWayMatch(old: old, new: new) { $0.identityKey }
+        let matched = threeWayMatch(oldByKey: oldByKey, newByKey: newByKey)
 
         var changes: [ObjCMemberChange] = []
         changes.append(contentsOf: matched.removed.map {
@@ -229,18 +248,14 @@ public struct ObjCAPIDiffer: Sendable {
 
     // MARK: - Generic primitives
 
-    /// The single three-way matcher every diff axis specializes: index both
-    /// sides by `identity`, then partition into old-only (`removed`),
+    /// The single three-way matcher every diff axis specializes: partition
+    /// two sides, each already keyed by identity, into old-only (`removed`),
     /// new-only (`added`), and present-on-both (`common`, as old/new pairs).
     /// Callers decide how to compare each `common` pair.
     private func threeWayMatch<Element>(
-        old: [Element],
-        new: [Element],
-        identity: (Element) -> ObjCAPIKey
+        oldByKey: [ObjCAPIKey: Element],
+        newByKey: [ObjCAPIKey: Element]
     ) -> (removed: [Element], added: [Element], common: [(old: Element, new: Element)]) {
-        let oldByKey = keyedFirstWins(old, by: identity)
-        let newByKey = keyedFirstWins(new, by: identity)
-
         var removed: [Element] = []
         var added: [Element] = []
         var common: [(old: Element, new: Element)] = []

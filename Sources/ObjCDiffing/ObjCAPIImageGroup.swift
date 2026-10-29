@@ -22,8 +22,9 @@ public struct ObjCAPIImageSnapshot: Sendable, Codable, Equatable {
 ///   and the key collision names the other.
 /// - Categories: one container per unique name, with the members of every
 ///   image's category of that name in group order — the runtime attaches them
-///   all to the same class. A selector two images both declare collides as a
-///   member.
+///   all to the same class. A selector two images both declare is one member
+///   held twice, which `ObjCMemberSelection` resolves: it collides only when
+///   the two declarations differ.
 /// - Protocols: every image referencing a protocol carries its own copy of
 ///   the `protocol_t` — the dyld shared cache builder points references at a
 ///   canonical copy but leaves each image's `__objc_protolist` on its own. A
