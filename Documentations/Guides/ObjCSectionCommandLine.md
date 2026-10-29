@@ -361,10 +361,16 @@ let merged = try builder.build(availabilityPlatform: "macos")
   协议的属性跟着重复好几份（[协议副本](../Glossary.md#protocol-copy协议副本)）。比较时先跳过协议副本，取类或 category 自己写的
   第一条，合并头文件写的就是这一条，写在它原来的位置。其余的里，只有不是协议副本、内容又和比较的那条不同的，才连同签名列在
   文件末尾的 identity key 冲突警告里。所以同一个镜像交两次时，正文是 `objc dump` 的输出少掉这些重复行。
+- **`via <协议>` 说的是属性跟着哪个协议来去。** 一个属性在某版本只剩协议副本时，它的增删改写成
+  `added in 13.0 via <NSAKLayoutItem>`：它在类里是因为采纳了这个协议，未必是新 API。NSView 的锚点就是这样——SDK 在分类里
+  声明它们、标 `macos(10.11)`，那个分类不留属性记录，13.0 起才有协议副本；同名的取值方法整条轴上都在。二进制分不清这种
+  情况与私有方法后来公开（`NSBezierPath.CGPath` 也是取值方法早就在、属性 14.0 才出现，SDK 就标 14.0），要下结论请对照
+  取值方法那一行与 SDK 头文件。
 - **可用性宏只在一个宏能说完整个生命周期时才写。** 平台名原样写进宏，label 必须是 1–3 段数字。引入后一直在：
   `API_AVAILABLE(macos(13.0))`；引入后又删掉：`API_OBSOLETED("Removed", macos(12.0.1, 13.0, 13.0))`。从轴起点就在、
   后来删掉的不写：`API_OBSOLETED` 必须带引入版本，而版本轴不知道它，这一点与 Swift 一侧的 `@available(macOS, obsoleted:)`
-  不同。删了又加回的、只被修改过的也不写；ivar、采纳的协议和 superclass 从来不写。
+  不同。删了又加回的、只被修改过的也不写；ivar、采纳的协议和 superclass 从来不写；新增或删除带着 `via <协议>` 的成员也不写，
+  宏会被读成 SDK 的可用性。
 - **C struct 与 union 不参与追踪。** 它们放在最后，每个取自定义它的最新版本，前面一行注释说明这一点。
 - **声明会在几个 image 之间搬家的，一个版本交一组 image。** 见下一节。
 

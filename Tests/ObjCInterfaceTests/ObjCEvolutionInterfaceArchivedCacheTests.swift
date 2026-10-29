@@ -116,6 +116,26 @@ struct ObjCEvolutionInterfaceArchivedCacheTests {
         #expect(geometryLines == ["@property struct CGRect frame;", "@property struct CGRect bounds;"])
     }
 
+    /// AppKit's NSLayoutConstraint.h declares NSView's anchors in a category,
+    /// `@property (readonly, strong) NSLayoutXAxisAnchor *leadingAnchor
+    /// API_AVAILABLE(macos(10.11))`, which leaves no property record; the
+    /// getter `- leadingAnchor` is there on the whole axis. From macOS 13 the
+    /// read-only copy `NSAKLayoutItem` brings is NSView's only record of it.
+    @Test("A property only an adopted protocol brings names the protocol and gets no availability macro")
+    func protocolBroughtPropertyNamesTheProtocol() async throws {
+        let lines = try await Self.lines()
+        let interfaceLineIndex = try #require(lines.firstIndex { $0.hasPrefix("@interface NSView : NSResponder") })
+        let endLineIndex = try #require(lines[interfaceLineIndex...].firstIndex(of: "@end"))
+        let propertyLineIndex = try #require(lines[interfaceLineIndex ..< endLineIndex].firstIndex { line in
+            line.hasPrefix("@property (readonly) NSLayoutXAxisAnchor *leadingAnchor")
+        })
+        let propertyLine = lines[propertyLineIndex]
+        #expect(!propertyLine.contains("API_AVAILABLE"))
+        // An annotation past the column cap moves to the next line.
+        let annotationLine = propertyLine.contains("// [") ? propertyLine : lines[propertyLineIndex + 1]
+        #expect(annotationLine.hasSuffix("// [○○●] added in 13.0 via <NSAKLayoutItem>"))
+    }
+
     /// AppKit's NSMenuItem.h declares `@property (nullable) SEL action;` and
     /// `@property NSInteger tag;`, NSWindow.h `@property (nullable, strong)
     /// __kindof NSView *contentView;`. Categories the linker merges into each

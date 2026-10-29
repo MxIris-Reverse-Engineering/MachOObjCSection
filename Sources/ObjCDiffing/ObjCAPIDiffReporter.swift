@@ -48,6 +48,8 @@ public struct ObjCAPIDiffReporter: Sendable {
 
     // MARK: - Lines
 
+    /// One member change, naming the protocol a property came with at the
+    /// end: `+ @property(readonly) … *leadingAnchor; (via <NSAKLayoutItem>)`.
     private func memberLine(_ change: ObjCMemberChange) -> String {
         let detail: String
         switch change.status {
@@ -58,7 +60,8 @@ public struct ObjCAPIDiffReporter: Sendable {
         case .modified:
             detail = "\(change.oldSignature ?? change.key.rawValue) → \(change.newSignature ?? change.key.rawValue)"
         }
-        return "\(sigil(change.status)) \(detail)"
+        let protocolPhrase = change.viaProtocolName.map { " (via <\($0)>)" } ?? ""
+        return "\(sigil(change.status)) \(detail)\(protocolPhrase)"
     }
 
     private func sigil(_ status: ObjCChangeStatus) -> String {

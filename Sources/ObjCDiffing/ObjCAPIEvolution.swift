@@ -72,13 +72,27 @@ public struct ObjCLineageEvent: Sendable, Codable, Equatable {
     /// `ObjCMemberRecord.compatibilityOverride(old:new:)`); `nil` means the
     /// plain status rule applies. Always `nil` on container-level events.
     public let compatibilityOverride: ObjCCompatibility?
+    /// The adopted protocol whose declaration the member's record copies, on
+    /// the side the event is about — the new one for `added` and `modified`,
+    /// the old one for `removed`: the property is there only because the
+    /// container adopts that protocol (see `ObjCMemberSelection`). `nil` for
+    /// a declaration of the container's own, and on container-level events.
+    public let viaProtocolName: String?
 
-    public init(versionIndex: Int, status: ObjCChangeStatus, oldSignature: String? = nil, newSignature: String? = nil, compatibilityOverride: ObjCCompatibility? = nil) {
+    public init(
+        versionIndex: Int,
+        status: ObjCChangeStatus,
+        oldSignature: String? = nil,
+        newSignature: String? = nil,
+        compatibilityOverride: ObjCCompatibility? = nil,
+        viaProtocolName: String? = nil
+    ) {
         self.versionIndex = versionIndex
         self.status = status
         self.oldSignature = oldSignature
         self.newSignature = newSignature
         self.compatibilityOverride = compatibilityOverride
+        self.viaProtocolName = viaProtocolName
     }
 }
 

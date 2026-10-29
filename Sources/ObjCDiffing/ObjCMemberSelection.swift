@@ -17,37 +17,71 @@ struct ObjCProtocolPropertyDeclarations: Sendable {
         let payloadKey: ObjCAPIKey
     }
 
-    private let protocolsByName: [String: [ObjCContainerSnapshot]]
-
-    init(protocols: [ObjCContainerSnapshot]) {
-        protocolsByName = Dictionary(grouping: protocols, by: \.name)
+    /// The protocol that declares a property, and how many adoptions away
+    /// from the protocol whose closure it is in: 0 for that protocol itself.
+    private struct DeclaringProtocol: Sendable {
+        let name: String
+        let adoptionDistance: Int
     }
 
-    /// The property declarations the protocols `members` adopt copy into
-    /// their container. A protocol the table does not hold contributes
-    /// nothing, so a copy of its declarations reads as the container's own.
-    func declarations(adoptedBy members: [ObjCMemberRecord]) -> Set<Declaration> {
-        var adoptedDeclarations: Set<Declaration> = []
-        var visitedProtocolNames: Set<String> = []
-        var pendingProtocolNames = members.compactMap(\.adoptedProtocolName)
-        while let protocolName = pendingProtocolNames.popLast() {
-            guard visitedProtocolNames.insert(protocolName).inserted else { continue }
+    /// For each protocol of the table, every property declaration of its
+    /// closure with the protocol nearest it that declares the property.
+    private let closuresByProtocolName: [String: [Declaration: DeclaringProtocol]]
+
+    init(protocols: [ObjCContainerSnapshot]) {
+        let protocolsByName = Dictionary(grouping: protocols, by: \.name)
+        var closuresByProtocolName: [String: [Declaration: DeclaringProtocol]] = [:]
+        var protocolNamesBeingClosed: Set<String> = []
+
+        /// A protocol's closure, built from its adoptions' closures; an
+        /// adoption cycle contributes nothing past the protocol it returns to.
+        func closure(ofProtocolNamed protocolName: String) -> [Declaration: DeclaringProtocol] {
+            if let knownClosure = closuresByProtocolName[protocolName] { return knownClosure }
+            guard protocolNamesBeingClosed.insert(protocolName).inserted else { return [:] }
+            defer { protocolNamesBeingClosed.remove(protocolName) }
+
+            var declaringProtocols: [Declaration: DeclaringProtocol] = [:]
             for protocolSnapshot in protocolsByName[protocolName] ?? [] {
                 for member in protocolSnapshot.members {
-                    switch member.kind {
-                    case .instanceProperty, .classProperty:
-                        adoptedDeclarations.insert(Declaration(identityKey: member.identityKey, payloadKey: member.payloadKeyWithoutOptionality))
-                    case .protocolAdoption:
-                        if let adoptedProtocolName = member.adoptedProtocolName {
-                            pendingProtocolNames.append(adoptedProtocolName)
-                        }
-                    case .instanceMethod, .classMethod, .ivar, .superclass:
-                        break
+                    guard member.kind == .instanceProperty || member.kind == .classProperty else { continue }
+                    let declaration = Declaration(identityKey: member.identityKey, payloadKey: member.payloadKeyWithoutOptionality)
+                    declaringProtocols[declaration] = DeclaringProtocol(name: protocolName, adoptionDistance: 0)
+                }
+            }
+            for protocolSnapshot in protocolsByName[protocolName] ?? [] {
+                for adoptedProtocolName in protocolSnapshot.members.compactMap(\.adoptedProtocolName) {
+                    for (declaration, declaringProtocol) in closure(ofProtocolNamed: adoptedProtocolName) {
+                        let candidate = DeclaringProtocol(name: declaringProtocol.name, adoptionDistance: declaringProtocol.adoptionDistance + 1)
+                        if let nearest = declaringProtocols[declaration], nearest.adoptionDistance <= candidate.adoptionDistance { continue }
+                        declaringProtocols[declaration] = candidate
                     }
                 }
             }
+            closuresByProtocolName[protocolName] = declaringProtocols
+            return declaringProtocols
         }
-        return adoptedDeclarations
+
+        for protocolName in protocolsByName.keys {
+            _ = closure(ofProtocolNamed: protocolName)
+        }
+        self.closuresByProtocolName = closuresByProtocolName
+    }
+
+    /// The protocol whose declaration `record` copies — the one nearest the
+    /// container among those declaring it, the first adopted on a tie — or
+    /// `nil` when none of `adoptedProtocolNames`, followed through their own
+    /// adoptions, declares it: the record is the container's own declaration.
+    /// A protocol the table does not hold contributes nothing.
+    func declaringProtocolName(of record: ObjCMemberRecord, adoptedProtocolNames: [String]) -> String? {
+        guard record.kind == .instanceProperty || record.kind == .classProperty else { return nil }
+        let declaration = Declaration(identityKey: record.identityKey, payloadKey: record.payloadKey)
+        var nearestProtocol: DeclaringProtocol?
+        for adoptedProtocolName in adoptedProtocolNames {
+            guard let declaringProtocol = closuresByProtocolName[adoptedProtocolName]?[declaration] else { continue }
+            if let nearest = nearestProtocol, nearest.adoptionDistance <= declaringProtocol.adoptionDistance { continue }
+            nearestProtocol = declaringProtocol
+        }
+        return nearestProtocol?.name
     }
 }
 
@@ -75,6 +109,13 @@ struct ObjCProtocolPropertyDeclarations: Sendable {
 /// protocol copy and its payload differs from the taken one's. An identical
 /// record hides nothing, and the protocol's own container reports the
 /// changes of what a protocol copy repeats.
+///
+/// When every record of an identity is a protocol copy, the property is in
+/// the container only because a protocol it adopts declares it, and the
+/// selection names that protocol (`keptProtocolNameByKey`). NSView's anchors
+/// read so from macOS 13: its own declarations sit in a category of the SDK
+/// header, which leaves no record, and `NSAKLayoutItem`'s copies are the only
+/// ones.
 struct ObjCMemberSelection: Sendable {
     /// The container's records, in order.
     let members: [ObjCMemberRecord]
@@ -86,6 +127,9 @@ struct ObjCMemberSelection: Sendable {
     /// For each identity key held more than once, which of its records is
     /// taken: 0 for the first record with the key, 1 for the second, and so on.
     let keptOccurrenceByDuplicatedKey: [ObjCAPIKey: Int]
+    /// For each identity key whose record taken is a protocol copy, the
+    /// protocol whose declaration it copies.
+    let keptProtocolNameByKey: [ObjCAPIKey: String]
 
     init(members: [ObjCMemberRecord], protocolPropertyDeclarations: ObjCProtocolPropertyDeclarations) {
         var memberIndicesByKey: [ObjCAPIKey: [Int]] = [:]
@@ -93,36 +137,32 @@ struct ObjCMemberSelection: Sendable {
         for (memberIndex, member) in members.enumerated() {
             memberIndicesByKey[member.identityKey, default: []].append(memberIndex)
         }
+        let adoptedProtocolNames = members.compactMap(\.adoptedProtocolName)
+        func declaringProtocolName(ofMemberAt memberIndex: Int) -> String? {
+            guard !adoptedProtocolNames.isEmpty else { return nil }
+            return protocolPropertyDeclarations.declaringProtocolName(of: members[memberIndex], adoptedProtocolNames: adoptedProtocolNames)
+        }
 
         var keptMemberIndexByKey: [ObjCAPIKey: Int] = [:]
         keptMemberIndexByKey.reserveCapacity(memberIndicesByKey.count)
         var reportedDroppedMemberIndicesByKey: [ObjCAPIKey: [Int]] = [:]
         var keptOccurrenceByDuplicatedKey: [ObjCAPIKey: Int] = [:]
-        // Most containers hold each identity once, so the adopted protocols
-        // are walked only for one that does not.
-        var adoptedDeclarationsOfContainer: Set<ObjCProtocolPropertyDeclarations.Declaration>?
+        var keptProtocolNameByKey: [ObjCAPIKey: String] = [:]
         for (memberKey, memberIndices) in memberIndicesByKey {
-            guard memberIndices.count > 1 else {
-                keptMemberIndexByKey[memberKey] = memberIndices[0]
-                continue
-            }
-            let protocolCopies = adoptedDeclarationsOfContainer ?? protocolPropertyDeclarations.declarations(adoptedBy: members)
-            adoptedDeclarationsOfContainer = protocolCopies
-            let isProtocolCopy = { (memberIndex: Int) in
-                protocolCopies.contains(ObjCProtocolPropertyDeclarations.Declaration(
-                    identityKey: members[memberIndex].identityKey,
-                    payloadKey: members[memberIndex].payloadKey
-                ))
-            }
-            let keptOccurrence = memberIndices.firstIndex { !isProtocolCopy($0) } ?? 0
+            let declaringProtocolNames = memberIndices.map(declaringProtocolName(ofMemberAt:))
+            let keptOccurrence = declaringProtocolNames.firstIndex { $0 == nil } ?? 0
             let keptMemberIndex = memberIndices[keptOccurrence]
             keptMemberIndexByKey[memberKey] = keptMemberIndex
+            if let keptProtocolName = declaringProtocolNames[keptOccurrence] {
+                keptProtocolNameByKey[memberKey] = keptProtocolName
+            }
+            guard memberIndices.count > 1 else { continue }
             keptOccurrenceByDuplicatedKey[memberKey] = keptOccurrence
             let keptPayloadKey = members[keptMemberIndex].payloadKey
-            let reportedMemberIndices = memberIndices.filter { memberIndex in
-                memberIndex != keptMemberIndex
-                    && !isProtocolCopy(memberIndex)
-                    && members[memberIndex].payloadKey != keptPayloadKey
+            let reportedMemberIndices = zip(memberIndices, declaringProtocolNames).compactMap { memberIndex, protocolName in
+                memberIndex != keptMemberIndex && protocolName == nil && members[memberIndex].payloadKey != keptPayloadKey
+                    ? memberIndex
+                    : nil
             }
             if !reportedMemberIndices.isEmpty {
                 reportedDroppedMemberIndicesByKey[memberKey] = reportedMemberIndices
@@ -133,6 +173,7 @@ struct ObjCMemberSelection: Sendable {
         self.keptMemberIndexByKey = keptMemberIndexByKey
         self.reportedDroppedMemberIndicesByKey = reportedDroppedMemberIndicesByKey
         self.keptOccurrenceByDuplicatedKey = keptOccurrenceByDuplicatedKey
+        self.keptProtocolNameByKey = keptProtocolNameByKey
     }
 
     /// The record taken for each identity key.

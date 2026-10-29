@@ -171,21 +171,23 @@ public struct ObjCAPIEvolutionReporter: Sendable {
         return (eventLines + moveLines).sorted { $0.versionIndex < $1.versionIndex }.map(\.text)
     }
 
-    /// One event phrased against the axis. `signatures: false` keeps
-    /// container events to the bare phrase (containers carry no signature;
-    /// their name is already on the lineage line).
+    /// One event phrased against the axis, naming the protocol a property
+    /// came with (`+ added in 13.0 via <NSAKLayoutItem>`). `signatures: false`
+    /// keeps container events to the bare phrase (containers carry no
+    /// signature; their name is already on the lineage line).
     private func eventLine(_ event: ObjCLineageEvent, _ evolution: ObjCAPIEvolution, signatures: Bool) -> String {
         let label = evolution.versions[event.versionIndex].label
+        let protocolPhrase = event.viaProtocolName.map { " via <\($0)>" } ?? ""
         switch event.status {
         case .added:
-            return "+ added in \(label)"
+            return "+ added in \(label)\(protocolPhrase)"
         case .removed:
-            return "- removed in \(label)"
+            return "- removed in \(label)\(protocolPhrase)"
         case .modified:
             guard signatures, let oldSignature = event.oldSignature, let newSignature = event.newSignature else {
-                return "~ modified in \(label)"
+                return "~ modified in \(label)\(protocolPhrase)"
             }
-            return "~ modified in \(label): \(oldSignature) → \(newSignature)"
+            return "~ modified in \(label)\(protocolPhrase): \(oldSignature) → \(newSignature)"
         }
     }
 
