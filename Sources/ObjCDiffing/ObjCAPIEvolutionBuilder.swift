@@ -6,6 +6,10 @@
 /// semantics (identity match on `identityKey`, change detection on
 /// `payloadKey`, first-wins key collisions), so for N == 2 the events are
 /// the two-sided `ObjCAPIDiff` verbatim.
+///
+/// `evolution(ofImageGroups:versions:)` tracks several images per version as
+/// one API surface instead, merging each version's images before the matrix
+/// is computed and recording where declarations moved between them.
 public struct ObjCAPIEvolutionBuilder: Sendable {
     public init() {}
 
@@ -31,18 +35,76 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
     /// Track a binary's ObjC API across ordered snapshots (oldest first)
     /// under an explicit version axis.
     public func evolution(of snapshots: [ObjCAPISnapshot], versions: [ObjCAPIVersionDescriptor]) throws -> ObjCAPIEvolution {
-        guard snapshots.count >= 2 else {
-            throw ObjCAPIEvolutionError.fewerThanTwoVersions(versionCount: snapshots.count)
+        try validate(versionCount: snapshots.count, versions: versions)
+        return evolution(
+            snapshots: snapshots,
+            versions: versions,
+            keyCollisionsByVersion: snapshots.map { $0.keyCollisions() },
+            imageGroups: nil
+        )
+    }
+
+    /// Track the ObjC API several images make up together across ordered
+    /// versions (oldest first), so a declaration moving from one image to
+    /// another is a move, not a removal and an addition.
+    ///
+    /// - Parameters:
+    ///   - imageGroups: Each version's images, the primary image first. A
+    ///     version holds only the images present in it, so an image can join
+    ///     the group partway along the axis; an empty group is a version
+    ///     holding nothing.
+    ///   - versions: The axis. Each version's `imageNames` is set from its
+    ///     group.
+    ///
+    /// Each version's images merge into one snapshot as
+    /// ``ObjCAPIImageGroupMerge`` describes, and the evolution of those is
+    /// what the lineages' events state. A class or category, or a member of
+    /// one, present on both sides of a transition in different images gets
+    /// an ``ObjCImageMove`` there — a member only where it moved differently
+    /// from its container. Moves never make a transition breaking.
+    public func evolution(ofImageGroups imageGroups: [[ObjCAPIImageSnapshot]], versions: [ObjCAPIVersionDescriptor]) throws -> ObjCAPIEvolution {
+        try validate(versionCount: imageGroups.count, versions: versions)
+        return try evolution(ofImageGroupMerges: imageGroups.map(ObjCAPIImageGroupMerge.init), versions: versions)
+    }
+
+    /// ``evolution(ofImageGroups:versions:)`` over groups a caller merged
+    /// already, as `ObjCEvolutionInterfaceBuilder` keeps them.
+    package func evolution(ofImageGroupMerges imageGroups: [ObjCAPIImageGroupMerge], versions: [ObjCAPIVersionDescriptor]) throws -> ObjCAPIEvolution {
+        try validate(versionCount: imageGroups.count, versions: versions)
+        let groupVersions = zip(versions, imageGroups).map { version, imageGroup in
+            ObjCAPIVersionDescriptor(label: version.label, provenance: version.provenance, imageNames: imageGroup.imageNames)
         }
-        guard snapshots.count == versions.count else {
-            throw ObjCAPIEvolutionError.labelCountMismatch(labelCount: versions.count, versionCount: snapshots.count)
+        return evolution(
+            snapshots: imageGroups.map(\.snapshot),
+            versions: groupVersions,
+            keyCollisionsByVersion: imageGroups.map(\.keyCollisions),
+            imageGroups: imageGroups
+        )
+    }
+
+    private func validate(versionCount: Int, versions: [ObjCAPIVersionDescriptor]) throws {
+        guard versionCount >= 2 else {
+            throw ObjCAPIEvolutionError.fewerThanTwoVersions(versionCount: versionCount)
         }
-        let keyCollisionsByVersion = snapshots.map { $0.keyCollisions() }
+        guard versionCount == versions.count else {
+            throw ObjCAPIEvolutionError.labelCountMismatch(labelCount: versions.count, versionCount: versionCount)
+        }
+    }
+
+    /// The evolution of validated inputs. `imageGroups`, when given, holds
+    /// each version's merged group, whose images the moves are computed from.
+    private func evolution(
+        snapshots: [ObjCAPISnapshot],
+        versions: [ObjCAPIVersionDescriptor],
+        keyCollisionsByVersion: [[ObjCAPIKeyCollision]],
+        imageGroups: [ObjCAPIImageGroupMerge]?
+    ) -> ObjCAPIEvolution {
         let requirementsByVersion = snapshots.map { ObjCProtocolRequirements(protocols: $0.protocols) }
         return ObjCAPIEvolution(
             versions: versions,
-            classes: containerLineages(snapshots.map(\.classes)),
-            protocols: containerLineages(snapshots.map(\.protocols)) { adoption, protocolName, versionIndex in
+            classes: containerLineages(snapshots.map(\.classes), imageGroups: imageGroups),
+            // No image owns a protocol, so protocols never move.
+            protocols: containerLineages(snapshots.map(\.protocols), imageGroups: nil) { adoption, protocolName, versionIndex in
                 ObjCMemberRecord.adoptionCompatibilityOverride(
                     adding: adoption,
                     toProtocolNamed: protocolName,
@@ -50,7 +112,7 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
                     newRequirements: requirementsByVersion[versionIndex]
                 )
             },
-            categories: containerLineages(snapshots.map(\.categories)),
+            categories: containerLineages(snapshots.map(\.categories), imageGroups: imageGroups),
             keyCollisionsByVersion: keyCollisionsByVersion.allSatisfy(\.isEmpty) ? nil : keyCollisionsByVersion
         )
     }
@@ -59,11 +121,13 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
 
     /// One container bucket (classes, protocols, or categories) across all
     /// versions: `perVersionContainers[i]` is that bucket in version `i`.
-    /// `addedAdoptionOverride` judges an adoption a container gains, given the
-    /// container's name and the version it appears in; only the protocol
-    /// bucket passes one.
+    /// `imageGroups`, when given, holds each version's merged group, which the
+    /// bucket's moves are computed from. `addedAdoptionOverride` judges an
+    /// adoption a container gains, given the container's name and the version
+    /// it appears in; only the protocol bucket passes one.
     private func containerLineages(
         _ perVersionContainers: [[ObjCContainerSnapshot]],
+        imageGroups: [ObjCAPIImageGroupMerge]?,
         addedAdoptionOverride: ((_ adoption: ObjCMemberRecord, _ containerName: String, _ versionIndex: Int) -> ObjCCompatibility?)? = nil
     ) -> [ObjCContainerLineage] {
         let keyedPerVersion = perVersionContainers.map { keyedFirstWins($0, by: \.key) }
@@ -77,20 +141,28 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
             // Name/kind from the latest appearance, so a report shows the
             // most recent spelling of the container.
             let latest = perVersion.reversed().compactMap { $0 }.first!
+            let containerMoves = imageGroups.map { imageGroups in
+                imageMoves(presence: presence) { versionIndex in
+                    imageGroups[versionIndex].imageNames(ofContainer: containerKey) ?? []
+                }
+            } ?? []
             let members = memberLineages(
                 perVersionMembers: perVersion.map { $0?.members },
+                containerKey: containerKey,
+                imageGroups: imageGroups,
                 addedAdoptionOverride: addedAdoptionOverride.map { override in
                     { adoption, versionIndex in override(adoption, latest.name, versionIndex) }
                 }
             )
-            guard !containerEvents.isEmpty || !members.isEmpty else { continue }
+            guard !containerEvents.isEmpty || !members.isEmpty || !containerMoves.isEmpty else { continue }
             lineages.append(ObjCContainerLineage(
                 key: containerKey,
                 name: latest.name,
                 containerKind: latest.kind,
                 presence: presence,
                 events: containerEvents,
-                memberLineages: members
+                memberLineages: members,
+                imageMoves: containerMoves.isEmpty ? nil : containerMoves
             ))
         }
         return lineages.sorted { $0.key.rawValue < $1.key.rawValue }
@@ -104,9 +176,13 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
     /// container — a container-level appearance/disappearance is the
     /// container's own event, and enumerating members across the gap would
     /// diverge from the two-sided differ (which leaves an added/removed
-    /// container's `memberChanges` empty).
+    /// container's `memberChanges` empty). With `imageGroups`, a member
+    /// present on both sides of a transition moves there when its images
+    /// change otherwise than those of `containerKey`, its container.
     private func memberLineages(
         perVersionMembers: [[ObjCMemberRecord]?],
+        containerKey: ObjCAPIKey,
+        imageGroups: [ObjCAPIImageGroupMerge]?,
         addedAdoptionOverride: ((_ adoption: ObjCMemberRecord, _ versionIndex: Int) -> ObjCCompatibility?)?
     ) -> [ObjCMemberLineage] {
         let keyedPerVersion = perVersionMembers.map { members in
@@ -148,19 +224,75 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
                     break
                 }
             }
-            guard !events.isEmpty else { continue }
-            // The record must exist somewhere on the axis for an event to
-            // have been produced, so the latest appearance always resolves a
-            // kind.
-            let kind = perVersion.reversed().compactMap { $0 }.first!.kind
+            let moves = imageGroups.map { imageGroups in
+                memberImageMoves(memberKey, perVersion: perVersion, containerKey: containerKey, imageGroups: imageGroups)
+            } ?? []
+            guard !events.isEmpty || !moves.isEmpty else { continue }
+            // The record must exist somewhere on the axis for an event or a
+            // move to have been produced, so the latest appearance always
+            // resolves a kind and a signature.
+            let latest = perVersion.reversed().compactMap { $0 }.first!
             lineages.append(ObjCMemberLineage(
                 key: memberKey,
-                kind: kind,
+                kind: latest.kind,
                 presence: presence,
-                events: events
+                events: events,
+                imageMoves: moves.isEmpty ? nil : moves,
+                latestSignature: events.isEmpty ? latest.signature : nil
             ))
         }
         return lineages.sorted { $0.key.rawValue < $1.key.rawValue }
+    }
+
+    // MARK: - Image moves
+
+    /// A move at every transition where the declaration is present on both
+    /// sides and `imageNamesAt` names other images on each.
+    private func imageMoves(presence: [Bool], imageNamesAt: (_ versionIndex: Int) -> [String]) -> [ObjCImageMove] {
+        var moves: [ObjCImageMove] = []
+        for versionIndex in 1 ..< presence.count where presence[versionIndex - 1] && presence[versionIndex] {
+            let oldImageNames = imageNamesAt(versionIndex - 1)
+            let newImageNames = imageNamesAt(versionIndex)
+            if Self.nameDifferentImages(oldImageNames, newImageNames) {
+                moves.append(ObjCImageMove(versionIndex: versionIndex, oldImageNames: oldImageNames, newImageNames: newImageNames))
+            }
+        }
+        return moves
+    }
+
+    /// A member's moves: transitions where it is present on both sides and
+    /// its images change, unless they change exactly as its container's do —
+    /// every member of a class that moved as a whole would otherwise repeat
+    /// the class's move. `perVersion[i]` is the member's record in version
+    /// `i`.
+    private func memberImageMoves(
+        _ memberKey: ObjCAPIKey,
+        perVersion: [ObjCMemberRecord?],
+        containerKey: ObjCAPIKey,
+        imageGroups: [ObjCAPIImageGroupMerge]
+    ) -> [ObjCImageMove] {
+        var moves: [ObjCImageMove] = []
+        for versionIndex in 1 ..< perVersion.count {
+            guard perVersion[versionIndex - 1] != nil, perVersion[versionIndex] != nil else { continue }
+            let oldGroup = imageGroups[versionIndex - 1]
+            let newGroup = imageGroups[versionIndex]
+            let oldImageNames = oldGroup.imageNames(ofMember: memberKey, inContainer: containerKey) ?? []
+            let newImageNames = newGroup.imageNames(ofMember: memberKey, inContainer: containerKey) ?? []
+            guard Self.nameDifferentImages(oldImageNames, newImageNames) else { continue }
+            let oldContainerImageNames = oldGroup.imageNames(ofContainer: containerKey) ?? []
+            let newContainerImageNames = newGroup.imageNames(ofContainer: containerKey) ?? []
+            guard Self.nameDifferentImages(oldImageNames, oldContainerImageNames)
+                || Self.nameDifferentImages(newImageNames, newContainerImageNames)
+            else { continue }
+            moves.append(ObjCImageMove(versionIndex: versionIndex, oldImageNames: oldImageNames, newImageNames: newImageNames))
+        }
+        return moves
+    }
+
+    /// Whether two image lists name different images. Each list is in its
+    /// own version's group order, which does not count.
+    private static func nameDifferentImages(_ lhs: [String], _ rhs: [String]) -> Bool {
+        lhs != rhs && Set(lhs) != Set(rhs)
     }
 
     // MARK: - Primitives

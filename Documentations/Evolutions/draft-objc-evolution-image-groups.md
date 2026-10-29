@@ -57,11 +57,12 @@ public struct ObjCImageMove: Sendable, Codable, Equatable {
     public let versionIndex: Int
     public let oldImageNames: [String]
     public let newImageNames: [String]
-    public let signature: String?   // members only: the new side's rendering
 }
 
 // ObjCContainerLineage and ObjCMemberLineage
 public let imageMoves: [ObjCImageMove]?   // nil when there is none
+// ObjCMemberLineage
+public let latestSignature: String?       // the newest rendering, only when the lineage has no event
 ```
 
 - 只有当声明在一次跳变的两侧都在场时才比较。某一侧的 image 集合，是该版本里含有它的所有 image，按组顺序排（通常只有一个，
@@ -105,7 +106,7 @@ Categories:
   同一版本内按组顺序）。
 - 事件与搬家按 `versionIndex` 合在一起排；同一个版本里，事件在前、搬家在后。image 集合用 ` + ` 连接。
 - 跳变摘要在 added / removed / modified 之后加一项 `N moved`；只有搬家的那一步也照常给 verdict 词。
-- 只有搬家的成员，签名取自搬家记录的 `signature`。
+- 成员的签名先从事件里取；只有搬家、没有事件的成员取 lineage 的 `latestSignature`（它最新出现那一版的渲染）。
 
 ### 合并头文件（`ObjCInterface`）
 
@@ -148,7 +149,7 @@ extension ObjCEvolutionInterfaceBuilder {
 每一步单独构建通过、相关测试通过后提交，文档随所在的那一步一起提交。
 
 - [x] 1. 固定单 image 演进的 JSON：在改代码之前写好测试并跑通。
-- [ ] 2. `ObjCDiffing` 的模型与计算：`ObjCAPIImageSnapshot`、`evolution(ofImageGroups:versions:)`、`imageNames`、
+- [x] 2. `ObjCDiffing` 的模型与计算：`ObjCAPIImageSnapshot`、`evolution(ofImageGroups:versions:)`、`imageNames`、
   合并规则、`ObjCImageMove` 与 `imageMoves`、`droppedImageNames`；单元测试；设计说明与术语表。
 - [ ] 3. 报告：Image group、`> moved` 行、`N moved`、collision 警告里的 image；报告测试。
 - [ ] 4. 合并头文件：`ObjCEvolutionInterfaceImage`、`addVersion(images:version:)`、混用报错、搬家标注与图例；测试；
@@ -166,3 +167,4 @@ extension ObjCEvolutionInterfaceBuilder {
 | 2026-10-29 | 接口一次收齐一个版本的全部 image | 一次调用加完一个版本，不留半开的状态；代价是同一版本的几个索引器要同时在内存里 |
 | 2026-10-29 | key collision 警告注明 image | 不注明的话，读者看不出被丢的那份在哪个 image 里 |
 | 2026-10-29 | 补上落地步骤，状态改为 Accepted | 用户批准，开始实现 |
+| 2026-10-29 | 只有搬家的成员，签名放在成员 lineage 的 `latestSignature` 上，搬家记录不再带 `signature` | 与 Swift 一侧对齐：那边的成员 lineage 已经有同名字段，语义相同（没有事件时填最新一版的渲染，有事件时为 nil） |

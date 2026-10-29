@@ -1,6 +1,7 @@
 # ObjC API Diff — 设计与已知局限
 
-> 面向维护者的实现说明。对应提案 [0006](../Evolutions/0006-objc-api-diff-and-evolution.md)。
+> 面向维护者的实现说明。对应提案 [0006](../Evolutions/0006-objc-api-diff-and-evolution.md)；
+> 「image 组」一节对应提案 [ObjC 演进按 image 组比较，并报出搬家](../Evolutions/draft-objc-evolution-image-groups.md)。
 > 记录 `ObjCDiffing` 模块（ObjC API 比对引擎）的架构、关键设计取舍，以及一组当前的
 > 已知局限——大多数源于 ObjC metadata 本身携带的信息边界，而非实现取巧。
 >
@@ -84,6 +85,46 @@ category 新采纳协议仍是 additive，它们是在提供实现。这条判�
 看不出来，所以放在容器层：`ObjCMemberRecord.adoptionCompatibilityOverride` 由双侧 differ 与
 evolution builder 共用，各自传入相邻两个快照的 `ObjCProtocolRequirements`。
 
+## image 组：几个 image 当作一个 API 面
+
+单 image 演进里，从 AppKit 搬到 UIFoundation、CollectionViewCore 的声明在 AppKit 一侧报成 removed，在新库一侧
+报成 added，其实它们没有消失。`evolution(ofImageGroups:versions:)` 让每个版本交一组 image（主 image 在前，image 名由
+调用方给），先把一个版本的几个 image 合并成一份快照，再走同一套逐版本矩阵；搬家另记成 `ObjCImageMove`。事件因此
+就是「对两侧合并后的快照做 diff」的结果，判定规则一条没变。
+
+**一个版本内怎么合并**（`ObjCAPIImageGroupMerge`）：
+
+- **class**：所有 image 的都列入，按组顺序。两个 image 都有的类留两个容器，first-wins 比较第一个 image 的，另一个记成
+  key collision。上文局限 6 的订正说单 image 里这条诊断触发不了；跨 image 的重复类正是它在 image 组里的现实来源。
+- **category**：unique name 相同的合成一个容器，成员按组顺序拼接——运行时把它们都挂到同一个类上。同一个 selector
+  在两个 image 里各有一份时，成员级 key collision 报出来。
+- **protocol**：每个引用它的 image 都在 `__objc_protolist` 里带一份 `protocol_t`。dyld 的 cache builder 只把
+  `__objc_protorefs` 与类、category、协议里的引用改指向一份规范副本，`__objc_protolist` 留在各 image 自己的副本上
+  （`dyld/cache_builder/NewSharedCacheBuilder.cpp` 的注释："We do NOT update __objc_protolist"）。所以 AppKit 和
+  UIFoundation 各带一份 `NSCopying` 是常态：内容相同的副本静默去重；内容不同的留下，于是撞键、比较第一份。
+- key collision 在 image 组里注明被丢那份来自哪个 image（`ObjCAPIKeyCollision.droppedImageNames`，与
+  `droppedSignatures` 一一对应），单 image 时为 nil。
+
+**搬家的规则**：
+
+- 声明在一次跳变两侧都在场才比较；一侧的 image 集合是该版本里含有它的全部 image。集合按各自版本的组顺序存，比较时
+  不看顺序。
+- 容器两侧集合不同就记一次搬家。成员要两侧集合不同，**并且**（旧, 新）与所属容器的（旧, 新）不同才记：整个类搬走时，
+  每个方法都跟着换了 image，再记一遍只是重复；category 拆成两个 image 后，换了 image 的方法单独记，留下的不记（只比
+  「与容器不同」的话，留下的方法会被记成 `AppKit → AppKit`）。
+- protocol 没有「所在的 image」，不记搬家。
+- 只有搬家的 lineage 也要列出来；这样的成员没有事件可取签名，签名放在 `ObjCMemberLineage.latestSignature`（它最新
+  出现那一版的渲染，有事件时为 nil）。
+- 搬家不影响判定。按旧 install name 绑定的符号还能不能找到，取决于旧 image 有没有 re-export 新 image，快照里没有
+  这个事实，所以只报不判。
+
+**内存**：成员的 image 归属只为两个以上 image 拼成的容器单独保存，其余成员沿用容器的归属——跨 51 个版本的 AppKit
+若每个成员都存一份，会再多出一份与快照同量级的数据。
+
+**与 Swift 一侧**：MachOSwiftSection 的 SwiftDiffing 按同一套模型与报告文案做，两边的类型名对应（`ObjCImageMove` ↔
+`ImageMove` 等）。Swift 一侧多一个 `earliestVersionIndex`：被剥掉 local 符号的版本里声明看不见，搬家只能落在两次
+观测之间；ObjC 没有这种情况。
+
 ## 已知局限
 
 ### 1. ObjC 无访问控制 → 判定分不出公开 API 与私有实现
@@ -133,10 +174,12 @@ Warnings 段列出被丢弃的。
 
 ## 测试结构
 
-- `Tests/ObjCDiffingTests/` —— 纯值单元测试（45 个）：投影键格局、三路匹配、
+- `Tests/ObjCDiffingTests/` —— 纯值单元测试：投影键格局、三路匹配、
   refinement、codec（round-trip / 缺版本头 / 版本不符 / 字节稳定）、evolution
   形状（presence 位图 / 缺口语义 / N == 2 一致性 / 标签解析）、两个 reporter 的
-  整段文本断言。全程无 Mach-O、无 runtime。
+  整段文本断言；image 组的合并与搬家规则（`ObjCAPIImageGroupEvolutionTests`），以及
+  单 image 演进的 JSON 与报告在加入 image 组前后不变（`SingleImageEvolutionOutputTests`）。
+  全程无 Mach-O、无 runtime。
 - `Tests/ObjCInterfaceTests/ObjCAPISnapshotBuilderTests.swift` —— 进程内
   Foundation 镜像的冒烟：module 组装（own-declaration only）、快照确定性、
   自 diff 为空、经 document 往返。
