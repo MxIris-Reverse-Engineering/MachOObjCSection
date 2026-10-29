@@ -192,7 +192,8 @@ private enum ArchivedMacOSCache {
     }
 
     static func image(named imageName: String, version: String) throws -> MachOFile {
-        try #require(imageIfPresent(named: imageName, version: version), "no \(imageName) image in the macOS \(version) cache")
+        let image = try imageIfPresent(named: imageName, version: version)
+        return try #require(image, "no \(imageName) image in the macOS \(version) cache")
     }
 
     /// The image, or `nil` where the version's cache has none.
