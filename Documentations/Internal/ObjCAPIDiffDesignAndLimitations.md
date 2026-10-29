@@ -244,6 +244,10 @@ Warnings 段列出被丢弃的。
 - `Tests/ObjCInterfaceTests/ObjCAPISnapshotBuilderTests.swift` —— 进程内
   Foundation 镜像的冒烟：module 组装（own-declaration only）、快照确定性、
   自 diff 为空、经 document 往返。
+- `Tests/ObjCInterfaceTests/ObjCEvolutionInterfaceArchivedCacheTests.swift` —— 归档 cache 里 AppKit 的
+  11.0.1、12.0.1、13.0 合并成一份头文件，其中两条钉住重复成员的真实情形：`NSView.frame`/`bounds` 在 13.0 多出排在前面的
+  协议副本，`NSMenuItem.action`/`tag`、`NSWindow.contentView` 整条轴上协议副本都在前面；合并头文件都写类自己的声明、
+  不带标注。cache 不在时整组跳过。
 - 手工端到端验证（2026-08-20）：macOS 15.5 vs 26.5.2 两份 dyld shared cache 的
   CoreLocation，`snapshot` → `diff`（644 行报告，捕捉到 CLBeaconRegion 等类的
   真实属性删除）→ `evolution --summary-only`（226 added · 197 removed ·

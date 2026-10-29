@@ -51,8 +51,14 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
   与合并头文件（单 image 与 image 组）共用它；`ObjCAPIKeyCollision` 记下保留的那份。纯值回归测试与归档 cache 测试
   （`NSView.frame`）；实现说明、使用指南、代码注释、已裁决清单与术语表。
 - [x] 2. 报告：两个 reporter 与合并头文件末尾的警告标题，以及保留那份的写法；报告测试。
-- [ ] 3. 完整验证：全量测试，含 CI 用的 Xcode 26.6；用本分支的命令行重跑几版 AppKit 的演进，对照警告数与 `NSView.frame`，
-  结论写进本提案。
+- [x] 3. 完整验证：全量测试，含 CI 用的 Xcode 26.6；用本分支的命令行重跑几版 AppKit 的演进，对照警告数与 `NSView.frame`，
+  结论写进本提案。在 Ultra 上：CI 那组测试（`swift test --skip MachOObjCSectionTests`）在默认的 Xcode 27.2（Swift 6.4.2）与
+  CI 用的 Xcode 26.6（Swift 6.3.3）下都通过；归档 cache 的两个测试（`NSView.frame`/`bounds`，以及整条轴上协议副本都排在
+  前面的 `NSMenuItem.action`/`tag`、`NSWindow.contentView`）放进 `next` 的源码里跑都失败，在本分支通过。用命令行对 AppKit
+  的 12.0.1 → 13.0 → 27.0 跑演进：告警从 485 行（每版 126、136、223 行）降到 22 行（6、7、9 行），剩下的都是两份都不是
+  协议副本、彼此又不同的；报告正文与 `next` 相比只少了三条假变化（`NSView.frame`、`bounds` 在 13.0，`NSPopover.detached`
+  在 27.0），`NSScreen.hash`、`debugDescription` 改写成类自己的声明。release 构建三次各跑一遍，`next` 6.35–6.56 秒，
+  本分支 6.35–6.49 秒，看不出差别。
 
 ## 决策日志
 
@@ -70,3 +76,5 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
 | 2026-10-29 | 第 1 步：image 组的 `addVersion(images:version:)` 先取齐每个 image 的快照、合并，再渲染 | category 成员取哪个 image 的那份要看整组；为此每个 image 的 module 多组装一次，索引器的查找是字典缓存，这一步很便宜 |
 | 2026-10-29 | 第 1 步：改写三条钉住旧行为的测试，而不是删掉 | `ObjCAPIDifferTests` 与 `SingleImageEvolutionOutputTests` 原来用两份相同的记录造碰撞，image 组测试原来期望相同的 category 成员告警；改成两份不同的记录后它们仍钉住碰撞的形状，相同的情形另由新测试钉住「不告警」 |
 | 2026-10-29 | 第 2 步：标题定为 `Warnings — identity-key collisions (only the kept record was compared):`，每条写成 `kept: … · dropped: …`，没有保留记录的旧 JSON 只写 `dropped:` 一段 | 不写「内容不同」之类的限定：容器级的碰撞（image 组里的同名类）内容相同也照报，标题只说清楚比较了哪份；三处（diff 报告、演进报告、合并头文件）共用 `ObjCAPIKeyCollision.warningsHeading` 与 `recordsDescription` |
+| 2026-10-29 | 第 3 步：归档 cache 测试补一条整条轴上协议副本都排在前面的情形（`NSMenuItem.action`/`tag`、`NSWindow.contentView`） | `NSView.frame` 只覆盖「中途多出协议副本」；协议副本从轴起点就在前面时演进没有事件，错只出现在合并头文件的写法上，原来的测试抓不到 |
+| 2026-10-29 | 实现完成，待用户看过后收尾 | 文档：实现说明、使用指南、已裁决清单、术语表（「协议副本」）与两处索引已随第 1、2 步同步，不需要另写说明；README 不涉及告警，不用改。不在本案修、记下的两处：`stripSynthesizedMethods removes the setter` 随机挑类，全量跑时挑到 NSScanner 失败过一次，重跑四次都过；`MachOObjCSectionTests` 写死了本机没有的 `/Users/JH/Downloads/iOS18.5-SwiftUI`，CI 本来就跳过它。下游 MachOSwiftSection 升依赖后，`swift-section objc diff` / `evolution` 的告警跟着变，它的 `ObjCCommandLine.md` 若写到告警格式需同步 |
