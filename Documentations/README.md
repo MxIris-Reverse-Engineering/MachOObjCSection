@@ -32,6 +32,7 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [0014](Evolutions/0014-host-supplied-classes.md) | 由宿主补充文件里没有 class object 的类 | Implemented |
 | [0015](Evolutions/0015-objc-evolution-interface.md) | 带演进标注的合并 ObjC 头文件 | Implemented |
 | [0016](Evolutions/0016-objc-evolution-image-groups.md) | ObjC 演进按 image 组比较，并报出搬家 | Implemented |
+| [draft](Evolutions/draft-objc-duplicate-member-selection.md) | 同一容器里的重复成员按来源取舍，内容相同的不再告警 | Accepted |
 
 ## 使用指南
 
