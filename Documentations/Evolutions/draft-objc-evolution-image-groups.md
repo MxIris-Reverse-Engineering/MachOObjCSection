@@ -4,6 +4,9 @@
 - **创建日期**: 2026-10-29
 - **最后更新**: 2026-10-29
 - **实现分支**: `feature/objc-evolution-image-groups`
+- **配套文档**: [使用指南的库调用方一节](../Guides/ObjCSectionCommandLine.md#库调用方几个-image-当作一个-api-面)；
+  [实现说明的 image 组一节](../Internal/ObjCAPIDiffDesignAndLimitations.md#image-组几个-image-当作一个-api-面)；
+  术语表的 [image group](../Glossary.md#image-groupimage-组) 与 [image move](../Glossary.md#image-move搬家)
 - **关联**: MachOSwiftSection 同步做 Swift 一侧（SwiftDiffing / SwiftInterface）和两库的集成测试，模型与报告文案两边一致；
   那边的提案落地后在这里补链接
 
@@ -174,3 +177,4 @@ extension ObjCEvolutionInterfaceBuilder {
 | 2026-10-29 | 补上落地步骤，状态改为 Accepted | 用户批准，开始实现 |
 | 2026-10-29 | 只有搬家的成员，签名放在成员 lineage 的 `latestSignature` 上，搬家记录不再带 `signature` | 与 Swift 一侧对齐：那边的成员 lineage 已经有同名字段，语义相同（没有事件时填最新一版的渲染，有事件时为 nil） |
 | 2026-10-29 | 归档测试只固定 13.0 那次搬家，用 12.0.1 与 13.0 两个 cache | 这两个 cache 现有归档测试已经依赖，不新增前提；那一次有两个去向，其中 CollectionViewCore 是中途加入的 image |
+| 2026-10-29 | 实现完成，待用户看过后收尾 | 五个落地步骤都已完成；文档同步了使用指南、实现说明、术语表、README、文档索引与已裁决清单。与方案的偏离只有 `latestSignature` 那一处，见上 |
