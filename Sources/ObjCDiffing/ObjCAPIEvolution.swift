@@ -193,9 +193,9 @@ public struct ObjCAPIEvolution: Sendable, Codable, Equatable {
     public let categories: [ObjCContainerLineage]
     /// Identity-key collisions per version (one entry per version on the
     /// axis, aligned with `versions`), `nil` when no version has any. A
-    /// collision means first-wins keying dropped a record there, so that
-    /// version's transitions can be quietly weaker than reported — the
-    /// reporters surface these as warnings.
+    /// collision means a record that differs from the compared one was
+    /// dropped there, so that version's transitions can be quietly weaker
+    /// than reported — the reporters surface these as warnings.
     public let keyCollisionsByVersion: [[ObjCAPIKeyCollision]]?
 
     public init(

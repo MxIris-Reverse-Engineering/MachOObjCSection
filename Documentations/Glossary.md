@@ -104,6 +104,19 @@ image 组演进里的一种记录：声明在一次跳变两侧都在，所在�
 - **延伸阅读**：[实现说明](Internal/ObjCExportStatusResolution.md)、
   [提案 0008](Evolutions/0008-objc-export-status.md)
 
+### protocol copy（协议副本）
+
+类或 category 的属性表里，照抄所采纳协议某个属性声明的那条记录：identity 与 payload 都和协议的声明相同（协议成员
+payload 末尾的 `|optional:` 段不计）。clang 编译采纳了协议的 category 时把协议的属性抄进它的属性表，链接器又把
+category 并进类，所以一个类里同一个属性常有好几份，`hash`、`superclass`、`description`、`debugDescription` 最常见。
+diff 与演进取同一 identity 的记录时先跳过协议副本，取类或 category 自己写的那份；协议副本也从不进 key collision 警告。
+不要与 image 组里「各 image 自带的 protocol 副本」混淆：那是 `__objc_protolist` 里整个 `protocol_t` 的拷贝。
+
+- **主要出现在**：`Sources/ObjCDiffing/ObjCMemberSelection.swift`（`ObjCProtocolPropertyDeclarations`、
+  `ObjCMemberSelection`）
+- **延伸阅读**：[实现说明「同一容器里的重复成员」](Internal/ObjCAPIDiffDesignAndLimitations.md#同一容器里的重复成员)、
+  [提案](Evolutions/draft-objc-duplicate-member-selection.md)
+
 ### pseudo-member（伪成员）
 
 不是真实成员、但被投影成成员记录参与 diff 的容器属性：目前只有 `superclass` 一个。

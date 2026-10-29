@@ -102,20 +102,32 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
         }
     }
 
-    /// What one version has rendered so far, so that each later image of its
-    /// group renders only what the evolution takes from it: a class or
-    /// protocol no earlier image holds, a category member no earlier image
-    /// declares, a C struct or union no earlier image defines.
+    /// What one version has rendered so far, so that each image of its group
+    /// renders only what the evolution takes from it: a class or protocol no
+    /// earlier image holds, of each member the record the comparison takes,
+    /// a C struct or union no earlier image defines.
     private struct VersionRenderingState {
+        /// Which record of each identity a container holds more than once the
+        /// comparison takes, counted across the group's images in group order
+        /// (`ObjCAPISnapshot.keptMemberOccurrences()`).
+        let keptMemberOccurrences: [ObjCAPIKey: [ObjCAPIKey: Int]]
         var renderedContainerKeys: Set<ObjCAPIKey> = []
-        var renderedMemberKeysByContainer: [ObjCAPIKey: Set<ObjCAPIKey>] = [:]
+        /// How many records of each identity each container has met so far.
+        var memberOccurrenceCountsByContainer: [ObjCAPIKey: [ObjCAPIKey: Int]] = [:]
         var definedStructNames: Set<String> = []
         var definedUnionNames: Set<String> = []
+
+        init(keptMemberOccurrences: [ObjCAPIKey: [ObjCAPIKey: Int]]) {
+            self.keptMemberOccurrences = keptMemberOccurrences
+        }
     }
 
     private let cTypeReplacements: [ObjCPrimitiveTypePattern: String]
     private var versions: [ObjCAPIVersionDescriptor] = []
     private var versionSnapshots: [VersionSnapshot] = []
+    /// Each version's `VersionRenderingState.keptMemberOccurrences`, which the
+    /// member layout needs too.
+    private var keptMemberOccurrencesByVersion: [[ObjCAPIKey: [ObjCAPIKey: Int]]] = []
     private var containerRenderings: [ObjCAPIKey: ObjCEvolutionContainerRenderings] = [:]
     private var structDefinitions: [String: SemanticString] = [:]
     private var unionDefinitions: [String: SemanticString] = [:]
@@ -142,8 +154,10 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
         machO: MachO,
         version: ObjCAPIVersionDescriptor
     ) {
-        var renderingState = VersionRenderingState()
-        let snapshot = render(indexer: indexer, machO: machO, atVersion: versions.count, state: &renderingState)
+        let snapshot = Self.snapshotForComparison(of: indexer)
+        var renderingState = VersionRenderingState(keptMemberOccurrences: snapshot.keptMemberOccurrences())
+        render(indexer: indexer, machO: machO, snapshot: snapshot, atVersion: versions.count, state: &renderingState)
+        keptMemberOccurrencesByVersion.append(renderingState.keptMemberOccurrences)
         versionSnapshots.append(.singleImage(snapshot))
         versions.append(version)
     }
@@ -161,22 +175,32 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
     ///     sets its `imageNames` from `images`.
     ///
     /// The images render as the evolution merges them: a class or protocol
-    /// from the first image holding it, a category's members each from the
-    /// first image declaring it, a C struct or union from the first image
-    /// defining it. The builder keeps no reference to any of the indexers or
-    /// Mach-Os once this returns.
+    /// from the first image holding it, a category member from the image
+    /// whose declaration the comparison takes, a C struct or union from the
+    /// first image defining it. The builder keeps no reference to any of the
+    /// indexers or Mach-Os once this returns.
     public mutating func addVersion<MachO: ObjCMetadataSource>(
         images: [ObjCEvolutionInterfaceImage<MachO>],
         version: ObjCAPIVersionDescriptor
     ) {
-        var renderingState = VersionRenderingState()
-        var imageSnapshots: [ObjCAPIImageSnapshot] = []
-        for image in images {
-            let snapshot = render(indexer: image.indexer, machO: image.machO, atVersion: versions.count, state: &renderingState)
-            imageSnapshots.append(ObjCAPIImageSnapshot(imageName: image.imageName, snapshot: snapshot))
+        // Which record of a category member the comparison takes rests on the
+        // whole group, so every image's snapshot comes before any rendering.
+        let imageSnapshots = images.map { image in
+            ObjCAPIImageSnapshot(imageName: image.imageName, snapshot: Self.snapshotForComparison(of: image.indexer))
         }
-        versionSnapshots.append(.imageGroup(ObjCAPIImageGroupMerge(imageSnapshots)))
+        let imageGroup = ObjCAPIImageGroupMerge(imageSnapshots)
+        var renderingState = VersionRenderingState(keptMemberOccurrences: imageGroup.snapshot.keptMemberOccurrences())
+        for (image, imageSnapshot) in zip(images, imageSnapshots) {
+            render(indexer: image.indexer, machO: image.machO, snapshot: imageSnapshot.snapshot, atVersion: versions.count, state: &renderingState)
+        }
+        keptMemberOccurrencesByVersion.append(renderingState.keptMemberOccurrences)
+        versionSnapshots.append(.imageGroup(imageGroup))
         versions.append(version)
+    }
+
+    /// The snapshot of one image, as `ObjCAPISnapshotBuilder` takes it.
+    private static func snapshotForComparison<MachO: ObjCMetadataSource>(of indexer: ObjCInterfaceIndexer<MachO>) -> ObjCAPISnapshot {
+        ObjCAPIDiffer().snapshot(of: ObjCAPISnapshotBuilder(indexer: indexer).module())
     }
 
     /// Computes the evolution of the versions added so far and renders the
@@ -216,6 +240,7 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
                     forContainer: containerKey,
                     kind: bucket.kind,
                     perVersion: keyedPerVersion.map { $0[containerKey] },
+                    keptOccurrencesByVersion: keptMemberOccurrencesByVersion.map { $0[containerKey] ?? [:] },
                     renderings: renderings
                 ))
             }
@@ -253,16 +278,16 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
     // MARK: - Rendering
 
     /// Renders what `indexer` adds to the version at `versionIndex` beyond
-    /// what `state` says earlier images of its group rendered, and returns the
-    /// image's snapshot.
+    /// what `state` says earlier images of its group rendered. `snapshot` is
+    /// the image's snapshot, as ``snapshotForComparison(of:)`` takes it.
     private mutating func render<MachO: ObjCMetadataSource>(
         indexer: ObjCInterfaceIndexer<MachO>,
         machO: MachO,
+        snapshot: ObjCAPISnapshot,
         atVersion versionIndex: Int,
         state: inout VersionRenderingState
-    ) -> ObjCAPISnapshot {
+    ) {
         let module = ObjCAPISnapshotBuilder(indexer: indexer).module()
-        let snapshot = ObjCAPIDiffer().snapshot(of: module)
         let context = ObjCInterfaceBuilder<MachO>.makeContext(
             indexer: indexer,
             machO: machO,
@@ -288,7 +313,8 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
                 methods: classInfo.classMethods + classInfo.methods,
                 into: &renderings,
                 at: versionIndex,
-                renderedKeys: &state.renderedMemberKeysByContainer[container.key, default: []],
+                keptOccurrences: state.keptMemberOccurrences[container.key] ?? [:],
+                occurrenceCounts: &state.memberOccurrenceCountsByContainer[container.key, default: [:]],
                 context: context
             )
             containerRenderings[container.key] = renderings
@@ -299,8 +325,8 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
             guard state.renderedContainerKeys.insert(container.key).inserted else { continue }
             var renderings = containerRenderings[container.key] ?? ObjCEvolutionContainerRenderings()
             renderings.name = protocolInfo.name
-            // Required before optional, as the snapshot lists them, so a
-            // selector declared both ways keeps the record the snapshot keeps.
+            // Required before optional, as the snapshot lists them, so the
+            // records of an identity are counted in the snapshot's order.
             Self.recordMembers(
                 properties: protocolInfo.classProperties + protocolInfo.properties
                     + protocolInfo.optionalClassProperties + protocolInfo.optionalProperties,
@@ -308,14 +334,15 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
                     + protocolInfo.optionalClassMethods + protocolInfo.optionalMethods,
                 into: &renderings,
                 at: versionIndex,
-                renderedKeys: &state.renderedMemberKeysByContainer[container.key, default: []],
+                keptOccurrences: state.keptMemberOccurrences[container.key] ?? [:],
+                occurrenceCounts: &state.memberOccurrenceCountsByContainer[container.key, default: [:]],
                 context: context
             )
             containerRenderings[container.key] = renderings
         }
         for (categoryInfo, container) in zip(module.categories, snapshot.categories) {
             // The categories of one name in several images are one category,
-            // whose members each come from the first image declaring them.
+            // whose members are counted across the images in group order.
             var renderings = containerRenderings[container.key] ?? ObjCEvolutionContainerRenderings()
             if state.renderedContainerKeys.insert(container.key).inserted {
                 renderings.name = categoryInfo.className
@@ -326,7 +353,8 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
                 methods: categoryInfo.classMethods + categoryInfo.methods,
                 into: &renderings,
                 at: versionIndex,
-                renderedKeys: &state.renderedMemberKeysByContainer[container.key, default: []],
+                keptOccurrences: state.keptMemberOccurrences[container.key] ?? [:],
+                occurrenceCounts: &state.memberOccurrenceCountsByContainer[container.key, default: [:]],
                 context: context
             )
             containerRenderings[container.key] = renderings
@@ -344,29 +372,42 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
                 state.definedUnionNames.insert(unionName)
             }
         }
-        return snapshot
     }
 
-    /// Records the renderings of a container's members in `versionIndex`,
-    /// except those whose key is in `renderedKeys` — the version rendered them
-    /// already, and the snapshot keeps the first record of a key.
+    /// Records the renderings of a container's members in `versionIndex`: of
+    /// each identity, only the record the comparison takes. `occurrenceCounts`
+    /// counts the records of each identity met so far in the version, earlier
+    /// images of its group included; the record taken is the one whose count
+    /// `keptOccurrences` names, the first where it names none.
     private static func recordMembers<MachO: ObjCMetadataSource>(
         ivars: [ObjCIvarInfo] = [],
         properties: [ObjCPropertyInfo],
         methods: [ObjCMethodInfo],
         into renderings: inout ObjCEvolutionContainerRenderings,
         at versionIndex: Int,
-        renderedKeys: inout Set<ObjCAPIKey>,
+        keptOccurrences: [ObjCAPIKey: Int],
+        occurrenceCounts: inout [ObjCAPIKey: Int],
         context: ObjCRenderingContext<MachO>
     ) {
+        func isKept(_ memberKey: ObjCAPIKey) -> Bool {
+            let occurrence = occurrenceCounts[memberKey, default: 0]
+            occurrenceCounts[memberKey] = occurrence + 1
+            return occurrence == keptOccurrences[memberKey, default: 0]
+        }
         for ivarInfo in ivars {
-            renderings.record(ivarInfo.semanticString(using: context), for: ObjCMemberRecord.identityKey(of: ivarInfo), at: versionIndex, renderedKeys: &renderedKeys)
+            let memberKey = ObjCMemberRecord.identityKey(of: ivarInfo)
+            guard isKept(memberKey) else { continue }
+            renderings.record(ivarInfo.semanticString(using: context), for: memberKey, at: versionIndex)
         }
         for propertyInfo in properties {
-            renderings.record(propertyInfo.semanticString(using: context), for: ObjCMemberRecord.identityKey(of: propertyInfo), at: versionIndex, renderedKeys: &renderedKeys)
+            let memberKey = ObjCMemberRecord.identityKey(of: propertyInfo)
+            guard isKept(memberKey) else { continue }
+            renderings.record(propertyInfo.semanticString(using: context), for: memberKey, at: versionIndex)
         }
         for methodInfo in methods {
-            renderings.record(methodInfo.semanticString(using: context), for: ObjCMemberRecord.identityKey(of: methodInfo), at: versionIndex, renderedKeys: &renderedKeys)
+            let memberKey = ObjCMemberRecord.identityKey(of: methodInfo)
+            guard isKept(memberKey) else { continue }
+            renderings.record(methodInfo.semanticString(using: context), for: memberKey, at: versionIndex)
         }
     }
 

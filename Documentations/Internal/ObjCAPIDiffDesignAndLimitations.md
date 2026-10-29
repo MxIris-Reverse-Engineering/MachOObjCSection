@@ -1,13 +1,15 @@
 # ObjC API Diff — 设计与已知局限
 
 > 面向维护者的实现说明。对应提案 [0006](../Evolutions/0006-objc-api-diff-and-evolution.md)；
-> 「image 组」一节对应提案 [0016](../Evolutions/0016-objc-evolution-image-groups.md)。
+> 「image 组」一节对应提案 [0016](../Evolutions/0016-objc-evolution-image-groups.md)；
+> 「同一容器里的重复成员」一节对应提案
+> [同一容器里的重复成员按来源取舍，内容相同的不再告警](../Evolutions/draft-objc-duplicate-member-selection.md)。
 > 记录 `ObjCDiffing` 模块（ObjC API 比对引擎）的架构、关键设计取舍，以及一组当前的
 > 已知局限——大多数源于 ObjC metadata 本身携带的信息边界，而非实现取巧。
 >
 > 参考实现：MachOSwiftSection 的 `SwiftDiffing`
 > （其设计文档 `ABIDiffDesignAndLimitations.md` / `ABIEvolutionDesign.md`）。本文只展开
-> ObjC 侧**不同**的部分；与参考实现逐点一致的算法（三路匹配、first-wins keying、
+> ObjC 侧**不同**的部分；与参考实现逐点一致的算法（三路匹配、容器的 first-wins keying、
 > evolution 的逐版本矩阵、N == 2 与双侧 diff 的一致性保证）不重复论证。
 
 ## 概述
@@ -29,7 +31,8 @@ frozen（`diff(old: ObjCAPISnapshot, new:)`，纯值）。
 | 身份 | remangle 后的 mangled symbol（`.mangled`/`.printed` 双 case + 回退诊断） | 命名空间字符串（`method:-foo:` 等），无回退路径 | ObjC 身份是纯名字，remangle 及其全部复杂度不存在 |
 | function/method 换签名 | removed + added（换 mangled symbol = 换 ABI 入口点） | **modified**（selector 不变即同一入口，typeEncoding 进 payload） | ObjC 的派发身份是 selector 本身 |
 | 容器 kind 变化 | 折入容器身份（struct↔class 报 removed+added） | superclass 作为**伪成员**（换父类报 modified，old → new 并列） | 类名是稳定身份，整类 removed+added 会淹没「其余成员未变」的信息 |
-| 诊断通道 | 键碰撞 + remangle 回退两类 | 仅键碰撞一类 | 无 remangle；ObjC 侧碰撞的现实来源是 duplicate class（运行时允许） |
+| 诊断通道 | 键碰撞 + remangle 回退两类 | 仅键碰撞一类 | 无 remangle；成员级碰撞的现实来源是链接期并进类的 category，容器级的是 image 组里的同名类 |
+| 一个容器里重复的身份 | first-wins | 先排除协议副本再取第一份，内容相同的不告警（见「同一容器里的重复成员」） | 系统框架的类里重复成员是常态，first-wins 会取到协议抄来的声明 |
 | 顶层 bucket | 8 个（types/protocols/4×extension/2×global） | 3 个（classes/protocols/categories） | ObjC 无 extension 拆分问题，无 global 声明 |
 
 ## 键格局（即持久化格式）
@@ -85,6 +88,48 @@ category 新采纳协议仍是 additive，它们是在提供实现。这条判�
 看不出来，所以放在容器层：`ObjCMemberRecord.adoptionCompatibilityOverride` 由双侧 differ 与
 evolution builder 共用，各自传入相邻两个快照的 `ObjCProtocolRequirements`。
 
+## 同一容器里的重复成员
+
+一个容器的成员里，同一个 identity 可以出现好几次。系统框架的类里这是常态，来源有两步：
+
+- **链接器把 category 并进类。** ld64 默认（`-no_objc_category_merging` 才关）把本 image 里加在本 image 类上的
+  category 合并进类自己的方法表、属性表与协议表：category 的列表依次在前，类自己的放最后，不去重
+  （`/Volumes/AppleOSS/distribution-Developer_Tools/ld64` 的 `src/ld/passes/objc.cpp`，`PropertyListAtom`）。Swift 类
+  不合并。所以 AppKit 的 `__objc_catlist` 里几乎只剩加在别的 image 的类上的 category。
+- **clang 把协议的属性抄进 category。** 编译一个采纳了协议的 category 时，协议（连同它采纳的协议）声明的每个属性都
+  抄一份进这个 category 的属性表（`clang/lib/CodeGen/CGObjCMac.cpp` 的 `PushProtocolProperties`，同一张表内按名字
+  去重）。协议大多继承 `<NSObject>`，于是每个这样的 category 都带一份 `hash`、`superclass`、`description`、
+  `debugDescription`。
+
+两步叠起来，NSApplication 的属性表里这四个属性各有 4 份；`NSView` 从 macOS 13 起经合并进来的 category 采纳
+`NSLayoutItem`，这个协议的只读 `frame` 排到了类自己的可写 `frame` 前面。macOS 27.0 的 AppKit 有 216 组这样的重复、
+330 份多出来的记录，其中 304 份与第一份的 payload 相同。运行时看到的也是这些重复：`class_getProperty` 返回第一份。
+
+**取哪一份**（`ObjCMemberSelection`）：先认出**协议副本**——identity 与 payload 都和容器所采纳协议声明的某个属性相同的
+记录。协议沿 `adopts:` 记录在快照协议表里逐层展开，比较时去掉协议成员 payload 末尾的 `|optional:` 段
+（`ObjCProtocolPropertyDeclarations`）；不在表里的协议展开不了，它的副本当成容器自己的声明。非协议副本里取第一份，
+全是协议副本时取第一份。方法没有协议副本，取第一份，也就是运行时派发到的那份：合并进来的 category 方法排在类方法前面。
+
+**什么时候告警**：被丢的记录只有不是协议副本、payload 又和保留的那份不同，才进 key collision，并写明保留的是哪份
+（`ObjCAPIKeyCollision.keptSignature`）。payload 相同的丢了什么也不少；协议副本重复的是协议的声明，它的变化由协议自己
+的容器报告。27.0 的 AppKit 按这条规则剩 8 组告警，都是两份都不是协议副本、彼此又不同，分不出该比较哪份
+（`NSMenuItemBadge.stringValue`、`NSTextInputContext` 的三个属性等）；另有 15 组从协议副本改取类自己的声明，
+`NSView.frame` 那条「13.0 改成 readonly」的假变化因此消失。
+
+**为什么在配对时做，不在冻结快照时去重**：快照是未过滤的事实（局限 2）。冻结时去重还得升快照格式版本，否则带重复的
+旧 baseline 对去重后的新快照会取到不同的一份，报出假变化。现在旧 baseline 不用重新生成，也按同一条规则比较。
+
+**为什么不取最后一份，也不挑「更强」的一份**：类自己的列表虽然排在最后，但 `NSTextView.defaultParagraphStyle` 这类
+可写声明写在 category 里，类自己的列表里只有协议的只读副本，取最后一份反而取错。「可写优先、类型具体的优先」说不清：
+`NSScreen.hash` 两份的差别是 `unsigned long long` 对 `long long`。
+
+**一处定规则**：双侧 differ、evolution builder 与 `ObjCAPISnapshot.keyCollisions()` 都取 `ObjCMemberSelection` 选的
+那一份；公开的测试接缝 `diffMembers(old:new:)` 拿不到协议表，取第一份。合并头文件（`ObjCEvolutionInterfaceBuilder`）
+也写这一份，写在它在成员表里的位置：`ObjCAPISnapshot.keptMemberOccurrences()` 给出每个重复的 identity 取第几份，渲染与
+`ObjCEvolutionMemberLayout` 边走边数。image 组里 category 的成员跨 image 拼接，取哪份要看整组，所以
+`addVersion(images:version:)` 先取齐每个 image 的快照、合并，再渲染。容器级（一个轴上两个同名容器）仍是 first-wins：
+一个链接出来的 image 里没有同名容器，现实来源只有 image 组。
+
 ## image 组：几个 image 当作一个 API 面
 
 单 image 演进里，从 AppKit 搬到 UIFoundation、CollectionViewCore 的声明在 AppKit 一侧报成 removed，在新库一侧
@@ -97,13 +142,13 @@ evolution builder 共用，各自传入相邻两个快照的 `ObjCProtocolRequir
 - **class**：所有 image 的都列入，按组顺序。两个 image 都有的类留两个容器，first-wins 比较第一个 image 的，另一个记成
   key collision。上文局限 6 的订正说单 image 里这条诊断触发不了；跨 image 的重复类正是它在 image 组里的现实来源。
 - **category**：unique name 相同的合成一个容器，成员按组顺序拼接——运行时把它们都挂到同一个类上。同一个 selector
-  在两个 image 里各有一份时，成员级 key collision 报出来。
+  在两个 image 里各有一份时，按上一节的规则取舍：两份不同才报成员级 key collision，相同的不报。
 - **protocol**：每个引用它的 image 都在 `__objc_protolist` 里带一份 `protocol_t`。dyld 的 cache builder 只把
   `__objc_protorefs` 与类、category、协议里的引用改指向一份规范副本，`__objc_protolist` 留在各 image 自己的副本上
   （`dyld/cache_builder/NewSharedCacheBuilder.cpp` 的注释："We do NOT update __objc_protolist"）。所以 AppKit 和
   UIFoundation 各带一份 `NSCopying` 是常态：内容相同的副本静默去重；内容不同的留下，于是撞键、比较第一份。
-- key collision 在 image 组里注明被丢那份来自哪个 image（`ObjCAPIKeyCollision.droppedImageNames`，与
-  `droppedSignatures` 一一对应），单 image 时为 nil。
+- key collision 在 image 组里注明保留与被丢的那几份各来自哪个 image（`ObjCAPIKeyCollision.keptImageName`，以及与
+  `droppedSignatures` 一一对应的 `droppedImageNames`），单 image 时为 nil。
 
 **搬家的规则**：
 
@@ -178,14 +223,18 @@ Warnings 段列出被丢弃的。
 > 被合并成一个（实测本仓库测试包里两个文件对 NSString 的 Swift 扩展只剩一个 category）。上表「诊断通道」
 > 一行说碰撞的现实来源是 duplicate class，同样不成立：运行时的 duplicate class 告警说的是两个镜像。
 > 裁决与推翻条件见 [代码审查的已裁决清单](CodeReviewAdjudications.md)。
+>
+> **2026-10-29 补记**：上面说的只是容器级。成员级的碰撞在单 image 里非但触发得了，还是常态——链接器把 category
+> 并进类，留下大量重复成员，见上文「同一容器里的重复成员」。
 
 ## 测试结构
 
 - `Tests/ObjCDiffingTests/` —— 纯值单元测试：投影键格局、三路匹配、
   refinement、codec（round-trip / 缺版本头 / 版本不符 / 字节稳定）、evolution
   形状（presence 位图 / 缺口语义 / N == 2 一致性 / 标签解析）、两个 reporter 的
-  整段文本断言；image 组的合并与搬家规则（`ObjCAPIImageGroupEvolutionTests`），以及
-  单 image 演进的 JSON 与报告在加入 image 组前后不变（`SingleImageEvolutionOutputTests`）。
+  整段文本断言；image 组的合并与搬家规则（`ObjCAPIImageGroupEvolutionTests`），
+  单 image 演进的 JSON 与报告在加入 image 组前后不变（`SingleImageEvolutionOutputTests`），以及
+  一个容器里重复成员的取舍与告警（`DuplicateMemberSelectionTests`，用例按 AppKit 的真实情形构造）。
   全程无 Mach-O、无 runtime。
 - `Tests/ObjCInterfaceTests/ObjCAPISnapshotBuilderTests.swift` —— 进程内
   Foundation 镜像的冒烟：module 组装（own-declaration only）、快照确定性、

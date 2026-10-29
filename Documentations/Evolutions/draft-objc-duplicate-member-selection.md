@@ -1,6 +1,6 @@
 # Draft - 同一容器里的重复成员按来源取舍，内容相同的不再告警
 
-- **状态**: Accepted
+- **状态**: In Progress
 - **创建日期**: 2026-10-29
 - **最后更新**: 2026-10-29
 - **实现分支**: `feature/objc-duplicate-member-selection`
@@ -47,11 +47,12 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
 
 每一步单独构建通过、相关测试通过后提交，文档随所在的那一步一起提交。修复类的测试先确认在改动前失败。
 
-- [ ] 1. `ObjCDiffing` 的取舍规则：认出协议副本，按新规则为每个 identity key 取一份；双边 differ、evolution builder 与
-  `keyCollisions()` 共用它；`ObjCAPIKeyCollision` 记下保留的那份。纯值回归测试；实现说明、代码注释、已裁决清单与术语表。
-- [ ] 2. 报告：两个 reporter 的警告标题与保留那份的写法；报告测试。
-- [ ] 3. 合并头文件取比较时保留的那一份，单 image 与 image 组都是；归档 cache 测试断言 `NSView.frame`；使用指南。
-- [ ] 4. 完整验证：全量测试；用本分支的命令行重跑几版 AppKit 的演进，对照警告数与 `NSView.frame`，结论写进本提案。
+- [x] 1. 取舍规则：认出协议副本，按新规则为每个 identity key 取一份；双边 differ、evolution builder、`keyCollisions()`
+  与合并头文件（单 image 与 image 组）共用它；`ObjCAPIKeyCollision` 记下保留的那份。纯值回归测试与归档 cache 测试
+  （`NSView.frame`）；实现说明、使用指南、代码注释、已裁决清单与术语表。
+- [ ] 2. 报告：两个 reporter 与合并头文件末尾的警告标题，以及保留那份的写法；报告测试。
+- [ ] 3. 完整验证：全量测试，含 CI 用的 Xcode 26.6；用本分支的命令行重跑几版 AppKit 的演进，对照警告数与 `NSView.frame`，
+  结论写进本提案。
 
 ## 决策日志
 
@@ -63,3 +64,8 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
 | 2026-10-29 | 不按「可写优先、类型具体的优先」挑 | 说不清哪份更强：`NSScreen.hash` 两份的差别是 `unsigned long long` 对 `long long` |
 | 2026-10-29 | image 组里跨 image 的 category 成员，payload 相同也不再告警 | 规则统一为「告警即比较被削弱」；成员在哪几个 image 里仍由搬家记录跟踪，丢掉的副本不藏任何变化。这改变了 0016 使用指南里的说法，落地时一并改 |
 | 2026-10-29 | 用户批准，开始实现；补上落地步骤 | 精简提案原来没有落地步骤，按方案拆成四步，每步能单独构建、测试通过 |
+| 2026-10-29 | 第 1 步：除 `keptSignature` 外再加 `keptImageName`，容器级的告警也填这两项（签名即容器名） | image 组里只写保留那份的签名，读者仍不知道比较的是哪个 image 的；容器级也填，告警的写法才能统一成「保留哪份、丢了哪些」 |
+| 2026-10-29 | 第 1 步：公开的测试接缝 `diffMembers(old:new:)` 取第一份 | 它只拿到成员记录，没有协议表可认协议副本；从快照入口比较时都按新规则 |
+| 2026-10-29 | 原第 3 步（合并头文件取同一份）并进第 1 步，落地步骤从四步改成三步 | 「同一个镜像交两次，正文是 `objc dump` 少掉重复行」那条测试同时依赖比较与渲染，分开提交会留下比较取类自己的声明、头文件却写协议副本的中间状态 |
+| 2026-10-29 | 第 1 步：image 组的 `addVersion(images:version:)` 先取齐每个 image 的快照、合并，再渲染 | category 成员取哪个 image 的那份要看整组；为此每个 image 的 module 多组装一次，索引器的查找是字典缓存，这一步很便宜 |
+| 2026-10-29 | 第 1 步：改写三条钉住旧行为的测试，而不是删掉 | `ObjCAPIDifferTests` 与 `SingleImageEvolutionOutputTests` 原来用两份相同的记录造碰撞，image 组测试原来期望相同的 category 成员告警；改成两份不同的记录后它们仍钉住碰撞的形状，相同的情形另由新测试钉住「不告警」 |

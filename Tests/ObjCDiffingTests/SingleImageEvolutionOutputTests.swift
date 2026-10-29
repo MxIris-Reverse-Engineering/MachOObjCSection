@@ -35,7 +35,7 @@ struct SingleImageEvolutionOutputTests {
             categories: [
                 Fixtures.containerSnapshot(key: "category:NSObject(Extras)", name: "NSObject(Extras)", kind: .category, members: [
                     Fixtures.record(identity: "method:-extra", payload: "enc:v16@0:8", signature: "- (void)extra;"),
-                    Fixtures.record(identity: "method:-extra", payload: "enc:v16@0:8", signature: "- (void)extra;"),
+                    Fixtures.record(identity: "method:-extra", payload: "enc:@16@0:8", signature: "- (id)extra;"),
                 ]),
             ]
         )
@@ -119,7 +119,7 @@ struct SingleImageEvolutionOutputTests {
           ],
           "keyCollisionsByVersion": [
             [],
-            [{"containerName": "NSObject(Extras)", "droppedSignatures": ["- (void)extra;"], "key": "method:-extra"}],
+            [{"containerName": "NSObject(Extras)", "droppedSignatures": ["- (id)extra;"], "key": "method:-extra", "keptSignature": "- (void)extra;"}],
             []
           ],
           "protocols": [
@@ -182,7 +182,7 @@ struct SingleImageEvolutionOutputTests {
               - removed in 3.0
 
         Warnings — identity-key collisions (first record kept, later ones not compared):
-          2.0 · NSObject(Extras) · dropped: - (void)extra;
+          2.0 · NSObject(Extras) · dropped: - (id)extra;
         """
         #expect(try ObjCAPIEvolutionReporter().report(Self.evolution()) == expected)
     }

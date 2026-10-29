@@ -90,6 +90,21 @@ struct ObjCEvolutionInterfaceArchivedCacheTests {
             }
         }
     }
+
+    /// AppKit's NSView.h declares `@property NSRect frame;` and `bounds` alike.
+    /// From macOS 13 a category the linker merges into NSView adopts
+    /// `NSLayoutItem`, whose read-only `frame` and `bounds` it puts ahead of
+    /// the class's own; neither declaration of NSView changed.
+    @Test("A property a protocol copies ahead of the class's own declaration reads as the class declares it, unchanged")
+    func ownDeclarationOutranksProtocolCopy() async throws {
+        let lines = try await Self.lines()
+        let interfaceLineIndex = try #require(lines.firstIndex { $0.hasPrefix("@interface NSView : NSResponder") })
+        let endLineIndex = try #require(lines[interfaceLineIndex...].firstIndex(of: "@end"))
+        let geometryLines = lines[interfaceLineIndex ..< endLineIndex].filter { line in
+            line.hasPrefix("@property ") && (line.contains(" frame;") || line.contains(" bounds;"))
+        }
+        #expect(geometryLines == ["@property struct CGRect frame;", "@property struct CGRect bounds;"])
+    }
 }
 
 /// AppKit's image group across macOS 12.0.1 and 13.0, the release that moved

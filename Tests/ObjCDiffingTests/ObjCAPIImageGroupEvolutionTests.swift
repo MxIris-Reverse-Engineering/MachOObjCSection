@@ -178,7 +178,9 @@ struct ObjCAPIImageGroupEvolutionTests {
             key: key("protocol:NSTextAttachmentContainer"),
             containerName: nil,
             droppedSignatures: ["NSTextAttachmentContainer"],
-            droppedImageNames: ["UIFoundation"]
+            droppedImageNames: ["UIFoundation"],
+            keptSignature: "NSTextAttachmentContainer",
+            keptImageName: "AppKit"
         )
         #expect(evolution.isEmpty)
         #expect(evolution.keyCollisionsByVersion == [[collision], [collision]])
@@ -200,22 +202,36 @@ struct ObjCAPIImageGroupEvolutionTests {
         #expect(evolution.classes.map(\.imageMoves) == [[ObjCImageMove(versionIndex: 1, oldImageNames: ["AppKit"], newImageNames: ["AppKit", "UIFoundation"])]])
         #expect(evolution.keyCollisionsByVersion == [
             [],
-            [ObjCAPIKeyCollision(key: key("class:NSFoo"), containerName: nil, droppedSignatures: ["NSFoo"], droppedImageNames: ["UIFoundation"])],
+            [ObjCAPIKeyCollision(key: key("class:NSFoo"), containerName: nil, droppedSignatures: ["NSFoo"], droppedImageNames: ["UIFoundation"], keptSignature: "NSFoo", keptImageName: "AppKit")],
         ])
     }
 
-    @Test("A selector two images both add to one category collides as a member, naming the second image")
-    func categoryMemberDeclaredTwiceCollides() throws {
+    @Test("A selector two images both add to one category with one type encoding is no collision")
+    func categoryMemberDeclaredTwiceAlikeIsNoCollision() throws {
         let group = [
             image("AppKit", categories: [categorySnapshot("NSString(Drawing)", members: [method("draw")])]),
             image("UIFoundation", categories: [categorySnapshot("NSString(Drawing)", members: [method("draw")])]),
         ]
         let evolution = try builder.evolution(ofImageGroups: [group, group], versions: versions(["13.0", "14.0"]))
+        #expect(evolution.keyCollisionsByVersion == nil)
+    }
+
+    @Test("A selector two images add to one category with differing type encodings collides as a member, naming the second image")
+    func categoryMemberDeclaredTwiceDifferentlyCollides() throws {
+        let group = [
+            image("AppKit", categories: [categorySnapshot("NSString(Drawing)", members: [method("draw")])]),
+            image("UIFoundation", categories: [categorySnapshot("NSString(Drawing)", members: [
+                Fixtures.record(identity: "method:-draw", payload: "enc:B16@0:8", signature: "- (BOOL)draw;"),
+            ])]),
+        ]
+        let evolution = try builder.evolution(ofImageGroups: [group, group], versions: versions(["13.0", "14.0"]))
         let collision = ObjCAPIKeyCollision(
             key: key("method:-draw"),
             containerName: "NSString(Drawing)",
-            droppedSignatures: ["- (void)draw;"],
-            droppedImageNames: ["UIFoundation"]
+            droppedSignatures: ["- (BOOL)draw;"],
+            droppedImageNames: ["UIFoundation"],
+            keptSignature: "- (void)draw;",
+            keptImageName: "AppKit"
         )
         #expect(evolution.keyCollisionsByVersion == [[collision], [collision]])
     }
