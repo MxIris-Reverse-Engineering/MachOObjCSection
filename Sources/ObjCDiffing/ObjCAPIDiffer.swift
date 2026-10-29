@@ -180,8 +180,8 @@ public struct ObjCAPIDiffer: Sendable {
         })
         for (oldContainer, newContainer) in matched.common {
             let memberChanges = diffMembers(
-                oldByKey: ObjCMemberSelection(members: oldContainer.members, protocolPropertyDeclarations: propertyDeclarations.old).keptMembersByKey,
-                newByKey: ObjCMemberSelection(members: newContainer.members, protocolPropertyDeclarations: propertyDeclarations.new).keptMembersByKey,
+                old: ObjCMemberSelection(members: oldContainer.members, protocolPropertyDeclarations: propertyDeclarations.old),
+                new: ObjCMemberSelection(members: newContainer.members, protocolPropertyDeclarations: propertyDeclarations.new),
                 addedAdoptionOverride: addedAdoptionOverride.map { override in
                     { adoption in override(adoption, newContainer.name) }
                 }
@@ -207,30 +207,40 @@ public struct ObjCAPIDiffer: Sendable {
     ///
     /// An identity held more than once on a side takes its first record.
     /// ``diff(old:new:oldProvenance:newProvenance:)`` passes over copies of
-    /// adopted protocols' declarations first, which takes the snapshot's
-    /// protocol table that bare records do not carry.
+    /// adopted protocols' declarations first, and names the protocol a
+    /// change's property came with, which takes the snapshot's protocol table
+    /// that bare records do not carry.
     public func diffMembers(old: [ObjCMemberRecord], new: [ObjCMemberRecord]) -> [ObjCMemberChange] {
         let noProtocols = ObjCProtocolPropertyDeclarations(protocols: [])
         return diffMembers(
-            oldByKey: ObjCMemberSelection(members: old, protocolPropertyDeclarations: noProtocols).keptMembersByKey,
-            newByKey: ObjCMemberSelection(members: new, protocolPropertyDeclarations: noProtocols).keptMembersByKey,
+            old: ObjCMemberSelection(members: old, protocolPropertyDeclarations: noProtocols),
+            new: ObjCMemberSelection(members: new, protocolPropertyDeclarations: noProtocols),
             addedAdoptionOverride: nil
         )
     }
 
     /// The member changes between the records each side takes per identity
-    /// key, with `addedAdoptionOverride` judging each adoption the container
+    /// key, each naming the protocol its property came with on the side it is
+    /// about, with `addedAdoptionOverride` judging each adoption the container
     /// gains in place of the record-level rule.
     func diffMembers(
-        oldByKey: [ObjCAPIKey: ObjCMemberRecord],
-        newByKey: [ObjCAPIKey: ObjCMemberRecord],
+        old oldSelection: ObjCMemberSelection,
+        new newSelection: ObjCMemberSelection,
         addedAdoptionOverride: ((_ adoption: ObjCMemberRecord) -> ObjCCompatibility?)?
     ) -> [ObjCMemberChange] {
-        let matched = threeWayMatch(oldByKey: oldByKey, newByKey: newByKey)
+        let matched = threeWayMatch(oldByKey: oldSelection.keptMembersByKey, newByKey: newSelection.keptMembersByKey)
 
         var changes: [ObjCMemberChange] = []
-        changes.append(contentsOf: matched.removed.map {
-            ObjCMemberChange(key: $0.identityKey, kind: $0.kind, status: .removed, oldSignature: $0.signature, newSignature: nil, compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: $0, new: nil))
+        changes.append(contentsOf: matched.removed.map { removedRecord in
+            ObjCMemberChange(
+                key: removedRecord.identityKey,
+                kind: removedRecord.kind,
+                status: .removed,
+                oldSignature: removedRecord.signature,
+                newSignature: nil,
+                compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: removedRecord, new: nil),
+                viaProtocolName: oldSelection.keptProtocolNameByKey[removedRecord.identityKey]
+            )
         })
         changes.append(contentsOf: matched.added.map { addedRecord in
             let compatibilityOverride: ObjCCompatibility? = if addedRecord.kind == .protocolAdoption, let addedAdoptionOverride {
@@ -238,10 +248,26 @@ public struct ObjCAPIDiffer: Sendable {
             } else {
                 ObjCMemberRecord.compatibilityOverride(old: nil, new: addedRecord)
             }
-            return ObjCMemberChange(key: addedRecord.identityKey, kind: addedRecord.kind, status: .added, oldSignature: nil, newSignature: addedRecord.signature, compatibilityOverride: compatibilityOverride)
+            return ObjCMemberChange(
+                key: addedRecord.identityKey,
+                kind: addedRecord.kind,
+                status: .added,
+                oldSignature: nil,
+                newSignature: addedRecord.signature,
+                compatibilityOverride: compatibilityOverride,
+                viaProtocolName: newSelection.keptProtocolNameByKey[addedRecord.identityKey]
+            )
         })
         for (oldRecord, newRecord) in matched.common where oldRecord.payloadKey != newRecord.payloadKey {
-            changes.append(ObjCMemberChange(key: newRecord.identityKey, kind: newRecord.kind, status: .modified, oldSignature: oldRecord.signature, newSignature: newRecord.signature, compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: oldRecord, new: newRecord)))
+            changes.append(ObjCMemberChange(
+                key: newRecord.identityKey,
+                kind: newRecord.kind,
+                status: .modified,
+                oldSignature: oldRecord.signature,
+                newSignature: newRecord.signature,
+                compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: oldRecord, new: newRecord),
+                viaProtocolName: newSelection.keptProtocolNameByKey[newRecord.identityKey]
+            ))
         }
         return sorted(changes, key: \.key, status: \.status)
     }

@@ -51,6 +51,14 @@ struct ObjCEvolutionMarkingTests {
         #expect(ObjCEvolutionMarking.phrase(for: unknown, versions: Self.threeVersions) == "modified in 14.0")
     }
 
+    @Test("An event an adopted protocol brought names the protocol")
+    func protocolBroughtEventPhrase() {
+        let added = Event(versionIndex: 1, change: .added, viaProtocolName: "NSAKLayoutItem")
+        let modified = Event(versionIndex: 2, change: .modified(old: "@property id a;", new: "@property (copy) id a;"), viaProtocolName: "NSObject")
+        #expect(ObjCEvolutionMarking.phrase(for: added, versions: Self.threeVersions) == "added in 13.0 via <NSAKLayoutItem>")
+        #expect(ObjCEvolutionMarking.phrase(for: modified, versions: Self.threeVersions) == "modified in 14.0 via <NSObject>: @property id a; → @property (copy) id a;")
+    }
+
     @Test("A subject leads an annotation that stands on a line of its own")
     func subjectLeads() {
         let annotation = ObjCEvolutionAnnotation(

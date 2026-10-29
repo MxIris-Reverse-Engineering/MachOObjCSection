@@ -25,6 +25,9 @@ struct ObjCEvolutionAnnotation: Equatable {
         /// is the one before it.
         let versionIndex: Int
         let change: Change
+        /// The adopted protocol the member came with, as the lineage event
+        /// names it (`ObjCLineageEvent.viaProtocolName`).
+        var viaProtocolName: String? = nil
     }
 
     /// What the annotation is about when it does not trail its own
@@ -113,22 +116,25 @@ enum ObjCEvolutionMarking {
         "[" + presence.map { $0 ? "●" : "○" }.joined() + "]"
     }
 
-    /// One event phrased against the version axis. A `modified` event whose
-    /// two sides read the same keeps the bare phrase: `A → A` says nothing.
+    /// One event phrased against the version axis, naming the protocol a
+    /// member came with (`added in 13.0 via <NSAKLayoutItem>`). A `modified`
+    /// event whose two sides read the same keeps the bare phrase: `A → A`
+    /// says nothing.
     static func phrase(for event: ObjCEvolutionAnnotation.Event, versions: [ObjCAPIVersionDescriptor]) -> String {
         let label = versions.indices.contains(event.versionIndex)
             ? versions[event.versionIndex].label
             : "v\(event.versionIndex + 1)"
+        let protocolPhrase = event.viaProtocolName.map { " via <\($0)>" } ?? ""
         switch event.change {
         case .added:
-            return "added in \(label)"
+            return "added in \(label)\(protocolPhrase)"
         case .removed:
-            return "removed in \(label)"
+            return "removed in \(label)\(protocolPhrase)"
         case .modified(let old, let new):
             guard let old, let new, old != new else {
-                return "modified in \(label)"
+                return "modified in \(label)\(protocolPhrase)"
             }
-            return "modified in \(label): \(old) → \(new)"
+            return "modified in \(label)\(protocolPhrase): \(old) → \(new)"
         case .moved(let move):
             return move.phrase(versionLabel: label)
         }

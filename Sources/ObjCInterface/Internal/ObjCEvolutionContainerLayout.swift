@@ -359,7 +359,12 @@ struct ObjCEvolutionContainerAssembler {
         writesAvailability: Bool
     ) -> [ObjCEvolutionLine] {
         guard var declaration = renderings.newestRendering(of: memberKey) else { return [] }
-        if writesAvailability, let availabilityPlatform, let lineage {
+        // A member that came or went with an adopted protocol may well be
+        // older API whose own declaration leaves no record — NSView's anchors,
+        // declared in a category of the SDK header — so its lifecycle says
+        // nothing about the SDK's availability.
+        let cameOrWentWithProtocol = lineage?.events.contains { $0.status != .modified && $0.viaProtocolName != nil } ?? false
+        if writesAvailability, let availabilityPlatform, let lineage, !cameOrWentWithProtocol {
             let macro = ObjCEvolutionMarking.availabilityMacro(presence: lineage.presence, versions: versions, platform: availabilityPlatform)
             declaration = ObjCEvolutionMarking.declaration(declaration, withAvailabilityMacro: macro)
         }
@@ -395,7 +400,11 @@ struct ObjCEvolutionContainerAssembler {
                 oldSide = Self.requirementKeyword(isOptional: wasOptional)
                 newSide = Self.requirementKeyword(isOptional: isOptional)
             }
-            return ObjCEvolutionAnnotation.Event(versionIndex: event.versionIndex, change: .modified(old: oldSide, new: newSide))
+            return ObjCEvolutionAnnotation.Event(
+                versionIndex: event.versionIndex,
+                change: .modified(old: oldSide, new: newSide),
+                viaProtocolName: event.viaProtocolName
+            )
         }
         return Self.annotation(subject: subject, presence: lineage.presence, events: events, imageMoves: lineage.imageMoves)
     }
@@ -434,14 +443,12 @@ struct ObjCEvolutionContainerAssembler {
 
     /// An `added` or `removed` event, as is.
     private static func presenceEvent(_ event: ObjCLineageEvent) -> ObjCEvolutionAnnotation.Event {
-        switch event.status {
-        case .added:
-            ObjCEvolutionAnnotation.Event(versionIndex: event.versionIndex, change: .added)
-        case .removed:
-            ObjCEvolutionAnnotation.Event(versionIndex: event.versionIndex, change: .removed)
-        case .modified:
-            ObjCEvolutionAnnotation.Event(versionIndex: event.versionIndex, change: .modified(old: nil, new: nil))
+        let change: ObjCEvolutionAnnotation.Event.Change = switch event.status {
+        case .added: .added
+        case .removed: .removed
+        case .modified: .modified(old: nil, new: nil)
         }
+        return ObjCEvolutionAnnotation.Event(versionIndex: event.versionIndex, change: change, viaProtocolName: event.viaProtocolName)
     }
 
     // MARK: - Text

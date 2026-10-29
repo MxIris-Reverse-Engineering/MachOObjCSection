@@ -123,6 +123,18 @@ evolution builder 共用，各自传入相邻两个快照的 `ObjCProtocolRequir
 可写声明写在 category 里，类自己的列表里只有协议的只读副本，取最后一份反而取错。「可写优先、类型具体的优先」说不清：
 `NSScreen.hash` 两份的差别是 `unsigned long long` 对 `long long`。
 
+**只有协议副本时写明来源**：一个属性在某版本只剩协议副本，说明它在容器里只是因为采纳了声明它的协议。这时的增删改
+未必是 API 的增删改：NSView 的锚点在 SDK 里写在分类 `NSView (NSConstraintBasedLayoutInstallingConstraints)` 中、标
+`macos(10.11)`，可那个分类不留属性记录（12.7 的 NSView 只有取值方法），13.0 起经并进类的分类采纳 `NSAKLayoutItem` 才有了
+协议副本。二进制分不清这种情况与私有方法后来公开：`NSBezierPath.CGPath`、`accessibilityUserInputLabels` 也是取值方法早就
+在、属性记录后来才出现，SDK 却都标 `macos(14.0)`，那次出现正是公开的时候。所以不改事件，只陈述来源：
+`ObjCMemberSelection.keptProtocolNameByKey` 给出取到的那份是哪个协议的副本，`ObjCLineageEvent` 与 `ObjCMemberChange` 的
+`viaProtocolName` 记下它（新增与修改看新的一侧，删除看旧的一侧），报告写成 `+ added in 13.0 via <NSAKLayoutItem>`、
+diff 写成 `… (via <NSAKLayoutItem>)`，合并头文件写成 `added in 13.0 via <NSAKLayoutItem>`，并且新增或删除带着协议的
+成员不写可用性宏——宏会被读成 SDK 的可用性。声明它的协议取离容器最近的那个（按采纳关系的层数，同层取先采纳的），
+`ObjCProtocolPropertyDeclarations` 为快照里每个协议预先算好它展开后的声明与最近的声明者，查一条记录只需按容器采纳的
+几个协议各查一次表。
+
 **一处定规则**：双侧 differ、evolution builder 与 `ObjCAPISnapshot.keyCollisions()` 都取 `ObjCMemberSelection` 选的
 那一份；公开的测试接缝 `diffMembers(old:new:)` 拿不到协议表，取第一份。合并头文件（`ObjCEvolutionInterfaceBuilder`）
 也写这一份，写在它在成员表里的位置：`ObjCAPISnapshot.keptMemberOccurrences()` 给出每个重复的 identity 取第几份，渲染与
@@ -247,7 +259,8 @@ Warnings 段列出被丢弃的。
 - `Tests/ObjCInterfaceTests/ObjCEvolutionInterfaceArchivedCacheTests.swift` —— 归档 cache 里 AppKit 的
   11.0.1、12.0.1、13.0 合并成一份头文件，其中两条钉住重复成员的真实情形：`NSView.frame`/`bounds` 在 13.0 多出排在前面的
   协议副本，`NSMenuItem.action`/`tag`、`NSWindow.contentView` 整条轴上协议副本都在前面；合并头文件都写类自己的声明、
-  不带标注。cache 不在时整组跳过。
+  不带标注。另一条钉住只剩协议副本的 `NSView.leadingAnchor`：标注写 `added in 13.0 via <NSAKLayoutItem>`，不写可用性宏。
+  cache 不在时整组跳过。
 - `Tests/ObjCInterfaceTests/ObjCEvolutionInterfaceDumpTests.swift` —— 给维护者看的导出，不做断言：把 AppKit、UIFoundation、
   CollectionViewCore、CoreAutoLayout 这一组在全部 51 个归档 macOS 版本上合并成一份头文件，写到
   `~/Documents/SwiftInterfaceTests/macOS-<SDK>-AppKit+…-ObjCEvolutionInterface-MachOObjCSection.h`。移植自 MachOSwiftSection 的

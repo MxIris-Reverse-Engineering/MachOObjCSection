@@ -73,6 +73,72 @@ struct ObjCAPIReporterTests {
         """))
     }
 
+    @Test("A change an adopted protocol brought names the protocol in the diff report")
+    func diffReportNamesTheProtocolThatBroughtAChange() {
+        let diff = ObjCAPIDiff(classes: [
+            ObjCContainerChange(
+                key: ObjCAPIKey(rawValue: "class:NSView"),
+                name: "NSView",
+                containerKind: .class,
+                status: .modified,
+                memberChanges: [
+                    ObjCMemberChange(
+                        key: ObjCAPIKey(rawValue: "property:-leadingAnchor"),
+                        kind: .instanceProperty,
+                        status: .added,
+                        oldSignature: nil,
+                        newSignature: "@property(readonly) NSLayoutXAxisAnchor *leadingAnchor;",
+                        viaProtocolName: "NSAKLayoutItem"
+                    ),
+                ]
+            ),
+        ])
+        let expected = """
+        Classes:
+          ~ NSView
+              + @property(readonly) NSLayoutXAxisAnchor *leadingAnchor; (via <NSAKLayoutItem>)
+        """
+        #expect(ObjCAPIDiffReporter().report(diff) == expected)
+    }
+
+    @Test("A change an adopted protocol brought names the protocol in the evolution report")
+    func evolutionReportNamesTheProtocolThatBroughtAChange() {
+        let evolution = ObjCAPIEvolution(
+            versions: [ObjCAPIVersionDescriptor(label: "12.0"), ObjCAPIVersionDescriptor(label: "13.0")],
+            classes: [
+                ObjCContainerLineage(
+                    key: ObjCAPIKey(rawValue: "class:NSView"), name: "NSView", containerKind: .class,
+                    presence: [true, true],
+                    events: [],
+                    memberLineages: [
+                        ObjCMemberLineage(
+                            key: ObjCAPIKey(rawValue: "property:-leadingAnchor"), kind: .instanceProperty,
+                            presence: [false, true],
+                            events: [ObjCLineageEvent(
+                                versionIndex: 1,
+                                status: .added,
+                                newSignature: "@property(readonly) NSLayoutXAxisAnchor *leadingAnchor;",
+                                viaProtocolName: "NSAKLayoutItem"
+                            )]
+                        ),
+                    ]
+                ),
+            ]
+        )
+        let expected = """
+        ObjC API evolution across 2 versions: 12.0 → 13.0
+
+        Transitions:
+          12.0 → 13.0: 1 added · additive
+
+        Classes:
+          [●●] NSView
+              [○●] @property(readonly) NSLayoutXAxisAnchor *leadingAnchor;
+                  + added in 13.0 via <NSAKLayoutItem>
+        """
+        #expect(ObjCAPIEvolutionReporter().report(evolution) == expected)
+    }
+
     @Test func emptyDiffReportsNoChanges() {
         #expect(ObjCAPIDiffReporter().report(ObjCAPIDiff()) == "No ObjC API changes.")
     }

@@ -110,6 +110,8 @@ image 组演进里的一种记录：声明在一次跳变两侧都在，所在�
 payload 末尾的 `|optional:` 段不计）。clang 编译采纳了协议的 category 时把协议的属性抄进它的属性表，链接器又把
 category 并进类，所以一个类里同一个属性常有好几份，`hash`、`superclass`、`description`、`debugDescription` 最常见。
 diff 与演进取同一 identity 的记录时先跳过协议副本，取类或 category 自己写的那份；协议副本也从不进 key collision 警告。
+一个属性只剩协议副本时，它的事件带上声明它的协议（`viaProtocolName`，报告里写 `via <NSAKLayoutItem>`），合并头文件也不给
+这样增删的成员写可用性宏。
 不要与 image 组里「各 image 自带的 protocol 副本」混淆：那是 `__objc_protolist` 里整个 `protocol_t` 的拷贝。
 
 - **主要出现在**：`Sources/ObjCDiffing/ObjCMemberSelection.swift`（`ObjCProtocolPropertyDeclarations`、

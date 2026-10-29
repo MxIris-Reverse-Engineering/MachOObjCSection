@@ -34,6 +34,13 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
 - **告警文案**：标题里的「first record kept, later ones not compared」改成按新规则的说法；每条告警加上保留的那份签名，
   `ObjCAPIKeyCollision` 新增可选的 `keptSignature`，没有它的旧 JSON 照样能解码。MachOSwiftSection 的 SwiftDiffing 仍取第一份，
   两边文案从此不同。
+- **只有协议副本的属性写明来源**：一个属性在某版本只剩协议副本时，它在那一版的增删改是采纳的协议带来的，未必是新 API。
+  NSView 的锚点就是这样：SDK 写的是 `macos(10.11)`，头文件把它们声明在分类里、编不出属性记录，13.0 起经合并进类的分类采纳
+  `NSAKLayoutItem` 才有了协议副本，演进却报「13.0 加入」并写 `API_AVAILABLE(macos(13.0))`。从二进制分不出这种情况与私有
+  方法后来公开（`NSBezierPath.CGPath`、`accessibilityUserInputLabels`，SDK 都写 14.0），所以只陈述事实：事件带上声明它的
+  协议（`ObjCLineageEvent` 与 `ObjCMemberChange` 新增可选的 `viaProtocolName`；新增与修改看新的一侧，删除看旧的一侧），
+  报告与合并头文件写成 `added in 13.0 via <NSAKLayoutItem>`；新增或删除带着协议的成员不写 `API_AVAILABLE` /
+  `API_OBSOLETED`。声明它的协议取离容器最近的那个：按容器采纳的顺序逐层展开，先遇到哪个协议自己声明了它就是哪个。
 - **不改的**：`objc dump` / `interface` 照原样打印每一份；同名类与 protocol 副本这两种容器级告警不变。
 - **测试**：`ObjCDiffingTests` 加纯值用例，先确认改前失败——NSView 的情形（新版本多出一份排在前面的只读协议副本，现在报
   modified，改后无事件、无告警）、payload 相同的重复不告警、两份不同的非协议副本仍告警并带保留的签名。
@@ -62,6 +69,12 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
   行，与 MachOSwiftSection 生成的完全一样（只少了它补充的 36 个 Swift 类）；本分支降到 385 行，正文只有 21 行不同，全是
   预期的修正——`NSView.frame`/`bounds`（13.0）、`NSPopover.detached`（14.4）、`headerLevel`（12.0、14.4）的假变化去掉，
   `NSMenuItem.action`/`tag`、`NSWindow.contentView`、`NSResponder.touchBar` 等改回可写。
+- [x] 4. 只有协议副本的属性写明来源：`viaProtocolName`，两个报告与合并头文件的写法，不写可用性宏；纯值测试、报告测试与
+  归档 cache 测试（`NSView.leadingAnchor`）；实现说明、使用指南与术语表；重新生成 51 个版本的头文件核对。归档 cache 测试
+  在改动前失败（写的是 `leadingAnchor API_AVAILABLE(macos(13.0));` 与 `added in 13.0`），改后通过。重新生成的 51 个版本
+  头文件里：NSView 的锚点写成 `added in 13.0 via <NSAKLayoutItem>`、不带宏；1,204 处标注写明了协议，其中 411 处是所有类上的
+  `modified in 14.4 via <NSObject>`（NSObject 协议自己的 `debugDescription` 在 14.4 变了，以前看不出缘由）；可用性宏从
+  17,088 行减到 16,474 行。
 
 ## 决策日志
 
@@ -82,3 +95,6 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
 | 2026-10-29 | 第 3 步：归档 cache 测试补一条整条轴上协议副本都排在前面的情形（`NSMenuItem.action`/`tag`、`NSWindow.contentView`） | `NSView.frame` 只覆盖「中途多出协议副本」；协议副本从轴起点就在前面时演进没有事件，错只出现在合并头文件的写法上，原来的测试抓不到 |
 | 2026-10-29 | 实现完成，待用户看过后收尾 | 文档：实现说明、使用指南、已裁决清单、术语表（「协议副本」）与两处索引已随第 1、2 步同步，不需要另写说明；README 不涉及告警，不用改。不在本案修、记下的两处：`stripSynthesizedMethods removes the setter` 随机挑类，全量跑时挑到 NSScanner 失败过一次，重跑四次都过；`MachOObjCSectionTests` 写死了本机没有的 `/Users/JH/Downloads/iOS18.5-SwiftUI`，CI 本来就跳过它。下游 MachOSwiftSection 升依赖后，`swift-section objc diff` / `evolution` 的告警跟着变，它的 `ObjCCommandLine.md` 若写到告警格式需同步 |
 | 2026-10-30 | 应用户要求，把 MachOSwiftSection 导出 AppKit 图像组合并头文件的那个集成测试移植进来（`ObjCEvolutionInterfaceDumpTests`），只在设了 `MACHO_OBJC_SECTION_DUMP=1` 时运行 | MachOSwiftSection 规定 agent 不跑它的 `IntegrationTests`，移过来才能在本仓库生成并对照改动前后的头文件；补不了没有 class object 的 Swift 类，所以输出另带 `-MachOObjCSection` 后缀，不覆盖那边生成的文件 |
+| 2026-10-30 | 用户决定：只有协议副本的属性，在事件里写明是哪个协议带进来的，并且不写可用性宏；作为第 4 步加进本案 | 用户指出 NSView 的锚点早在 SDK 的分类里声明（`macos(10.11)`），合并头文件却写「13.0 加入」与 `API_AVAILABLE(macos(13.0))`。核实后：那个分类在二进制里不留属性记录，13.0 才出现的是 `NSAKLayoutItem` 的协议副本；而「取值方法更早就在」这条线索分不清它和私有方法后来公开（`NSBezierPath.CGPath`、`accessibilityUserInputLabels` 在 SDK 里都是 14.0），51 个版本的头文件里约 2500 处中途新增的属性有约 400 处属于这两类之一。所以不改事件本身，只陈述「经由哪个协议」，并去掉会被当成 SDK 可用性的宏；要得到 10.11 这类结论得另读 SDK 头文件，是另一个功能 |
+| 2026-10-30 | 第 4 步：写法定为紧跟在事件后的 `via <协议>`（`added in 13.0 via <NSAKLayoutItem>`），diff 报告写在行尾 `(via <协议>)`；声明它的协议取离容器最近的那个，同层取先采纳的；只有新增或删除带协议时才不写宏 | 不用 ` · ` 分隔，免得被读成另一个事件；最近的协议最能说明属性从哪来（`NSObject` 的四个属性经任何继承它的协议进来，都记作 `NSObject`）；修改不影响宏，宏只说引入与移除 |
+| 2026-10-30 | 第 4 步：认协议副本改成对每条属性记录都查（原来只在一个 identity 出现多次时才查），为此给快照里每个协议预先算好展开后的声明 | 只剩一份协议副本的属性正是要写明来源的那些；预先算好之后，查一条记录只需按容器采纳的几个协议各查一次表 |

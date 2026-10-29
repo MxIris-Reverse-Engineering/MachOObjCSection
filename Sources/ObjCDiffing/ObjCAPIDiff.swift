@@ -41,6 +41,11 @@ public struct ObjCMemberChange: Sendable, Codable, Equatable {
     /// `ObjCMemberRecord.compatibilityOverride(old:new:)`). `nil` means the
     /// plain status rule applies.
     public let compatibilityOverride: ObjCCompatibility?
+    /// The adopted protocol whose declaration the member's record copies, on
+    /// the side the change is about — the new one for `added` and
+    /// `modified`, the old one for `removed`; `nil` for a declaration of the
+    /// container's own. Same rule as `ObjCLineageEvent.viaProtocolName`.
+    public let viaProtocolName: String?
 
     public init(
         key: ObjCAPIKey,
@@ -48,7 +53,8 @@ public struct ObjCMemberChange: Sendable, Codable, Equatable {
         status: ObjCChangeStatus,
         oldSignature: String?,
         newSignature: String?,
-        compatibilityOverride: ObjCCompatibility? = nil
+        compatibilityOverride: ObjCCompatibility? = nil,
+        viaProtocolName: String? = nil
     ) {
         self.key = key
         self.kind = kind
@@ -56,6 +62,7 @@ public struct ObjCMemberChange: Sendable, Codable, Equatable {
         self.oldSignature = oldSignature
         self.newSignature = newSignature
         self.compatibilityOverride = compatibilityOverride
+        self.viaProtocolName = viaProtocolName
     }
 }
 

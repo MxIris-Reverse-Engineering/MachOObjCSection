@@ -152,12 +152,12 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
                 }
             } ?? []
             let members = memberLineages(
-                perVersionKeyedMembers: perVersion.enumerated().map { versionIndex, container in
+                perVersionSelections: perVersion.enumerated().map { versionIndex, container in
                     container.map { container in
                         ObjCMemberSelection(
                             members: container.members,
                             protocolPropertyDeclarations: propertyDeclarationsByVersion[versionIndex]
-                        ).keptMembersByKey
+                        )
                     }
                 },
                 containerKey: containerKey,
@@ -182,9 +182,10 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
 
     // MARK: - Member axis
 
-    /// Member lifelines across versions. `perVersionKeyedMembers[i]` is the
-    /// record the container takes for each identity in version `i`, `nil`
-    /// when the owning container is absent there. Member events are
+    /// Member lifelines across versions. `perVersionSelections[i]` is the
+    /// record the container takes for each identity in version `i`, and the
+    /// protocol each property came with, `nil` when the owning container is
+    /// absent there. Member events are
     /// computed only for transitions where both adjacent versions have the
     /// container — a container-level appearance/disappearance is the
     /// container's own event, and enumerating members across the gap would
@@ -193,11 +194,12 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
     /// present on both sides of a transition moves there when its images
     /// change otherwise than those of `containerKey`, its container.
     private func memberLineages(
-        perVersionKeyedMembers keyedPerVersion: [[ObjCAPIKey: ObjCMemberRecord]?],
+        perVersionSelections: [ObjCMemberSelection?],
         containerKey: ObjCAPIKey,
         imageGroups: [ObjCAPIImageGroupMerge]?,
         addedAdoptionOverride: ((_ adoption: ObjCMemberRecord, _ versionIndex: Int) -> ObjCCompatibility?)?
     ) -> [ObjCMemberLineage] {
+        let keyedPerVersion = perVersionSelections.map { $0?.keptMembersByKey }
         let orderedKeys = unionOfKeys(keyedPerVersion.map { $0 ?? [:] })
 
         var lineages: [ObjCMemberLineage] = []
@@ -212,6 +214,8 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
                 }
                 let oldRecord = perVersion[versionIndex - 1]
                 let newRecord = perVersion[versionIndex]
+                let oldProtocolName = perVersionSelections[versionIndex - 1]?.keptProtocolNameByKey[memberKey]
+                let newProtocolName = perVersionSelections[versionIndex]?.keptProtocolNameByKey[memberKey]
                 switch (oldRecord, newRecord) {
                 case (nil, let newRecord?):
                     let compatibilityOverride: ObjCCompatibility? = if newRecord.kind == .protocolAdoption, let addedAdoptionOverride {
@@ -219,16 +223,29 @@ public struct ObjCAPIEvolutionBuilder: Sendable {
                     } else {
                         ObjCMemberRecord.compatibilityOverride(old: nil, new: newRecord)
                     }
-                    events.append(ObjCLineageEvent(versionIndex: versionIndex, status: .added, newSignature: newRecord.signature, compatibilityOverride: compatibilityOverride))
+                    events.append(ObjCLineageEvent(
+                        versionIndex: versionIndex,
+                        status: .added,
+                        newSignature: newRecord.signature,
+                        compatibilityOverride: compatibilityOverride,
+                        viaProtocolName: newProtocolName
+                    ))
                 case (let oldRecord?, nil):
-                    events.append(ObjCLineageEvent(versionIndex: versionIndex, status: .removed, oldSignature: oldRecord.signature, compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: oldRecord, new: nil)))
+                    events.append(ObjCLineageEvent(
+                        versionIndex: versionIndex,
+                        status: .removed,
+                        oldSignature: oldRecord.signature,
+                        compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: oldRecord, new: nil),
+                        viaProtocolName: oldProtocolName
+                    ))
                 case (let oldRecord?, let newRecord?) where oldRecord.payloadKey != newRecord.payloadKey:
                     events.append(ObjCLineageEvent(
                         versionIndex: versionIndex,
                         status: .modified,
                         oldSignature: oldRecord.signature,
                         newSignature: newRecord.signature,
-                        compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: oldRecord, new: newRecord)
+                        compatibilityOverride: ObjCMemberRecord.compatibilityOverride(old: oldRecord, new: newRecord),
+                        viaProtocolName: newProtocolName
                     ))
                 default:
                     break
