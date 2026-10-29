@@ -24,12 +24,13 @@
 
 ## 安装与构建
 
-0.8.106 起，每个版本的 [GitHub Release](https://github.com/MxIris-Reverse-Engineering/MachOObjCSection/releases)
-都附带 `objc-section-macos-universal.zip`（Apple Silicon 与 Intel 通用），解压即用。二进制只做了
+objc-section 已并入 MachOSwiftSection，成为 `swift-section objc`，本仓库不再发布它。0.8.106 起到 0.8.204 为止的
+[GitHub Release](https://github.com/MxIris-Reverse-Engineering/MachOObjCSection/releases)
+附带 `objc-section-macos-universal.zip`（Apple Silicon 与 Intel 通用），解压即用。二进制只做了
 ad-hoc 签名、没有公证，用浏览器下载的副本如果被 macOS 拦下，执行
 `xattr -d com.apple.quarantine objc-section`。
 
-也可以从源码构建（Xcode 26.0 / Swift 6.2 起）：
+之后的版本只有 tag，没有预编译二进制，从源码构建（Xcode 26.0 / Swift 6.2 起）：
 
 ```bash
 swift build -c release --product objc-section

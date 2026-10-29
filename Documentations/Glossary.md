@@ -26,10 +26,10 @@ lineage，没有注释就是整条轴上都在、从没变过。与 lineage 报�
 
 ### fork numbering（fork 版本号）
 
-本仓库是 `p-x9/MachOObjCSection` 的 fork，自己的发布版本号写作 `<上游 major>.<上游 minor>.<P>NN`：前两段跟随所基于的上游版本；第三段是百位不为 0 的三位数，百位 `P` 跟着合入的上游补丁号走，后两位逐次递增。合入上游 0.8.0、0.8.1 期间发的是 `0.8.100`–`0.8.111`，合入上游 0.8.2 后从 `0.8.200` 起编。三位数的第三段与上游自己的一两位补丁号（`0.8.2` 之类）永不相撞。这个号同时是 SwiftPM 的包版本（下游 `from:` / `exact:` 依赖的就是它）和 `objc-section --version` 的输出。发布流水线**只认这个形状**：`release.yml` 的 tag 过滤只匹配它，所以同步过来的上游 tag 不会触发发布；`version-check.yml` 拒绝不符合它的 `BundledVersion.value`，免得打了 tag 却没有任何报错地不发布。
+本仓库是 `p-x9/MachOObjCSection` 的 fork，自己的发布版本号写作 `<上游 major>.<上游 minor>.<P>NN`：前两段跟随所基于的上游版本；第三段是百位不为 0 的三位数，百位 `P` 跟着合入的上游补丁号走，后两位逐次递增。合入上游 0.8.0、0.8.1 期间发的是 `0.8.100`–`0.8.111`，合入上游 0.8.2 后从 `0.8.200` 起编。三位数的第三段与上游自己的一两位补丁号（`0.8.2` 之类）永不相撞。这个号就是 tag 名，也是 SwiftPM 的包版本（下游 `from:` / `exact:` 依赖的就是它）。`objc-section --version` 停在 0.8.204：命令行此后不再发布，`Version.swift` 不再跟着改。
 
-- **主要出现在**：`Sources/objc-section/Version.swift`、`.github/workflows/release.yml`、`.github/workflows/version-check.yml`
-- **延伸阅读**：[提案 0009](Evolutions/0009-objc-section-release-automation.md)
+- **主要出现在**：本仓库的 tag、[文档索引的「发版」一节](README.md#发版)、`Sources/objc-section/Version.swift`（停在 0.8.204）
+- **延伸阅读**：[提案 0009](Evolutions/0009-objc-section-release-automation.md)（建立发布流水线）、[提案 0010](Evolutions/0010-remove-objc-section-cli.md)（退役）
 
 ### image group（image 组）
 

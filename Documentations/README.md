@@ -2,8 +2,8 @@
 
 MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步更新这份索引。
 
-面向公众的文档（`README.md`、`LICENSE`、每个版本一份的 `Changelogs/<版本>.md`）不在此目录，
-仍在仓库根目录，且使用英文。`Changelogs/<版本>.md` 同时就是该版本 GitHub Release 的正文。
+面向公众的文档（`README.md`、`LICENSE`、`Changelogs/<版本>.md`）不在此目录，仍在仓库根目录，且使用英文。
+`Changelogs/<版本>.md` 是 0.8.204 及之前各版 GitHub Release 的正文；之后的版本只有 tag，不再写（见[发版](#发版)）。
 
 ## 目录
 
@@ -37,7 +37,7 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 
 | 文档 | 说明 |
 |---|---|
-| [objc-section 使用指南](Guides/ObjCSectionCommandLine.md) | 0002、0006、0007、0014、0015 与 0016 的配套。安装（Releases 上的预编译二进制或源码构建）与命令行用法（含 snapshot / diff / evolution），以及六条从签名和帮助文本里看不出来的契约：文件模式超类链截断、RW data 不在泛型接口上、分析 cache 需要 MachOKit 0.52.101+、纯 Swift 类的 ivar 记录对不上、baseline 的 formatVersion 契约、dump 的空结果只写 stderr 不改退出码。库调用方另有两节：由宿主补充的类的偏移约定、跳过规则、两个查询入口的分工、偏移未知的 ivar，以及经 stub 注册的两种类的 category 各怎么归位；把 N 个版本合并成带演进标注的头文件时的版本顺序、索引器何时可以释放与实测内存、没有标注的含义、重复成员只写第一条，以及可用性宏什么时候写；把每个版本的一组 image 当作一个 API 面时，image 名谁给、组的顺序与中途加入、一个版本内怎么合并、搬家什么时候记、为什么不影响判定，以及两种 `addVersion` 不能混用 |
+| [objc-section 使用指南](Guides/ObjCSectionCommandLine.md) | 0002、0006、0007、0014、0015 与 0016 的配套。安装（0.8.204 及之前 Releases 上的预编译二进制，之后的版本从源码构建）与命令行用法（含 snapshot / diff / evolution），以及六条从签名和帮助文本里看不出来的契约：文件模式超类链截断、RW data 不在泛型接口上、分析 cache 需要 MachOKit 0.52.101+、纯 Swift 类的 ivar 记录对不上、baseline 的 formatVersion 契约、dump 的空结果只写 stderr 不改退出码。库调用方另有两节：由宿主补充的类的偏移约定、跳过规则、两个查询入口的分工、偏移未知的 ivar，以及经 stub 注册的两种类的 category 各怎么归位；把 N 个版本合并成带演进标注的头文件时的版本顺序、索引器何时可以释放与实测内存、没有标注的含义、重复成员只写第一条，以及可用性宏什么时候写；把每个版本的一组 image 当作一个 API 面时，image 名谁给、组的顺序与中途加入、一个版本内怎么合并、搬家什么时候记、为什么不影响判定，以及两种 `addVersion` 不能混用 |
 
 ## 实现说明
 
@@ -53,3 +53,18 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [代码审查的已裁决清单](Internal/CodeReviewAdjudications.md) | 审查报出、判定为不修或误报的问题，连同理由与推翻条件。每次审查先对照它，已裁决且理由仍成立的直接跳过 |
 | [relative list of lists 的列表不一定和镜像 header 在同一个文件](Internal/RelativeListsAcrossSubCacheFiles.md) | 一次 bug 修复的记录，没有提案，移植自上游 `10b3dd5`。macOS 26.4 起 cache 把每组镜像的数据单独放进 `.dylddata` 文件，类的属性表、协议表与 header 不在同一个文件；读取器只在 header 所在文件里找，离线读时被别的镜像加过 category 的类（NSView、NSWindow、NSString 等）丢掉全部实例属性和协议列表。内容包括：各版本 cache 的布局与修复前后的数字、受影响的范围、同 PR 的 `ff936fa`（同一镜像的多张列表全部读入）为什么当时没移植、后来随上游 0.8.2 合入（0.8.200），以及验证与耗时数据 |
 | [dyld cache 里相对方法名的起算点随版本而变](Internal/DyldCacheRelativeMethodNameBase.md) | 一次 bug 修复的记录，没有提案。cache builder 写的相对方法列表（flag `0x40000000`）里，方法名在 macOS 12 起从选择器基址 `@selector(🤯)` 算起，在 macOS 11 从字段自身算起；macOS 11 的 cache（`objc_opt_t` v15）不记基址，读取器原来就从 cache 开头算，11.x 上类和分类的方法名全部读成乱码。内容包括：按 objc 优化数据的版本而不是「有没有基址」判定、读不到时留空不猜、进程内按运行时版本判定，Apple 源码与 cache 实测的证据，受影响的范围，来历，以及验证数据 |
+
+## 发版
+
+objc-section 不再单独发布：它已并入 MachOSwiftSection，成为 `swift-section objc`。最后一个带预编译二进制的
+GitHub Release 是 0.8.204。从 0.8.205 起，库的新版本只推一个 tag：
+
+1. 版本号按 [fork numbering](Glossary.md#fork-numberingfork-版本号) 把第三段的后两位加一。
+2. 先推 `next`，再把 `main` 快进到要发布的提交（`git push origin next:main`）。推 `main` 会触发 `ci.yml`（只改了文档时不触发），
+   等它通过再打 tag。
+3. 在这个提交上打 annotated tag，说明写成 `<版本> — <一句话概括>`，与之前的 tag 一致，然后推送 tag。
+
+不改 `Sources/objc-section/Version.swift`（停在 0.8.204），不写 `Changelogs/<版本>.md`，不建 GitHub Release。
+推 tag 不会触发任何工作流：发布用的 `release.yml` 和给它把关的 `version-check.yml` 已经删除，它们由
+[0009](Evolutions/0009-objc-section-release-automation.md) 建立，按 [0010](Evolutions/0010-remove-objc-section-cli.md)
+退役。命令行本身仍按 0010 的原计划，等 swift-section 发版之后再删。

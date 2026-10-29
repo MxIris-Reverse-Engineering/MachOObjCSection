@@ -1,9 +1,8 @@
-// Single source of truth for the CLI version. Kept in step with the package's
-// fork numbering (`<upstream major>.<upstream minor>.<P>NN`, P >= 1 following the upstream
-// patch merged in: `0.8.111` before upstream 0.8.2, `0.8.200` after).
-// When bumping: also add Changelogs/<value>.md, then tag the release with the same string.
-// Verified by .github/workflows/version-check.yml (main) and .github/workflows/release.yml (tag),
-// which publishes the universal binary to GitHub Releases.
+// The CLI's version string, frozen at 0.8.204: the last release that published a
+// prebuilt binary. objc-section has moved into MachOSwiftSection as `swift-section objc`
+// and is no longer released, so the package's later versions are git tags alone and do
+// not touch this file (the release section of Documentations/README.md). It goes with
+// the CLI (evolution proposal `remove-objc-section-cli`).
 enum BundledVersion {
     static let value = "0.8.204"
 }
