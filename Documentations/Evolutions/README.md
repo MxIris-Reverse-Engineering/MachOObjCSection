@@ -39,7 +39,7 @@
 | [0013](0013-protocol-adoption-compatibility.md) | 协议新采纳另一个协议时按破坏性改动判定 | Implemented |
 | [0014](0014-host-supplied-classes.md) | 由宿主补充文件里没有 class object 的类 | Implemented |
 | [0015](0015-objc-evolution-interface.md) | 带演进标注的合并 ObjC 头文件 | Implemented |
-| [draft](draft-objc-evolution-image-groups.md) | ObjC 演进按 image 组比较，并报出搬家 | Draft |
+| [draft](draft-objc-evolution-image-groups.md) | ObjC 演进按 image 组比较，并报出搬家 | In Progress |
 
 0002 以 0001 为前置，两者共同构成「让 MachOObjCSection 具备与 MachOSwiftSection 对等的
 渲染 / 索引 / 命令行能力」这一条完整路线。

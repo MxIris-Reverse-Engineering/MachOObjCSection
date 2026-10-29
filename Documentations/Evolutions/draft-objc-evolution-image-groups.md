@@ -1,6 +1,6 @@
 # Draft - ObjC 演进按 image 组比较，并报出搬家
 
-- **状态**: Accepted
+- **状态**: In Progress
 - **创建日期**: 2026-10-29
 - **最后更新**: 2026-10-29
 - **实现分支**: `feature/objc-evolution-image-groups`
@@ -147,7 +147,7 @@ extension ObjCEvolutionInterfaceBuilder {
 
 每一步单独构建通过、相关测试通过后提交，文档随所在的那一步一起提交。
 
-- [ ] 1. 固定单 image 演进的 JSON：在改代码之前写好测试并跑通。
+- [x] 1. 固定单 image 演进的 JSON：在改代码之前写好测试并跑通。
 - [ ] 2. `ObjCDiffing` 的模型与计算：`ObjCAPIImageSnapshot`、`evolution(ofImageGroups:versions:)`、`imageNames`、
   合并规则、`ObjCImageMove` 与 `imageMoves`、`droppedImageNames`；单元测试；设计说明与术语表。
 - [ ] 3. 报告：Image group、`> moved` 行、`N moved`、collision 警告里的 image；报告测试。
