@@ -22,11 +22,11 @@ public struct ObjCAPIDiffReporter: Sendable {
     /// looks: a collision-dropped record was not compared (see
     /// `ObjCAPIKeyCollision`).
     private func warningsSection(_ diagnostics: ObjCAPIDiffDiagnostics) -> String {
-        var lines = ["Warnings — identity-key collisions (first record kept, later ones not compared):"]
+        var lines = [ObjCAPIKeyCollision.warningsHeading]
         for (sideName, collisions) in [("old", diagnostics.oldSideKeyCollisions), ("new", diagnostics.newSideKeyCollisions)] {
             for collision in collisions {
                 let scope = collision.containerName.map { "\($0) · " } ?? ""
-                lines.append("  \(sideName) · \(scope)dropped: \(collision.droppedSignatures.joined(separator: ", "))")
+                lines.append("  \(sideName) · \(scope)\(collision.recordsDescription)")
             }
         }
         return lines.joined(separator: "\n")

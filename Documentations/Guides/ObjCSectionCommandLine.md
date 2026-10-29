@@ -406,7 +406,8 @@ builder.addVersion(
   组为空就是这个版本什么都没有。组的顺序决定同名的类比较哪一份，换顺序本身不算搬家。
 - **一个版本里的几个 image 怎么合并**：同名的类比较第一个 image 的那份，其余的列进 key collision 警告；同名的 category
   合成一个，成员按组顺序拼接，同一个 selector 在几个 image 里各有一份时按上一节的规则取一份，内容不同才进警告；各 image
-  自带的 protocol 副本，相同的去重，不同的比较第一份、其余的进警告。警告里被丢的那份后面用括号注明 image。
+  自带的 protocol 副本，相同的去重，不同的比较第一份、其余的进警告。警告先写保留的那份、再写被丢的，各自在后面用括号
+  注明 image：`14.0 · kept: NSFoo (AppKit) · dropped: NSFoo (UIFoundation)`。
   合并头文件的渲染跟着同一套规则：类和协议取被比较的那一份，category 成员取比较时取的那个 image 的，C struct 与 union 取
   第一个定义它的 image。
 - **搬家只在两侧都在场时记，成员只在换法与所属容器不同时才记。** 整个类搬走时方法不逐条记；category 拆到两个 image 后，

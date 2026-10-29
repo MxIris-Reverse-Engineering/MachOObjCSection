@@ -50,7 +50,7 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
 - [x] 1. 取舍规则：认出协议副本，按新规则为每个 identity key 取一份；双边 differ、evolution builder、`keyCollisions()`
   与合并头文件（单 image 与 image 组）共用它；`ObjCAPIKeyCollision` 记下保留的那份。纯值回归测试与归档 cache 测试
   （`NSView.frame`）；实现说明、使用指南、代码注释、已裁决清单与术语表。
-- [ ] 2. 报告：两个 reporter 与合并头文件末尾的警告标题，以及保留那份的写法；报告测试。
+- [x] 2. 报告：两个 reporter 与合并头文件末尾的警告标题，以及保留那份的写法；报告测试。
 - [ ] 3. 完整验证：全量测试，含 CI 用的 Xcode 26.6；用本分支的命令行重跑几版 AppKit 的演进，对照警告数与 `NSView.frame`，
   结论写进本提案。
 
@@ -69,3 +69,4 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
 | 2026-10-29 | 原第 3 步（合并头文件取同一份）并进第 1 步，落地步骤从四步改成三步 | 「同一个镜像交两次，正文是 `objc dump` 少掉重复行」那条测试同时依赖比较与渲染，分开提交会留下比较取类自己的声明、头文件却写协议副本的中间状态 |
 | 2026-10-29 | 第 1 步：image 组的 `addVersion(images:version:)` 先取齐每个 image 的快照、合并，再渲染 | category 成员取哪个 image 的那份要看整组；为此每个 image 的 module 多组装一次，索引器的查找是字典缓存，这一步很便宜 |
 | 2026-10-29 | 第 1 步：改写三条钉住旧行为的测试，而不是删掉 | `ObjCAPIDifferTests` 与 `SingleImageEvolutionOutputTests` 原来用两份相同的记录造碰撞，image 组测试原来期望相同的 category 成员告警；改成两份不同的记录后它们仍钉住碰撞的形状，相同的情形另由新测试钉住「不告警」 |
+| 2026-10-29 | 第 2 步：标题定为 `Warnings — identity-key collisions (only the kept record was compared):`，每条写成 `kept: … · dropped: …`，没有保留记录的旧 JSON 只写 `dropped:` 一段 | 不写「内容不同」之类的限定：容器级的碰撞（image 组里的同名类）内容相同也照报，标题只说清楚比较了哪份；三处（diff 报告、演进报告、合并头文件）共用 `ObjCAPIKeyCollision.warningsHeading` 与 `recordsDescription` |

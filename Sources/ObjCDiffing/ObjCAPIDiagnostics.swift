@@ -48,9 +48,25 @@ public struct ObjCAPIKeyCollision: Sendable, Codable, Equatable {
 }
 
 extension ObjCAPIKeyCollision {
-    /// The dropped records as the warnings list them: each signature, then
-    /// its image in parentheses where known — `NSFoo (UIFoundation)`.
-    package var droppedRecordsDescription: String {
+    /// The line every warnings section opens with, in the diff and evolution
+    /// reports and, behind `// `, at the end of the merged header.
+    package static let warningsHeading = "Warnings — identity-key collisions (only the kept record was compared):"
+
+    /// The records as a warning lists them: the kept one, then the dropped
+    /// ones, each followed by its image in parentheses where known —
+    /// `kept: NSFoo (AppKit) · dropped: NSFoo (UIFoundation)`. A collision
+    /// recorded before collisions named the kept record lists the dropped
+    /// ones alone.
+    package var recordsDescription: String {
+        let droppedRecords = "dropped: " + droppedRecordsDescription
+        guard let keptSignature else { return droppedRecords }
+        let keptRecord = keptImageName.map { "\(keptSignature) (\($0))" } ?? keptSignature
+        return "kept: \(keptRecord) · \(droppedRecords)"
+    }
+
+    /// The dropped records: each signature, then its image in parentheses
+    /// where known — `NSFoo (UIFoundation)`.
+    private var droppedRecordsDescription: String {
         guard let droppedImageNames, droppedImageNames.count == droppedSignatures.count else {
             return droppedSignatures.joined(separator: ", ")
         }

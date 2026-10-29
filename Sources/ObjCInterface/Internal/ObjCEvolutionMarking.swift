@@ -308,13 +308,13 @@ enum ObjCEvolutionMarking {
     static func warningsLines(for evolution: ObjCAPIEvolution) -> SemanticString? {
         guard let keyCollisionsByVersion = evolution.keyCollisionsByVersion else { return nil }
         var result = SemanticString()
-        result.append("// Warnings — identity-key collisions (first record kept, later ones not compared):", type: .comment)
+        result.append("// " + ObjCAPIKeyCollision.warningsHeading, type: .comment)
         for (versionIndex, collisions) in keyCollisionsByVersion.enumerated() {
             for collision in collisions {
                 let scope = collision.containerName.map { "\($0) · " } ?? ""
                 result.append("\n", type: .standard)
                 result.append(
-                    "//   \(evolution.versions[versionIndex].label) · \(scope)dropped: \(collision.droppedRecordsDescription)",
+                    "//   \(evolution.versions[versionIndex].label) · \(scope)\(collision.recordsDescription)",
                     type: .comment
                 )
             }

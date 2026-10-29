@@ -166,9 +166,14 @@ evolution builder 共用，各自传入相邻两个快照的 `ObjCProtocolRequir
 **报告**（`ObjCAPIEvolutionReporter`）：头部那行下面紧跟「Image group:」，每个 image 一行存在位图，按它在轴上首次
 出现的顺序排（先看旧版本，同一版本内按组顺序），`summary` 也带。搬家写成 `> moved in 14.0: AppKit → UIFoundation`，
 集合用 ` + ` 连接，与事件按版本合在一起排，同一个版本里事件在前。跳变摘要在 added / removed / modified 之后加
-`N moved`；只有搬家的一步照常给 verdict 词。key collision 警告在被丢的签名后用括号注明 image。搬家短语与警告的写法
-放在 `ObjCDiffing` 的 package 级扩展里（`ObjCImageMove.phrase(versionLabel:)`、
-`ObjCAPIKeyCollision.droppedRecordsDescription`），合并头文件的标注与这里用的是同一份。
+`N moved`；只有搬家的一步照常给 verdict 词。key collision 警告先写保留的那份、再写被丢的那几份，各自在签名后用括号
+注明 image。搬家短语与警告的写法放在 `ObjCDiffing` 的 package 级扩展里（`ObjCImageMove.phrase(versionLabel:)`、
+`ObjCAPIKeyCollision.warningsHeading` 与 `recordsDescription`），双侧 diff 的报告、演进报告与合并头文件末尾用的是同一份。
+
+**警告的写法**：标题是 `Warnings — identity-key collisions (only the kept record was compared):`，每条写成
+`<版本> · <容器> · kept: <签名> · dropped: <签名>, …`（容器级的碰撞没有容器一段，签名就是容器名）。保留的那份在
+「同一容器里的重复成员」一节之前一律是第一份，报告里也不写，所以旧版本编出来的 JSON 没有 `keptSignature`；这样的
+碰撞只写 `dropped:` 一段。这里的写法从此与 Swift 一侧不同：SwiftDiffing 仍取第一份，标题照旧。
 
 **内存**：成员的 image 归属只为两个以上 image 拼成的容器单独保存，其余成员沿用容器的归属——跨 51 个版本的 AppKit
 若每个成员都存一份，会再多出一份与快照同量级的数据。

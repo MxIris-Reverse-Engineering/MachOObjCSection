@@ -76,7 +76,7 @@ struct ObjCEvolutionInterfaceBuilderTests {
             #expect(trailingLines.isEmpty)
         } else {
             #expect(trailingLines.first == "")
-            #expect(trailingLines.dropFirst().first == "// Warnings — identity-key collisions (first record kept, later ones not compared):")
+            #expect(trailingLines.dropFirst().first == "// Warnings — identity-key collisions (only the kept record was compared):")
         }
     }
 
@@ -121,9 +121,9 @@ struct ObjCEvolutionInterfaceBuilderTests {
 
         let lines = imageGroup.interface.string.components(separatedBy: "\n")
         #expect(lines.contains("//   [●●] Copy"))
-        // The class `objc dump` checks its strip switches on, dropped from the second image.
-        #expect(lines.contains("//   1.0 · dropped: NSError (Copy)"))
-        #expect(!lines.contains { $0.hasPrefix("//   1.0 · dropped: NSCopying") })
+        // The class `objc dump` checks its strip switches on, kept from the first image and dropped from the second.
+        #expect(lines.contains("//   1.0 · kept: NSError (Foundation) · dropped: NSError (Copy)"))
+        #expect(!lines.contains { $0.hasPrefix("//   1.0 · kept: NSCopying") })
     }
 
     @Test("A class or category that moves to another image carries the move, and its members do not repeat it")

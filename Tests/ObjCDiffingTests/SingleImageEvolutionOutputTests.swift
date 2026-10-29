@@ -181,8 +181,8 @@ struct SingleImageEvolutionOutputTests {
               + added in 2.0
               - removed in 3.0
 
-        Warnings — identity-key collisions (first record kept, later ones not compared):
-          2.0 · NSObject(Extras) · dropped: - (id)extra;
+        Warnings — identity-key collisions (only the kept record was compared):
+          2.0 · NSObject(Extras) · kept: - (void)extra; · dropped: - (id)extra;
         """
         #expect(try ObjCAPIEvolutionReporter().report(Self.evolution()) == expected)
     }
