@@ -117,7 +117,7 @@ diff 与演进取同一 identity 的记录时先跳过协议副本，取类或 c
 - **主要出现在**：`Sources/ObjCDiffing/ObjCMemberSelection.swift`（`ObjCProtocolPropertyDeclarations`、
   `ObjCMemberSelection`）
 - **延伸阅读**：[实现说明「同一容器里的重复成员」](Internal/ObjCAPIDiffDesignAndLimitations.md#同一容器里的重复成员)、
-  [提案](Evolutions/draft-objc-duplicate-member-selection.md)
+  [提案 0017](Evolutions/0017-objc-duplicate-member-selection.md)
 
 ### pseudo-member（伪成员）
 

@@ -1,9 +1,13 @@
-# Draft - 同一容器里的重复成员按来源取舍，内容相同的不再告警
+# 0017 - 同一容器里的重复成员按来源取舍，内容相同的不再告警
 
-- **状态**: In Progress
+- **状态**: Implemented
 - **创建日期**: 2026-10-29
-- **最后更新**: 2026-10-29
+- **最后更新**: 2026-10-30
 - **实现分支**: `feature/objc-duplicate-member-selection`
+- **配套文档**: [实现说明「同一容器里的重复成员」](../Internal/ObjCAPIDiffDesignAndLimitations.md#同一容器里的重复成员)；
+  使用指南[合并头文件一节](../Guides/ObjCSectionCommandLine.md#库调用方把-n-个版本合并成一份带演进标注的头文件)与
+  [image 组一节](../Guides/ObjCSectionCommandLine.md#库调用方几个-image-当作一个-api-面)；术语表的
+  [protocol copy](../Glossary.md#protocol-copy协议副本)
 
 ## 摘要
 
@@ -76,6 +80,16 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
   `modified in 14.4 via <NSObject>`（NSObject 协议自己的 `debugDescription` 在 14.4 变了，以前看不出缘由）；可用性宏从
   17,088 行减到 16,474 行。
 
+## 后续项
+
+- **用 SDK 头文件校正可用性**：只剩协议副本的属性只能写明来源，二进制分不清「SDK 早就声明、不留属性记录」与「私有方法后来
+  公开」；要得出 NSView 锚点是 10.11 这类结论，得另读 SDK 头文件里的 `API_AVAILABLE`。这是另一个功能，要另起提案。
+- **MachOSwiftSection 跟进**：它的依赖升到含本案的版本后，`swift-section objc diff` / `evolution` 的告警与 `via <协议>` 写法
+  随之改变；它的 `Documentations/ObjCCommandLine.md` 若写到告警格式，需要同步。
+- **两个与本案无关、实现中碰到的测试问题**：`stripSynthesizedMethods removes the setter` 随机挑一个类来测，全量跑时挑到
+  NSScanner 失败过一次，重跑四次都通过；`MachOObjCSectionTests` 写死了本机没有的 `/Users/JH/Downloads/iOS18.5-SwiftUI`，
+  CI 本来就跳过它。
+
 ## 决策日志
 
 | 日期 | 决定 | 理由 |
@@ -98,3 +112,4 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
 | 2026-10-30 | 用户决定：只有协议副本的属性，在事件里写明是哪个协议带进来的，并且不写可用性宏；作为第 4 步加进本案 | 用户指出 NSView 的锚点早在 SDK 的分类里声明（`macos(10.11)`），合并头文件却写「13.0 加入」与 `API_AVAILABLE(macos(13.0))`。核实后：那个分类在二进制里不留属性记录，13.0 才出现的是 `NSAKLayoutItem` 的协议副本；而「取值方法更早就在」这条线索分不清它和私有方法后来公开（`NSBezierPath.CGPath`、`accessibilityUserInputLabels` 在 SDK 里都是 14.0），51 个版本的头文件里约 2500 处中途新增的属性有约 400 处属于这两类之一。所以不改事件本身，只陈述「经由哪个协议」，并去掉会被当成 SDK 可用性的宏；要得到 10.11 这类结论得另读 SDK 头文件，是另一个功能 |
 | 2026-10-30 | 第 4 步：写法定为紧跟在事件后的 `via <协议>`（`added in 13.0 via <NSAKLayoutItem>`），diff 报告写在行尾 `(via <协议>)`；声明它的协议取离容器最近的那个，同层取先采纳的；只有新增或删除带协议时才不写宏 | 不用 ` · ` 分隔，免得被读成另一个事件；最近的协议最能说明属性从哪来（`NSObject` 的四个属性经任何继承它的协议进来，都记作 `NSObject`）；修改不影响宏，宏只说引入与移除 |
 | 2026-10-30 | 第 4 步：认协议副本改成对每条属性记录都查（原来只在一个 identity 出现多次时才查），为此给快照里每个协议预先算好展开后的声明 | 只剩一份协议副本的属性正是要写明来源的那些；预先算好之后，查一条记录只需按容器采纳的几个协议各查一次表 |
+| 2026-10-30 | 实现完成，合入 `next`，编号 0017，状态改为 Implemented | 落地时取全部共享分支上的最大编号（0016）加一。与方案相比的出入都已记在上面各行：落地步骤由四步并成三步、又按用户决定加了第 4 步，告警多记了保留那份的 image，并移植了生成 51 个版本头文件的导出测试。文档：实现说明「同一容器里的重复成员」一节、使用指南的合并头文件与 image 组两节、已裁决清单与两处索引已同步，术语表新增「protocol copy（协议副本）」；不需要另写使用指南或实现说明。验证用的是第 4 步定稿代码上的那两次运行：CI 那组测试在 Xcode 27.2 与 26.6 下退出码都是 0 |

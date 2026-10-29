@@ -3,7 +3,7 @@
 > 面向维护者的实现说明。对应提案 [0006](../Evolutions/0006-objc-api-diff-and-evolution.md)；
 > 「image 组」一节对应提案 [0016](../Evolutions/0016-objc-evolution-image-groups.md)；
 > 「同一容器里的重复成员」一节对应提案
-> [同一容器里的重复成员按来源取舍，内容相同的不再告警](../Evolutions/draft-objc-duplicate-member-selection.md)。
+> [0017](../Evolutions/0017-objc-duplicate-member-selection.md)。
 > 记录 `ObjCDiffing` 模块（ObjC API 比对引擎）的架构、关键设计取舍，以及一组当前的
 > 已知局限——大多数源于 ObjC metadata 本身携带的信息边界，而非实现取巧。
 >
