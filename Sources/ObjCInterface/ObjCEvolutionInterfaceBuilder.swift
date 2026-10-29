@@ -14,14 +14,32 @@ public struct ObjCEvolutionInterface: Sendable {
     public let evolution: ObjCAPIEvolution
 
     /// The merged header. Comment lines first name the version axis and what
-    /// each position of a presence bitmap stands for. Then come the
-    /// declarations as `objc dump` writes them — classes, protocols,
-    /// categories, each sorted by name — where a declaration that changed
-    /// carries `// [●○●] added in 13.0`-style comments, and a declaration
-    /// removed along the axis stays where it last appeared. C struct and
-    /// union definitions follow, each from the newest version that has it,
-    /// without annotations.
+    /// each position of a presence bitmap stands for, and for image groups
+    /// which versions hold each image. Then come the declarations as
+    /// `objc dump` writes them — classes, protocols, categories, each sorted
+    /// by name — where a declaration that changed carries
+    /// `// [●○●] added in 13.0`-style comments, and a declaration removed
+    /// along the axis stays where it last appeared. C struct and union
+    /// definitions follow, each from the newest version that has it, without
+    /// annotations.
     public let interface: SemanticString
+}
+
+/// One image of a version, for
+/// ``ObjCEvolutionInterfaceBuilder/addVersion(images:version:)``.
+public struct ObjCEvolutionInterfaceImage<MachO: ObjCMetadataSource> {
+    /// The name the annotations call the image by (`AppKit`).
+    public let imageName: String
+    /// The image's indexer, already prepared.
+    public let indexer: ObjCInterfaceIndexer<MachO>
+    /// The Mach-O the indexer read.
+    public let machO: MachO
+
+    public init(imageName: String, indexer: ObjCInterfaceIndexer<MachO>, machO: MachO) {
+        self.imageName = imageName
+        self.indexer = indexer
+        self.machO = machO
+    }
 }
 
 /// Merges the Objective-C headers of N ≥ 2 versions of one binary into one,
@@ -38,13 +56,23 @@ public struct ObjCEvolutionInterface: Sendable {
 /// let merged = try builder.build(availabilityPlatform: "macos")
 /// ```
 ///
-/// The order of the `addVersion(indexer:machO:version:)` calls is the version
-/// axis, oldest first. Each call renders every declaration of its version and
-/// takes the snapshot `ObjCAPISnapshotBuilder` takes; the builder keeps no
-/// reference to the indexer or the Mach-O afterwards, so a host can index one
-/// version at a time and let each go before loading the next. What it keeps
-/// is every version's snapshot, the newest rendering of each declaration, and
-/// each rendering that differs from the one before it.
+/// The order of the `addVersion` calls is the version axis, oldest first.
+/// Each call renders every declaration of its version and takes the snapshot
+/// `ObjCAPISnapshotBuilder` takes; the builder keeps no reference to the
+/// indexer or the Mach-O afterwards, so a host can index one version at a
+/// time and let each go before loading the next. What it keeps is every
+/// version's snapshot, the newest rendering of each declaration, and each
+/// rendering that differs from the one before it.
+///
+/// A version can also be an image group, for a binary whose declarations
+/// move to other images along the axis — AppKit's into UIFoundation and
+/// CollectionViewCore, say. ``addVersion(images:version:)`` takes the
+/// version's images, and the evolution is
+/// `ObjCAPIEvolutionBuilder.evolution(ofImageGroups:versions:)`'s: a
+/// declaration that moved reads `// [●●●] moved in 14.0: AppKit →
+/// UIFoundation`, not removed from one image and added to the other. A
+/// builder takes either every version as one image or every version as an
+/// image group.
 ///
 /// Every annotation states one lineage of the evolution `build` computes from
 /// those snapshots: a container's own on its `@interface` or `@protocol`
@@ -60,9 +88,34 @@ public struct ObjCEvolutionInterface: Sendable {
 /// Given the same image twice, the declarations read exactly as `objc dump`
 /// writes them.
 public struct ObjCEvolutionInterfaceBuilder: Sendable {
+    /// One version's snapshot as the evolution takes it.
+    private enum VersionSnapshot: Sendable {
+        case singleImage(ObjCAPISnapshot)
+        case imageGroup(ObjCAPIImageGroupMerge)
+
+        /// The snapshot the evolution compares: an image group's merged one.
+        var comparedSnapshot: ObjCAPISnapshot {
+            switch self {
+            case .singleImage(let snapshot): snapshot
+            case .imageGroup(let imageGroup): imageGroup.snapshot
+            }
+        }
+    }
+
+    /// What one version has rendered so far, so that each later image of its
+    /// group renders only what the evolution takes from it: a class or
+    /// protocol no earlier image holds, a category member no earlier image
+    /// declares, a C struct or union no earlier image defines.
+    private struct VersionRenderingState {
+        var renderedContainerKeys: Set<ObjCAPIKey> = []
+        var renderedMemberKeysByContainer: [ObjCAPIKey: Set<ObjCAPIKey>] = [:]
+        var definedStructNames: Set<String> = []
+        var definedUnionNames: Set<String> = []
+    }
+
     private let cTypeReplacements: [ObjCPrimitiveTypePattern: String]
     private var versions: [ObjCAPIVersionDescriptor] = []
-    private var snapshots: [ObjCAPISnapshot] = []
+    private var versionSnapshots: [VersionSnapshot] = []
     private var containerRenderings: [ObjCAPIKey: ObjCEvolutionContainerRenderings] = [:]
     private var structDefinitions: [String: SemanticString] = [:]
     private var unionDefinitions: [String: SemanticString] = [:]
@@ -89,78 +142,40 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
         machO: MachO,
         version: ObjCAPIVersionDescriptor
     ) {
-        let versionIndex = versions.count
-        let module = ObjCAPISnapshotBuilder(indexer: indexer).module()
-        let snapshot = ObjCAPIDiffer().snapshot(of: module)
-        let context = ObjCInterfaceBuilder<MachO>.makeContext(
-            indexer: indexer,
-            machO: machO,
-            options: .default,
-            cTypeReplacements: cTypeReplacements,
-            ivarOffsetCommentBuilder: nil
-        )
+        var renderingState = VersionRenderingState()
+        let snapshot = render(indexer: indexer, machO: machO, atVersion: versions.count, state: &renderingState)
+        versionSnapshots.append(.singleImage(snapshot))
+        versions.append(version)
+    }
 
-        // The snapshot projects the module's containers one for one, in
-        // order, so each pair is one container and its identity key.
-        for (classInfo, container) in zip(module.classes, snapshot.classes) {
-            var renderings = containerRenderings[container.key] ?? ObjCEvolutionContainerRenderings()
-            renderings.name = classInfo.name
-            renderings.superclassName = classInfo.superClassName
-            renderings.suppliedClassKind = indexer.classGroup(forName: classInfo.name) == nil
-                ? indexer.suppliedClassGroup(forName: classInfo.name)?.suppliedClass.kind
-                : nil
-            Self.recordMembers(
-                ivars: classInfo.ivars,
-                properties: classInfo.classProperties + classInfo.properties,
-                methods: classInfo.classMethods + classInfo.methods,
-                into: &renderings,
-                at: versionIndex,
-                context: context
-            )
-            containerRenderings[container.key] = renderings
+    /// Renders the next version on the axis from the images of its image
+    /// group, which the evolution tracks as one API surface.
+    ///
+    /// - Parameters:
+    ///   - images: The version's images, each indexer already prepared, in
+    ///     group order with the primary image first. Only the images present
+    ///     in the version: an image can join the group partway along the axis,
+    ///     and an empty group is a version holding nothing.
+    ///   - version: The version's place on the axis. Its label names the
+    ///     version in the annotations and availability macros; the evolution
+    ///     sets its `imageNames` from `images`.
+    ///
+    /// The images render as the evolution merges them: a class or protocol
+    /// from the first image holding it, a category's members each from the
+    /// first image declaring it, a C struct or union from the first image
+    /// defining it. The builder keeps no reference to any of the indexers or
+    /// Mach-Os once this returns.
+    public mutating func addVersion<MachO: ObjCMetadataSource>(
+        images: [ObjCEvolutionInterfaceImage<MachO>],
+        version: ObjCAPIVersionDescriptor
+    ) {
+        var renderingState = VersionRenderingState()
+        var imageSnapshots: [ObjCAPIImageSnapshot] = []
+        for image in images {
+            let snapshot = render(indexer: image.indexer, machO: image.machO, atVersion: versions.count, state: &renderingState)
+            imageSnapshots.append(ObjCAPIImageSnapshot(imageName: image.imageName, snapshot: snapshot))
         }
-        for (protocolInfo, container) in zip(module.protocols, snapshot.protocols) {
-            var renderings = containerRenderings[container.key] ?? ObjCEvolutionContainerRenderings()
-            renderings.name = protocolInfo.name
-            // Required before optional, as the snapshot lists them, so a
-            // selector declared both ways keeps the record the snapshot keeps.
-            Self.recordMembers(
-                properties: protocolInfo.classProperties + protocolInfo.properties
-                    + protocolInfo.optionalClassProperties + protocolInfo.optionalProperties,
-                methods: protocolInfo.classMethods + protocolInfo.methods
-                    + protocolInfo.optionalClassMethods + protocolInfo.optionalMethods,
-                into: &renderings,
-                at: versionIndex,
-                context: context
-            )
-            containerRenderings[container.key] = renderings
-        }
-        for (categoryInfo, container) in zip(module.categories, snapshot.categories) {
-            var renderings = containerRenderings[container.key] ?? ObjCEvolutionContainerRenderings()
-            renderings.name = categoryInfo.className
-            renderings.categoryName = categoryInfo.name
-            Self.recordMembers(
-                properties: categoryInfo.classProperties + categoryInfo.properties,
-                methods: categoryInfo.classMethods + categoryInfo.methods,
-                into: &renderings,
-                at: versionIndex,
-                context: context
-            )
-            containerRenderings[container.key] = renderings
-        }
-
-        for structName in indexer.structNames {
-            if let definition = indexer.structSemanticString(forName: structName, context: context) {
-                structDefinitions[structName] = definition
-            }
-        }
-        for unionName in indexer.unionNames {
-            if let definition = indexer.unionSemanticString(forName: unionName, context: context) {
-                unionDefinitions[unionName] = definition
-            }
-        }
-
-        snapshots.append(snapshot)
+        versionSnapshots.append(.imageGroup(ObjCAPIImageGroupMerge(imageSnapshots)))
         versions.append(version)
     }
 
@@ -175,16 +190,19 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
     ///   start of the axis, removed and added back, only modified — and
     ///   versions whose labels are not dotted numbers get none.
     /// - Throws: `ObjCAPIEvolutionError.fewerThanTwoVersions` when fewer than
-    ///   two versions were added.
+    ///   two versions were added, and
+    ///   ``ObjCEvolutionInterfaceError/singleImageVersionsMixedWithImageGroups``
+    ///   when some were added as one image and others as image groups.
     public func build(availabilityPlatform: String? = nil) throws -> ObjCEvolutionInterface {
-        let evolution = try ObjCAPIEvolutionBuilder().evolution(of: snapshots, versions: versions)
+        let evolution = try trackedEvolution()
         let assembler = ObjCEvolutionContainerAssembler(evolution: evolution, availabilityPlatform: availabilityPlatform)
+        let comparedSnapshots = versionSnapshots.map(\.comparedSnapshot)
 
         var blocks: [[ObjCEvolutionLine]] = []
         let containerBuckets: [(kind: ObjCContainerKind, perVersion: [[ObjCContainerSnapshot]])] = [
-            (.class, snapshots.map(\.classes)),
-            (.protocol, snapshots.map(\.protocols)),
-            (.category, snapshots.map(\.categories)),
+            (.class, comparedSnapshots.map(\.classes)),
+            (.protocol, comparedSnapshots.map(\.protocols)),
+            (.category, comparedSnapshots.map(\.categories)),
         ]
         for bucket in containerBuckets {
             let keyedPerVersion = bucket.perVersion.map(Self.keyedFirstWins)
@@ -212,17 +230,135 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
         return ObjCEvolutionInterface(evolution: evolution, interface: interface)
     }
 
+    /// The evolution of the versions added so far, of image groups when they
+    /// were added as image groups.
+    private func trackedEvolution() throws -> ObjCAPIEvolution {
+        var singleImageSnapshots: [ObjCAPISnapshot] = []
+        var imageGroups: [ObjCAPIImageGroupMerge] = []
+        for versionSnapshot in versionSnapshots {
+            switch versionSnapshot {
+            case .singleImage(let snapshot): singleImageSnapshots.append(snapshot)
+            case .imageGroup(let imageGroup): imageGroups.append(imageGroup)
+            }
+        }
+        if imageGroups.isEmpty {
+            return try ObjCAPIEvolutionBuilder().evolution(of: singleImageSnapshots, versions: versions)
+        }
+        guard singleImageSnapshots.isEmpty else {
+            throw ObjCEvolutionInterfaceError.singleImageVersionsMixedWithImageGroups
+        }
+        return try ObjCAPIEvolutionBuilder().evolution(ofImageGroupMerges: imageGroups, versions: versions)
+    }
+
     // MARK: - Rendering
 
+    /// Renders what `indexer` adds to the version at `versionIndex` beyond
+    /// what `state` says earlier images of its group rendered, and returns the
+    /// image's snapshot.
+    private mutating func render<MachO: ObjCMetadataSource>(
+        indexer: ObjCInterfaceIndexer<MachO>,
+        machO: MachO,
+        atVersion versionIndex: Int,
+        state: inout VersionRenderingState
+    ) -> ObjCAPISnapshot {
+        let module = ObjCAPISnapshotBuilder(indexer: indexer).module()
+        let snapshot = ObjCAPIDiffer().snapshot(of: module)
+        let context = ObjCInterfaceBuilder<MachO>.makeContext(
+            indexer: indexer,
+            machO: machO,
+            options: .default,
+            cTypeReplacements: cTypeReplacements,
+            ivarOffsetCommentBuilder: nil
+        )
+
+        // The snapshot projects the module's containers one for one, in
+        // order, so each pair is one container and its identity key.
+        for (classInfo, container) in zip(module.classes, snapshot.classes) {
+            // A class an earlier image holds too is compared as that image's.
+            guard state.renderedContainerKeys.insert(container.key).inserted else { continue }
+            var renderings = containerRenderings[container.key] ?? ObjCEvolutionContainerRenderings()
+            renderings.name = classInfo.name
+            renderings.superclassName = classInfo.superClassName
+            renderings.suppliedClassKind = indexer.classGroup(forName: classInfo.name) == nil
+                ? indexer.suppliedClassGroup(forName: classInfo.name)?.suppliedClass.kind
+                : nil
+            Self.recordMembers(
+                ivars: classInfo.ivars,
+                properties: classInfo.classProperties + classInfo.properties,
+                methods: classInfo.classMethods + classInfo.methods,
+                into: &renderings,
+                at: versionIndex,
+                renderedKeys: &state.renderedMemberKeysByContainer[container.key, default: []],
+                context: context
+            )
+            containerRenderings[container.key] = renderings
+        }
+        for (protocolInfo, container) in zip(module.protocols, snapshot.protocols) {
+            // Every image referencing a protocol carries a copy of it; the
+            // first image's is the one compared.
+            guard state.renderedContainerKeys.insert(container.key).inserted else { continue }
+            var renderings = containerRenderings[container.key] ?? ObjCEvolutionContainerRenderings()
+            renderings.name = protocolInfo.name
+            // Required before optional, as the snapshot lists them, so a
+            // selector declared both ways keeps the record the snapshot keeps.
+            Self.recordMembers(
+                properties: protocolInfo.classProperties + protocolInfo.properties
+                    + protocolInfo.optionalClassProperties + protocolInfo.optionalProperties,
+                methods: protocolInfo.classMethods + protocolInfo.methods
+                    + protocolInfo.optionalClassMethods + protocolInfo.optionalMethods,
+                into: &renderings,
+                at: versionIndex,
+                renderedKeys: &state.renderedMemberKeysByContainer[container.key, default: []],
+                context: context
+            )
+            containerRenderings[container.key] = renderings
+        }
+        for (categoryInfo, container) in zip(module.categories, snapshot.categories) {
+            // The categories of one name in several images are one category,
+            // whose members each come from the first image declaring them.
+            var renderings = containerRenderings[container.key] ?? ObjCEvolutionContainerRenderings()
+            if state.renderedContainerKeys.insert(container.key).inserted {
+                renderings.name = categoryInfo.className
+                renderings.categoryName = categoryInfo.name
+            }
+            Self.recordMembers(
+                properties: categoryInfo.classProperties + categoryInfo.properties,
+                methods: categoryInfo.classMethods + categoryInfo.methods,
+                into: &renderings,
+                at: versionIndex,
+                renderedKeys: &state.renderedMemberKeysByContainer[container.key, default: []],
+                context: context
+            )
+            containerRenderings[container.key] = renderings
+        }
+
+        for structName in indexer.structNames where !state.definedStructNames.contains(structName) {
+            if let definition = indexer.structSemanticString(forName: structName, context: context) {
+                structDefinitions[structName] = definition
+                state.definedStructNames.insert(structName)
+            }
+        }
+        for unionName in indexer.unionNames where !state.definedUnionNames.contains(unionName) {
+            if let definition = indexer.unionSemanticString(forName: unionName, context: context) {
+                unionDefinitions[unionName] = definition
+                state.definedUnionNames.insert(unionName)
+            }
+        }
+        return snapshot
+    }
+
+    /// Records the renderings of a container's members in `versionIndex`,
+    /// except those whose key is in `renderedKeys` — the version rendered them
+    /// already, and the snapshot keeps the first record of a key.
     private static func recordMembers<MachO: ObjCMetadataSource>(
         ivars: [ObjCIvarInfo] = [],
         properties: [ObjCPropertyInfo],
         methods: [ObjCMethodInfo],
         into renderings: inout ObjCEvolutionContainerRenderings,
         at versionIndex: Int,
+        renderedKeys: inout Set<ObjCAPIKey>,
         context: ObjCRenderingContext<MachO>
     ) {
-        var renderedKeys: Set<ObjCAPIKey> = []
         for ivarInfo in ivars {
             renderings.record(ivarInfo.semanticString(using: context), for: ObjCMemberRecord.identityKey(of: ivarInfo), at: versionIndex, renderedKeys: &renderedKeys)
         }
@@ -259,5 +395,21 @@ public struct ObjCEvolutionInterfaceBuilder: Sendable {
             keyedContainers[container.key] = container
         }
         return keyedContainers
+    }
+}
+
+/// Why ``ObjCEvolutionInterfaceBuilder/build(availabilityPlatform:)`` cannot
+/// build, besides the `ObjCAPIEvolutionError` the evolution throws.
+public enum ObjCEvolutionInterfaceError: Swift.Error, Equatable, CustomStringConvertible {
+    /// Some versions were added with `addVersion(indexer:machO:version:)` and
+    /// others with `addVersion(images:version:)`. An image group names its
+    /// images and a single image does not, so the two cannot share an axis.
+    case singleImageVersionsMixedWithImageGroups
+
+    public var description: String {
+        switch self {
+        case .singleImageVersionsMixedWithImageGroups:
+            return "An ObjC evolution interface takes every version as one image or every version as an image group; this builder was given both."
+        }
     }
 }

@@ -192,6 +192,9 @@ struct ObjCEvolutionMemberLayout {
 /// - the superclass's and each adopted protocol's on a comment line of its
 ///   own above the first line, since they share it.
 ///
+/// In an evolution of image groups an annotation also states the lineage's
+/// moves, among its events in version order.
+///
 /// With an availability platform, a container whose lineage one macro can
 /// state gets the macro on a line above its first line, and so does a method
 /// or a property before its `;`. Ivars, adoptions and the superclass get
@@ -268,7 +271,7 @@ struct ObjCEvolutionContainerAssembler {
             firstLine.append(" {", type: .standard)
         }
         let containerAnnotation = containerLineage.flatMap { lineage in
-            lineage.events.isEmpty ? nil : ObjCEvolutionAnnotation(subject: nil, presence: lineage.presence, events: lineage.events.map(Self.presenceEvent))
+            Self.annotation(subject: nil, presence: lineage.presence, events: lineage.events.map(Self.presenceEvent), imageMoves: lineage.imageMoves)
         }
         lines.append(ObjCEvolutionLine(content: firstLine, annotation: containerAnnotation))
 
@@ -367,7 +370,6 @@ struct ObjCEvolutionContainerAssembler {
         renderings: ObjCEvolutionContainerRenderings,
         layout: ObjCEvolutionMemberLayout
     ) -> ObjCEvolutionAnnotation? {
-        guard !lineage.events.isEmpty else { return nil }
         let events = lineage.events.map { event -> ObjCEvolutionAnnotation.Event in
             guard event.status == .modified else { return Self.presenceEvent(event) }
             let previousVersionIndex = event.versionIndex - 1
@@ -382,13 +384,12 @@ struct ObjCEvolutionContainerAssembler {
             }
             return ObjCEvolutionAnnotation.Event(versionIndex: event.versionIndex, change: .modified(old: oldSide, new: newSide))
         }
-        return ObjCEvolutionAnnotation(subject: subject, presence: lineage.presence, events: events)
+        return Self.annotation(subject: subject, presence: lineage.presence, events: events, imageMoves: lineage.imageMoves)
     }
 
     /// The superclass's annotation: each change names the old and the new
     /// superclass, as the lineage's signatures do.
     private func superclassAnnotation(_ lineage: ObjCMemberLineage) -> ObjCEvolutionAnnotation? {
-        guard !lineage.events.isEmpty else { return nil }
         let events = lineage.events.map { event -> ObjCEvolutionAnnotation.Event in
             guard event.status == .modified else { return Self.presenceEvent(event) }
             return ObjCEvolutionAnnotation.Event(
@@ -399,7 +400,23 @@ struct ObjCEvolutionContainerAssembler {
                 )
             )
         }
-        return ObjCEvolutionAnnotation(subject: "superclass", presence: lineage.presence, events: events)
+        return Self.annotation(subject: "superclass", presence: lineage.presence, events: events, imageMoves: lineage.imageMoves)
+    }
+
+    /// An annotation of a lineage's events and image moves in version order,
+    /// an event first where both fall on one version, as the lineage report
+    /// lists them; `nil` when the lineage has neither.
+    private static func annotation(
+        subject: String?,
+        presence: [Bool],
+        events: [ObjCEvolutionAnnotation.Event],
+        imageMoves: [ObjCImageMove]?
+    ) -> ObjCEvolutionAnnotation? {
+        let moveEvents = (imageMoves ?? []).map { ObjCEvolutionAnnotation.Event(versionIndex: $0.versionIndex, change: .moved($0)) }
+        // A stable sort keeps an event ahead of a move at its version.
+        let timeline = (events + moveEvents).sorted { $0.versionIndex < $1.versionIndex }
+        guard !timeline.isEmpty else { return nil }
+        return ObjCEvolutionAnnotation(subject: subject, presence: presence, events: timeline)
     }
 
     /// An `added` or `removed` event, as is.

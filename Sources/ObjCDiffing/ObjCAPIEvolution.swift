@@ -5,10 +5,52 @@ public struct ObjCAPIVersionDescriptor: Sendable, Codable, Equatable {
     /// provenance, or a positional fallback.
     public let label: String
     public let provenance: ObjCAPIProvenance?
+    /// The images the version's API was read from, in the order of its image
+    /// group, when the evolution compares image groups —
+    /// `ObjCAPIEvolutionBuilder.evolution(ofImageGroups:versions:)` sets it
+    /// from the group. Empty for a version whose group is empty; `nil` in an
+    /// evolution of one image per version.
+    public let imageNames: [String]?
 
-    public init(label: String, provenance: ObjCAPIProvenance? = nil) {
+    public init(label: String, provenance: ObjCAPIProvenance? = nil, imageNames: [String]? = nil) {
         self.label = label
         self.provenance = provenance
+        self.imageNames = imageNames
+    }
+}
+
+/// A declaration present on both sides of a transition whose images differ,
+/// in an evolution that compares image groups: between
+/// `versions[versionIndex - 1]` and `versions[versionIndex]` the declaration
+/// left `oldImageNames` for `newImageNames`.
+///
+/// A side's images are every image of that version's group holding the
+/// declaration, in group order — one, unless it is duplicated. The order
+/// does not count: two sides naming the same images are no move.
+///
+/// A move never changes a verdict. Whether a client bound to the old image's
+/// install name still finds the symbol depends on whether the old image
+/// re-exports the new one, which no snapshot records, so a move is reported
+/// and not judged.
+public struct ObjCImageMove: Sendable, Codable, Equatable {
+    /// Always ≥ 1, as for `ObjCLineageEvent`.
+    public let versionIndex: Int
+    public let oldImageNames: [String]
+    public let newImageNames: [String]
+
+    public init(versionIndex: Int, oldImageNames: [String], newImageNames: [String]) {
+        self.versionIndex = versionIndex
+        self.oldImageNames = oldImageNames
+        self.newImageNames = newImageNames
+    }
+}
+
+extension ObjCImageMove {
+    /// `moved in 14.0: AppKit → AppKit + UIFoundation`, where `versionLabel`
+    /// labels the version the move arrives at — the wording the reporter and
+    /// the evolution interface share.
+    package func phrase(versionLabel: String) -> String {
+        "moved in \(versionLabel): \(oldImageNames.joined(separator: " + ")) → \(newImageNames.joined(separator: " + "))"
     }
 }
 
@@ -42,9 +84,9 @@ public struct ObjCLineageEvent: Sendable, Codable, Equatable {
 
 /// The lifeline of one member identity across the version axis.
 ///
-/// Only lineages with at least one event are materialized — an API that
-/// never changes never appears, mirroring `ObjCAPIDiff`'s "changes only"
-/// contract.
+/// Only lineages with at least one event or image move are materialized — an
+/// API that never changes never appears, mirroring `ObjCAPIDiff`'s "changes
+/// only" contract.
 public struct ObjCMemberLineage: Sendable, Codable, Equatable {
     public let key: ObjCAPIKey
     public let kind: ObjCMemberKind
@@ -59,12 +101,31 @@ public struct ObjCMemberLineage: Sendable, Codable, Equatable {
     /// the container's own event is the change (same rule as `ObjCAPIDiff`,
     /// whose added/removed containers carry no `memberChanges`).
     public let events: [ObjCLineageEvent]
+    /// Transitions where the member changed images differently from its
+    /// container, ordered by `versionIndex`: a method a category took to
+    /// another image, not every method of a class that moved as a whole.
+    /// `nil` when there is none, and always in an evolution of one image per
+    /// version.
+    public let imageMoves: [ObjCImageMove]?
+    /// The member's rendering in the newest version that has it, for a
+    /// lineage with no event to take one from — a member that only moved.
+    /// `nil` whenever `events` is not empty.
+    public let latestSignature: String?
 
-    public init(key: ObjCAPIKey, kind: ObjCMemberKind, presence: [Bool], events: [ObjCLineageEvent]) {
+    public init(
+        key: ObjCAPIKey,
+        kind: ObjCMemberKind,
+        presence: [Bool],
+        events: [ObjCLineageEvent],
+        imageMoves: [ObjCImageMove]? = nil,
+        latestSignature: String? = nil
+    ) {
         self.key = key
         self.kind = kind
         self.presence = presence
         self.events = events
+        self.imageMoves = imageMoves
+        self.latestSignature = latestSignature
     }
 }
 
@@ -82,8 +143,13 @@ public struct ObjCContainerLineage: Sendable, Codable, Equatable {
     /// "Modified at version i" is not a container event — it is derivable as
     /// "has a member event at i", so it is not stored twice.
     public let events: [ObjCLineageEvent]
-    /// Member lifelines with at least one event, sorted by key.
+    /// Member lifelines with at least one event or image move, sorted by key.
     public let memberLineages: [ObjCMemberLineage]
+    /// Transitions where a class or category changed images, ordered by
+    /// `versionIndex`. `nil` when there is none, always for a protocol — no
+    /// image owns one, every image referencing it carries a copy — and always
+    /// in an evolution of one image per version.
+    public let imageMoves: [ObjCImageMove]?
 
     public init(
         key: ObjCAPIKey,
@@ -91,7 +157,8 @@ public struct ObjCContainerLineage: Sendable, Codable, Equatable {
         containerKind: ObjCContainerKind,
         presence: [Bool],
         events: [ObjCLineageEvent],
-        memberLineages: [ObjCMemberLineage]
+        memberLineages: [ObjCMemberLineage],
+        imageMoves: [ObjCImageMove]? = nil
     ) {
         self.key = key
         self.name = name
@@ -99,6 +166,7 @@ public struct ObjCContainerLineage: Sendable, Codable, Equatable {
         self.presence = presence
         self.events = events
         self.memberLineages = memberLineages
+        self.imageMoves = imageMoves
     }
 }
 
@@ -110,6 +178,12 @@ public struct ObjCContainerLineage: Sendable, Codable, Equatable {
 /// and two evolutions compared directly. For N == 2 the events at
 /// `versionIndex == 1` correspond exactly to `ObjCAPIDiffer.diff(old:new:)`'s
 /// changes — the two paths cannot disagree.
+///
+/// An evolution of image groups tracks several images per version as one API
+/// surface, so a declaration moving between them is not a removal and an
+/// addition. Its events are those of diffing each version's merged snapshot;
+/// what moved where is in the lineages' `imageMoves`, which a diff has no
+/// counterpart for.
 public struct ObjCAPIEvolution: Sendable, Codable, Equatable {
     /// The ordered version axis every `presence` array and `versionIndex`
     /// refers into.
@@ -145,5 +219,24 @@ public struct ObjCAPIEvolution: Sendable, Codable, Equatable {
     /// `true` when nothing changed anywhere across the whole axis.
     public var isEmpty: Bool {
         allContainerLineages.isEmpty
+    }
+}
+
+extension [ObjCAPIVersionDescriptor] {
+    /// Each image of an axis of image groups with the versions holding it, in
+    /// the order the images first appear along the axis — oldest version
+    /// first, then group order. `nil` for an axis of one image per version.
+    /// The reporter and the evolution interface both list the group this way.
+    package var imageGroupPresence: [(imageName: String, presence: [Bool])]? {
+        guard contains(where: { $0.imageNames != nil }) else { return nil }
+        var imageNames: [String] = []
+        for version in self {
+            for imageName in version.imageNames ?? [] where !imageNames.contains(imageName) {
+                imageNames.append(imageName)
+            }
+        }
+        return imageNames.map { imageName in
+            (imageName, map { $0.imageNames?.contains(imageName) == true })
+        }
     }
 }

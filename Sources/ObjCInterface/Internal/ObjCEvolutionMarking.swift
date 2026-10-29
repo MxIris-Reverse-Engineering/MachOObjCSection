@@ -17,6 +17,8 @@ struct ObjCEvolutionAnnotation: Equatable {
             /// The two sides as rendered, `nil` when not worth showing: a
             /// change no rendered line makes visible keeps the bare phrase.
             case modified(old: String?, new: String?)
+            /// The declaration changed images, in an evolution of image groups.
+            case moved(ObjCImageMove)
         }
 
         /// The version the transition arrives at; `versions[versionIndex - 1]`
@@ -127,6 +129,8 @@ enum ObjCEvolutionMarking {
                 return "modified in \(label)"
             }
             return "modified in \(label): \(old) → \(new)"
+        case .moved(let move):
+            return move.phrase(versionLabel: label)
         }
     }
 
@@ -233,9 +237,10 @@ enum ObjCEvolutionMarking {
         return result
     }
 
-    /// The axis and what each bitmap position stands for; with availability
-    /// macros on, a third line saying what their versions mean, once, so no
-    /// macro in the body claims more than the axis knows.
+    /// The axis and what each bitmap position stands for; for image groups,
+    /// each image with the versions holding it, as the lineage report lists
+    /// them; with availability macros on, a line saying what their versions
+    /// mean, once, so no macro in the body claims more than the axis knows.
     static func legendLines(versions: [ObjCAPIVersionDescriptor], availabilityPlatform: String?) -> SemanticString {
         let labels = versions.map(\.label)
         var result = SemanticString()
@@ -245,6 +250,14 @@ enum ObjCEvolutionMarking {
             "// Bitmap positions: " + labels.enumerated().map { "[\($0 + 1)] \($1)" }.joined(separator: "  "),
             type: .comment
         )
+        if let imageGroupPresence = versions.imageGroupPresence {
+            result.append("\n", type: .standard)
+            result.append("// Image group:", type: .comment)
+            for image in imageGroupPresence {
+                result.append("\n", type: .standard)
+                result.append("//   \(bitmap(image.presence)) \(image.imageName)", type: .comment)
+            }
+        }
         if availabilityPlatform != nil {
             result.append("\n", type: .standard)
             result.append(
@@ -301,7 +314,7 @@ enum ObjCEvolutionMarking {
                 let scope = collision.containerName.map { "\($0) · " } ?? ""
                 result.append("\n", type: .standard)
                 result.append(
-                    "//   \(evolution.versions[versionIndex].label) · \(scope)dropped: \(collision.droppedSignatures.joined(separator: ", "))",
+                    "//   \(evolution.versions[versionIndex].label) · \(scope)dropped: \(collision.droppedRecordsDescription)",
                     type: .comment
                 )
             }

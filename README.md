@@ -673,6 +673,14 @@ changed with its presence across the versions and the version it was added, remo
 modified in, optionally with `API_AVAILABLE` / `API_OBSOLETED`. It takes one version's
 indexer at a time, so the versions never have to be in memory together.
 
+When declarations move between images over the years — AppKit's into UIFoundation and
+CollectionViewCore — track an image group per version instead:
+`ObjCAPIEvolutionBuilder.evolution(ofImageGroups:versions:)` and
+`ObjCEvolutionInterfaceBuilder.addVersion(images:version:)` take each version's images, the
+primary one first, and compare them as one API surface. A moved declaration reads
+`moved in 14.0: AppKit → UIFoundation` instead of removed from one image and added to the
+other, and a move never makes a transition API-breaking.
+
 Baselines carry a `formatVersion` header. The identity/payload key scheme is the de-facto
 persistence format, so a baseline written by a different format version is rejected with a
 clear error instead of being silently mis-compared — regenerate it with the current tool.

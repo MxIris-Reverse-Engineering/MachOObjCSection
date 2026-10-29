@@ -81,6 +81,75 @@ struct ObjCEvolutionInterfaceBuilderTests {
         }
     }
 
+    // MARK: - Image groups
+
+    /// The declarations between the legend and the warnings.
+    private static func declarations(of interface: String) -> String {
+        let afterLegend = interface.components(separatedBy: "\n\n").dropFirst().joined(separator: "\n\n")
+        return afterLegend.components(separatedBy: "\n\n// Warnings — ")[0]
+    }
+
+    @Test("The images of a group render as the evolution merges them: each declaration from the first image holding it")
+    func imageGroupRendersTheComparedCopies() async throws {
+        let (indexer, machO) = try await ObjCInterfaceTests.SharedFixture.shared.load()
+        var singleImageBuilder = ObjCEvolutionInterfaceBuilder()
+        var imageGroupBuilder = ObjCEvolutionInterfaceBuilder()
+        // The same image twice in one group: every class, category member and
+        // C type is declared by both images, and every protocol carried by both.
+        let group = [
+            ObjCEvolutionInterfaceImage(imageName: "Foundation", indexer: indexer, machO: machO),
+            ObjCEvolutionInterfaceImage(imageName: "Copy", indexer: indexer, machO: machO),
+        ]
+        for label in ["1.0", "2.0"] {
+            singleImageBuilder.addVersion(indexer: indexer, machO: machO, version: ObjCAPIVersionDescriptor(label: label))
+            imageGroupBuilder.addVersion(images: group, version: ObjCAPIVersionDescriptor(label: label))
+        }
+        let singleImage = try singleImageBuilder.build()
+        let imageGroup = try imageGroupBuilder.build()
+
+        #expect(imageGroup.evolution.isEmpty)
+        #expect(Self.declarations(of: imageGroup.interface.string) == Self.declarations(of: singleImage.interface.string))
+
+        let lines = imageGroup.interface.string.components(separatedBy: "\n")
+        #expect(lines.contains("//   [●●] Copy"))
+        // The class `objc dump` checks its strip switches on, dropped from the second image.
+        #expect(lines.contains("//   1.0 · dropped: NSError (Copy)"))
+        #expect(!lines.contains { $0.hasPrefix("//   1.0 · dropped: NSCopying") })
+    }
+
+    @Test("A class or category that moves to another image carries the move, and its members do not repeat it")
+    func movedDeclarationsCarryTheMove() async throws {
+        let (indexer, machO) = try await ObjCInterfaceTests.SharedFixture.shared.load()
+        var builder = ObjCEvolutionInterfaceBuilder()
+        builder.addVersion(images: [ObjCEvolutionInterfaceImage(imageName: "Primary", indexer: indexer, machO: machO)], version: ObjCAPIVersionDescriptor(label: "1.0"))
+        builder.addVersion(images: [ObjCEvolutionInterfaceImage(imageName: "Secondary", indexer: indexer, machO: machO)], version: ObjCAPIVersionDescriptor(label: "2.0"))
+        let merged = try builder.build()
+
+        let snapshot = ObjCAPISnapshotBuilder(indexer: indexer).snapshot()
+        let move = ObjCImageMove(versionIndex: 1, oldImageNames: ["Primary"], newImageNames: ["Secondary"])
+        let movedContainers = merged.evolution.classes + merged.evolution.categories
+        try #require(!snapshot.classes.isEmpty && !snapshot.categories.isEmpty)
+        #expect(movedContainers.count == snapshot.classes.count + snapshot.categories.count)
+        #expect(movedContainers.allSatisfy { $0.imageMoves == [move] && $0.events.isEmpty && $0.memberLineages.isEmpty })
+        #expect(merged.evolution.protocols.isEmpty)
+
+        let lines = merged.interface.string.components(separatedBy: "\n")
+        #expect(Array(lines[2 ... 4]) == ["// Image group:", "//   [●○] Primary", "//   [○●] Secondary"])
+        let moveAnnotationCount = lines.count { $0.hasSuffix("// [●●] moved in 2.0: Primary → Secondary") }
+        #expect(moveAnnotationCount == movedContainers.count)
+    }
+
+    @Test("A builder given both single images and image groups does not build")
+    func singleImagesAndImageGroupsDoNotMix() async throws {
+        let (indexer, machO) = try await ObjCInterfaceTests.SharedFixture.shared.load()
+        var builder = ObjCEvolutionInterfaceBuilder()
+        builder.addVersion(indexer: indexer, machO: machO, version: ObjCAPIVersionDescriptor(label: "1.0"))
+        builder.addVersion(images: [ObjCEvolutionInterfaceImage(imageName: "Foundation", indexer: indexer, machO: machO)], version: ObjCAPIVersionDescriptor(label: "2.0"))
+        #expect(throws: ObjCEvolutionInterfaceError.singleImageVersionsMixedWithImageGroups) {
+            try builder.build()
+        }
+    }
+
     // MARK: - Member order
 
     private static func key(_ rawValue: String) -> ObjCAPIKey {

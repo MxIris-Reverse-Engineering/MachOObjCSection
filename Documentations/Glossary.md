@@ -31,6 +31,24 @@ lineage，没有注释就是整条轴上都在、从没变过。与 lineage 报�
 - **主要出现在**：`Sources/objc-section/Version.swift`、`.github/workflows/release.yml`、`.github/workflows/version-check.yml`
 - **延伸阅读**：[提案 0009](Evolutions/0009-objc-section-release-automation.md)
 
+### image group（image 组）
+
+演进里一个版本交给比较的一组 image，主 image 在前（AppKit，再加 UIFoundation、CollectionViewCore 等它的声明搬去的库）。
+一个版本的几个 image 先合并成一份快照再比较：class 取组里第一个有它的 image，同名 category 合成一个容器，各 image
+自带的 protocol 副本去重。组里的 image 可以在轴上中途加入；一个版本的组为空，就是这个版本什么都没有。
+
+- **主要出现在**：`Sources/ObjCDiffing/ObjCAPIImageGroup.swift`、`ObjCAPIEvolutionBuilder.swift`
+- **延伸阅读**：[提案](Evolutions/draft-objc-evolution-image-groups.md)、
+  [实现说明的 image 组一节](Internal/ObjCAPIDiffDesignAndLimitations.md#image-组几个-image-当作一个-api-面)
+
+### image move（搬家）
+
+image 组演进里的一种记录：声明在一次跳变两侧都在，所在的 image 集合却变了（`ObjCImageMove`）。报告写成
+`> moved in 14.0: AppKit → UIFoundation`。成员只在换法与所属容器不同时才单独记；protocol 不记；搬家不影响兼容性判定。
+
+- **主要出现在**：`Sources/ObjCDiffing/ObjCAPIEvolution.swift`、`ObjCAPIEvolutionBuilder.swift`
+- **延伸阅读**：[提案](Evolutions/draft-objc-evolution-image-groups.md)
+
 ### key namespace（键命名空间）
 
 `ObjCAPIKey` 的前缀约定：`class:` / `protocol:` / `category:`（容器）、
