@@ -14,6 +14,11 @@
 ///       [●○○] - (void)bar;
 ///           - removed in 18.0
 /// ```
+///
+/// An evolution of image groups adds, under the header, which versions hold
+/// each image of the group, and among a lineage's events the transitions it
+/// moved images in (`> moved in 14.0: AppKit → UIFoundation`), which the
+/// summary counts as `N moved`.
 public struct ObjCAPIEvolutionReporter: Sendable {
     public init() {}
 
@@ -44,7 +49,7 @@ public struct ObjCAPIEvolutionReporter: Sendable {
         for (versionIndex, collisions) in keyCollisionsByVersion.enumerated() {
             for collision in collisions {
                 let scope = collision.containerName.map { "\($0) · " } ?? ""
-                lines.append("  \(evolution.versions[versionIndex].label) · \(scope)dropped: \(collision.droppedSignatures.joined(separator: ", "))")
+                lines.append("  \(evolution.versions[versionIndex].label) · \(scope)dropped: \(collision.droppedRecordsDescription)")
             }
         }
         return lines.joined(separator: "\n")
@@ -52,9 +57,18 @@ public struct ObjCAPIEvolutionReporter: Sendable {
 
     // MARK: - Header & summary
 
+    /// The axis, then for an evolution of image groups each image with the
+    /// versions holding it.
     private func header(_ evolution: ObjCAPIEvolution) -> String {
         let axis = evolution.versions.map(\.label).joined(separator: " → ")
-        return "ObjC API evolution across \(evolution.versions.count) versions: \(axis)"
+        var lines = ["ObjC API evolution across \(evolution.versions.count) versions: \(axis)"]
+        if let imageGroupPresence = evolution.imageGroupPresence {
+            lines.append("Image group:")
+            for image in imageGroupPresence {
+                lines.append("  \(bitmap(image.presence)) \(image.imageName)")
+            }
+        }
+        return lines.joined(separator: "\n")
     }
 
     private func transitionSummary(_ evolution: ObjCAPIEvolution) -> String {
@@ -70,6 +84,7 @@ public struct ObjCAPIEvolutionReporter: Sendable {
                 if counts.added > 0 { parts.append("\(counts.added) added") }
                 if counts.removed > 0 { parts.append("\(counts.removed) removed") }
                 if counts.modified > 0 { parts.append("\(counts.modified) modified") }
+                if counts.moved > 0 { parts.append("\(counts.moved) moved") }
                 let verdict = compatibilities[versionIndex - 1] == .breaking ? "API-breaking" : "additive"
                 lines.append("  \(step): " + (parts + [verdict]).joined(separator: " · "))
             }
@@ -81,9 +96,9 @@ public struct ObjCAPIEvolutionReporter: Sendable {
         return lines.joined(separator: "\n")
     }
 
-    private func eventCounts(_ evolution: ObjCAPIEvolution, at versionIndex: Int) -> (added: Int, removed: Int, modified: Int, total: Int) {
-        var added = 0, removed = 0, modified = 0
-        func count(_ events: [ObjCLineageEvent]) {
+    private func eventCounts(_ evolution: ObjCAPIEvolution, at versionIndex: Int) -> (added: Int, removed: Int, modified: Int, moved: Int, total: Int) {
+        var added = 0, removed = 0, modified = 0, moved = 0
+        func count(_ events: [ObjCLineageEvent], _ imageMoves: [ObjCImageMove]?) {
             for event in events where event.versionIndex == versionIndex {
                 switch event.status {
                 case .added: added += 1
@@ -91,14 +106,15 @@ public struct ObjCAPIEvolutionReporter: Sendable {
                 case .modified: modified += 1
                 }
             }
+            moved += (imageMoves ?? []).count { $0.versionIndex == versionIndex }
         }
         for lineage in evolution.allContainerLineages {
-            count(lineage.events)
+            count(lineage.events, lineage.imageMoves)
             for memberLineage in lineage.memberLineages {
-                count(memberLineage.events)
+                count(memberLineage.events, memberLineage.imageMoves)
             }
         }
-        return (added, removed, modified, added + removed + modified)
+        return (added, removed, modified, moved, added + removed + modified + moved)
     }
 
     // MARK: - Sections
@@ -113,13 +129,13 @@ public struct ObjCAPIEvolutionReporter: Sendable {
         var lines = ["\(title):"]
         for lineage in lineages {
             lines.append("  \(bitmap(lineage.presence)) \(lineage.name)")
-            for event in lineage.events {
-                lines.append("      \(eventLine(event, evolution, signatures: false))")
+            for line in timelineLines(lineage.events, lineage.imageMoves, evolution, signatures: false) {
+                lines.append("      \(line)")
             }
             for memberLineage in lineage.memberLineages {
                 lines.append("      \(bitmap(memberLineage.presence)) \(latestSignature(memberLineage))")
-                for event in memberLineage.events {
-                    lines.append("          \(eventLine(event, evolution, signatures: true))")
+                for line in timelineLines(memberLineage.events, memberLineage.imageMoves, evolution, signatures: true) {
+                    lines.append("          \(line)")
                 }
             }
         }
@@ -129,15 +145,30 @@ public struct ObjCAPIEvolutionReporter: Sendable {
     // MARK: - Lines
 
     /// The lineage's most recent rendering: the last event's signature (new
-    /// side preferred) — every lineage has at least one event by
-    /// construction.
+    /// side preferred), or for a lineage that only moved, the one it carries.
     private func latestSignature(_ lineage: ObjCMemberLineage) -> String {
         for event in lineage.events.reversed() {
             if let signature = event.newSignature ?? event.oldSignature {
                 return signature
             }
         }
-        return lineage.key.rawValue
+        return lineage.latestSignature ?? lineage.key.rawValue
+    }
+
+    /// A lineage's events and moves in version order; at one version the
+    /// event comes first.
+    private func timelineLines(
+        _ events: [ObjCLineageEvent],
+        _ imageMoves: [ObjCImageMove]?,
+        _ evolution: ObjCAPIEvolution,
+        signatures: Bool
+    ) -> [String] {
+        let eventLines = events.map { (versionIndex: $0.versionIndex, text: eventLine($0, evolution, signatures: signatures)) }
+        let moveLines = (imageMoves ?? []).map { move in
+            (versionIndex: move.versionIndex, text: "> " + move.phrase(versionLabel: evolution.versions[move.versionIndex].label))
+        }
+        // A stable sort, so an event stays ahead of a move at its version.
+        return (eventLines + moveLines).sorted { $0.versionIndex < $1.versionIndex }.map(\.text)
     }
 
     /// One event phrased against the axis. `signatures: false` keeps

@@ -45,6 +45,15 @@ public struct ObjCImageMove: Sendable, Codable, Equatable {
     }
 }
 
+extension ObjCImageMove {
+    /// `moved in 14.0: AppKit → AppKit + UIFoundation`, where `versionLabel`
+    /// labels the version the move arrives at — the wording the reporter and
+    /// the evolution interface share.
+    package func phrase(versionLabel: String) -> String {
+        "moved in \(versionLabel): \(oldImageNames.joined(separator: " + ")) → \(newImageNames.joined(separator: " + "))"
+    }
+}
+
 /// One transition on a lineage: what happened between the *previous* version
 /// and `versions[versionIndex]`.
 ///
@@ -210,5 +219,24 @@ public struct ObjCAPIEvolution: Sendable, Codable, Equatable {
     /// `true` when nothing changed anywhere across the whole axis.
     public var isEmpty: Bool {
         allContainerLineages.isEmpty
+    }
+}
+
+extension ObjCAPIEvolution {
+    /// Each image of an evolution of image groups with the versions holding
+    /// it, in the order the images first appear along the axis — oldest
+    /// version first, then group order. `nil` for an evolution of one image
+    /// per version.
+    package var imageGroupPresence: [(imageName: String, presence: [Bool])]? {
+        guard versions.contains(where: { $0.imageNames != nil }) else { return nil }
+        var imageNames: [String] = []
+        for version in versions {
+            for imageName in version.imageNames ?? [] where !imageNames.contains(imageName) {
+                imageNames.append(imageName)
+            }
+        }
+        return imageNames.map { imageName in
+            (imageName, versions.map { $0.imageNames?.contains(imageName) == true })
+        }
     }
 }

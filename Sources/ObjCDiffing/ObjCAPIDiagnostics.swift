@@ -28,6 +28,19 @@ public struct ObjCAPIKeyCollision: Sendable, Codable, Equatable {
     }
 }
 
+extension ObjCAPIKeyCollision {
+    /// The dropped records as the warnings list them: each signature, then
+    /// its image in parentheses where known — `NSFoo (UIFoundation)`.
+    package var droppedRecordsDescription: String {
+        guard let droppedImageNames, droppedImageNames.count == droppedSignatures.count else {
+            return droppedSignatures.joined(separator: ", ")
+        }
+        return zip(droppedSignatures, droppedImageNames)
+            .map { droppedSignature, droppedImageName in "\(droppedSignature) (\(droppedImageName))" }
+            .joined(separator: ", ")
+    }
+}
+
 /// The diagnostics side-channel of an `ObjCAPIDiff`: everything the
 /// comparison had to resolve silently, surfaced so a verdict is never
 /// quietly weaker than it looks. `nil` on the diff when there is nothing to
