@@ -140,8 +140,8 @@ extension ObjCEvolutionInterfaceBuilder {
 - `ObjCDiffingTests`：用手搭的快照覆盖三条合并规则、搬家的各条规则、只有搬家的 lineage、报告文案；另有一条测试固定
   单 image 演进的 JSON，在改代码之前写好并跑通，确保改完之后逐字节不变。
 - `ObjCInterfaceTests`：把进程里的 Foundation 以不同的 image 名放进不同版本，造出搬家与 protocol 去重。
-- 本机有 15.5、26.x、27.0 的归档 cache，先探一下其中有没有真实的搬家，有就加一组归档测试；11.0.1 到 15.x 的真实搬家由
-  MachOSwiftSection 的集成测试覆盖（那些 cache 在 Ultra 上）。
+- 归档测试用 12.0.1 与 13.0 两个 cache（现有归档测试已经依赖的那一批），固定 13.0 那次真实的搬家；没有这些 cache 的机器上
+  整组跳过。更多版本的真实搬家由 MachOSwiftSection 的集成测试覆盖。
 - 更新使用指南的库调用方一节、`ObjCAPIDiffDesignAndLimitations.md`、术语表（image 组、搬家）和 README。
 
 ## 落地步骤
@@ -154,7 +154,12 @@ extension ObjCEvolutionInterfaceBuilder {
 - [x] 3. 报告：Image group、`> moved` 行、`N moved`、collision 警告里的 image；报告测试。
 - [x] 4. 合并头文件：`ObjCEvolutionInterfaceImage`、`addVersion(images:version:)`、混用报错、搬家标注与图例；测试；
   使用指南与 README。
-- [ ] 5. 探本机归档 cache 里有没有真实的搬家，有就加归档测试，结论写进本提案。
+- [x] 5. 探归档 cache 里有没有真实的搬家，有就加归档测试，结论写进本提案。在 Ultra 的归档 cache 上，对 AppKit、UIFoundation、
+  CollectionViewCore、CoreAutoLayout 这一组跑了 11.0.1、12.0.1、13.0、14.0、15.0、26.0、27.0 七个版本：共 114 处搬家，
+  全是类。13.0 把集合视图布局相关的类搬出 UIFoundation，86 个进 AppKit，12 个进这一版才出现的 CollectionViewCore
+  （`NSCollectionLayoutSection` 等公开的布局构件）；15.0 把 diffable data source 相关的 16 个类搬出 UIFoundation，15 个进
+  AppKit，1 个进 CollectionViewCore。没有成员级搬家，没有两个 image 都有的同名类，各 image 自带的 protocol 副本内容全部
+  相同，静默去重。单看 UIFoundation，这些类在搬走那一版都报成 removed。
 
 ## 决策日志
 
@@ -168,3 +173,4 @@ extension ObjCEvolutionInterfaceBuilder {
 | 2026-10-29 | key collision 警告注明 image | 不注明的话，读者看不出被丢的那份在哪个 image 里 |
 | 2026-10-29 | 补上落地步骤，状态改为 Accepted | 用户批准，开始实现 |
 | 2026-10-29 | 只有搬家的成员，签名放在成员 lineage 的 `latestSignature` 上，搬家记录不再带 `signature` | 与 Swift 一侧对齐：那边的成员 lineage 已经有同名字段，语义相同（没有事件时填最新一版的渲染，有事件时为 nil） |
+| 2026-10-29 | 归档测试只固定 13.0 那次搬家，用 12.0.1 与 13.0 两个 cache | 这两个 cache 现有归档测试已经依赖，不新增前提；那一次有两个去向，其中 CollectionViewCore 是中途加入的 image |
