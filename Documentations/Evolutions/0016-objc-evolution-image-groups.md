@@ -7,8 +7,9 @@
 - **配套文档**: [使用指南的库调用方一节](../Guides/ObjCSectionCommandLine.md#库调用方几个-image-当作一个-api-面)；
   [实现说明的 image 组一节](../Internal/ObjCAPIDiffDesignAndLimitations.md#image-组几个-image-当作一个-api-面)；
   术语表的 [image group](../Glossary.md#image-groupimage-组) 与 [image move](../Glossary.md#image-move搬家)
-- **关联**: MachOSwiftSection 同步做 Swift 一侧（SwiftDiffing / SwiftInterface）和两库的集成测试，模型与报告文案两边一致；
-  那边的提案 slug 是 `image-group-evolution`，落地后在这里补链接。ObjC 的两个集成测试要求依赖下限 0.8.205
+- **关联**: MachOSwiftSection 的[提案 0082](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/0082-image-group-evolution.md)
+  （Swift 一侧：lineage 报告、JSON 与联合接口，另外让索引收下「类型定义在别的 image、成员在本 image」的成员），
+  模型与报告文案两边一致；两库的集成测试也在那边做，ObjC 的两个要求依赖下限 0.8.205
 
 ## 摘要
 
