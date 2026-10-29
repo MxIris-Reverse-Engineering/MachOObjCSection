@@ -248,6 +248,12 @@ Warnings 段列出被丢弃的。
   11.0.1、12.0.1、13.0 合并成一份头文件，其中两条钉住重复成员的真实情形：`NSView.frame`/`bounds` 在 13.0 多出排在前面的
   协议副本，`NSMenuItem.action`/`tag`、`NSWindow.contentView` 整条轴上协议副本都在前面；合并头文件都写类自己的声明、
   不带标注。cache 不在时整组跳过。
+- `Tests/ObjCInterfaceTests/ObjCEvolutionInterfaceDumpTests.swift` —— 给维护者看的导出，不做断言：把 AppKit、UIFoundation、
+  CollectionViewCore、CoreAutoLayout 这一组在全部 51 个归档 macOS 版本上合并成一份头文件，写到
+  `~/Documents/SwiftInterfaceTests/macOS-<SDK>-AppKit+…-ObjCEvolutionInterface-MachOObjCSection.h`。移植自 MachOSwiftSection 的
+  `ObjCEvolutionInterfaceTestSuite.AppKitImageGroupArchivedDyldCacheTests`，版本轴、标签与可用性宏都一样；补不了没有 class
+  object 的 Swift 类（那要读 Swift metadata），所以比那边的少这些类，文件名另带后缀、不覆盖那边的。要几分钟，只在设了
+  `MACHO_OBJC_SECTION_DUMP=1` 时运行，用 release 构建（`swift test -c release -Xswiftc -enable-testing`）快得多。
 - 手工端到端验证（2026-08-20）：macOS 15.5 vs 26.5.2 两份 dyld shared cache 的
   CoreLocation，`snapshot` → `diff`（644 行报告，捕捉到 CLBeaconRegion 等类的
   真实属性删除）→ `evolution --summary-only`（226 added · 197 removed ·
