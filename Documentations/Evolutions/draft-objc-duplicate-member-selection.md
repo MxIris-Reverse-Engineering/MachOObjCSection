@@ -58,7 +58,10 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
   的 12.0.1 → 13.0 → 27.0 跑演进：告警从 485 行（每版 126、136、223 行）降到 22 行（6、7、9 行），剩下的都是两份都不是
   协议副本、彼此又不同的；报告正文与 `next` 相比只少了三条假变化（`NSView.frame`、`bounds` 在 13.0，`NSPopover.detached`
   在 27.0），`NSScreen.hash`、`debugDescription` 改写成类自己的声明。release 构建三次各跑一遍，`next` 6.35–6.56 秒，
-  本分支 6.35–6.49 秒，看不出差别。
+  本分支 6.35–6.49 秒，看不出差别。用移植来的导出测试生成 51 个版本的 AppKit 图像组合并头文件：`next` 上的那份告警 8198
+  行，与 MachOSwiftSection 生成的完全一样（只少了它补充的 36 个 Swift 类）；本分支降到 385 行，正文只有 21 行不同，全是
+  预期的修正——`NSView.frame`/`bounds`（13.0）、`NSPopover.detached`（14.4）、`headerLevel`（12.0、14.4）的假变化去掉，
+  `NSMenuItem.action`/`tag`、`NSWindow.contentView`、`NSResponder.touchBar` 等改回可写。
 
 ## 决策日志
 
@@ -78,3 +81,4 @@ diff 和演进按 identity key 配对成员；同一个容器里一个 key 出�
 | 2026-10-29 | 第 2 步：标题定为 `Warnings — identity-key collisions (only the kept record was compared):`，每条写成 `kept: … · dropped: …`，没有保留记录的旧 JSON 只写 `dropped:` 一段 | 不写「内容不同」之类的限定：容器级的碰撞（image 组里的同名类）内容相同也照报，标题只说清楚比较了哪份；三处（diff 报告、演进报告、合并头文件）共用 `ObjCAPIKeyCollision.warningsHeading` 与 `recordsDescription` |
 | 2026-10-29 | 第 3 步：归档 cache 测试补一条整条轴上协议副本都排在前面的情形（`NSMenuItem.action`/`tag`、`NSWindow.contentView`） | `NSView.frame` 只覆盖「中途多出协议副本」；协议副本从轴起点就在前面时演进没有事件，错只出现在合并头文件的写法上，原来的测试抓不到 |
 | 2026-10-29 | 实现完成，待用户看过后收尾 | 文档：实现说明、使用指南、已裁决清单、术语表（「协议副本」）与两处索引已随第 1、2 步同步，不需要另写说明；README 不涉及告警，不用改。不在本案修、记下的两处：`stripSynthesizedMethods removes the setter` 随机挑类，全量跑时挑到 NSScanner 失败过一次，重跑四次都过；`MachOObjCSectionTests` 写死了本机没有的 `/Users/JH/Downloads/iOS18.5-SwiftUI`，CI 本来就跳过它。下游 MachOSwiftSection 升依赖后，`swift-section objc diff` / `evolution` 的告警跟着变，它的 `ObjCCommandLine.md` 若写到告警格式需同步 |
+| 2026-10-30 | 应用户要求，把 MachOSwiftSection 导出 AppKit 图像组合并头文件的那个集成测试移植进来（`ObjCEvolutionInterfaceDumpTests`），只在设了 `MACHO_OBJC_SECTION_DUMP=1` 时运行 | MachOSwiftSection 规定 agent 不跑它的 `IntegrationTests`，移过来才能在本仓库生成并对照改动前后的头文件；补不了没有 class object 的 Swift 类，所以输出另带 `-MachOObjCSection` 后缀，不覆盖那边生成的文件 |
