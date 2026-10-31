@@ -42,6 +42,7 @@
 | [0016](0016-objc-evolution-image-groups.md) | ObjC 演进按 image 组比较，并报出搬家 | Implemented |
 | [0017](0017-objc-duplicate-member-selection.md) | 同一容器里的重复成员按来源取舍，内容相同的不再告警 | Implemented |
 | [draft](draft-objc-exported-declarations-only.md) | 只打印导出的 ObjC 声明，导出判断改按地址 | In Progress |
+| [draft](draft-objc-comment-structure-marking.md) | 给 ObjC 注释标出种类和各段的角色 | Accepted |
 
 0002 以 0001 为前置，两者共同构成「让 MachOObjCSection 具备与 MachOSwiftSection 对等的
 渲染 / 索引 / 命令行能力」这一条完整路线。
