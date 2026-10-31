@@ -4,6 +4,9 @@
 - **创建日期**: 2026-10-31
 - **最后更新**: 2026-10-31
 - **实现分支**: `feature/objc-exported-declarations-only`（worktree `.worktrees/MachOObjCSection-ExportedDeclarationsOnly`，从 `next` 切）
+- **配套文档**: [实现说明「ObjC 导出状态的判定」](../Internal/ObjCExportStatusResolution.md)（按地址判、打印时怎么用、实测）；
+  使用指南[「库调用方：只打印导出的声明」](../Guides/ObjCSectionCommandLine.md#库调用方只打印导出的声明)；术语表的
+  [ObjCExportStatus](../Glossary.md#objcexportstatus导出状态)
 - **关联提案**: [0008](0008-objc-export-status.md)（导出状态的事实层，本案修正其中类与 ivar 的判据）、[0011](0011-visibility-regions.md)（标记模式）；
   MachOSwiftSection 的 0083 `exported-only-marking-mode`（Swift 一侧的同一功能）；RuntimeViewer 的 `draft-exported-declarations-filter`（使用方）
 
@@ -100,9 +103,10 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 - 不改 `objc-section` 命令行（按 0010 退役）；`swift-section objc` 要不要加 flag 由 MachOSwiftSection 决定。
 - 不进 snapshot / diff，理由同 0008：导出状态是符号层面的事实，不是 API 事实。
 
-**文档。** `Internal/ObjCExportStatusResolution.md` 补「按地址判断」一节（两处错、Swift 的符号形态、偏移口径、实测数据），
-术语表的 `ObjCExportStatus` 条目同步，使用指南的库调用方部分加一节（开关、空打印与 `nil` 的区别、per-image 语义、判断
-不了的保留）。
+**文档。** `Internal/ObjCExportStatusResolution.md` 补「为什么按地址判」「打印时怎么用这些结论」两节与 `prepare()` 的实测，
+`Internal/ObjCMetadataSourceGenericization.md` 补记核心 target 的第二处例外，术语表的 `ObjCExportStatus` 与 marked rendering
+条目同步，使用指南加「库调用方：只打印导出的声明」一节（只按确定未导出动手、`nil` 与空打印、类别、Swift 类与 ivar、标记
+模式、ivar 结论何时读），README 的 `ObjCGenerationOptions` 一段改为十一个开关并补一个查询示例。
 
 **落地步骤。** 每一步单独构建通过、相关测试通过后提交一次。
 
@@ -114,7 +118,7 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 3. ✅ 打印：`printExportedDeclarationsOnly` 与可见性选项；普通打印按结论去掉类、ivar 与类别。测试：开关开、关两种打印，旧设置的
    解码。（与第 4 步同一个提交，见决策日志。）
 4. ✅ 标记模式：类、类别与 ivar 的标记。测试：投影与普通打印逐字一致，被排除的类与类别开关打开时投影恰好为空串。
-5. 文档与收尾验证：实现说明、术语表与使用指南；`prepare()` 的耗时实测；全量测试；Xcode 26.6 编译。
+5. ✅ 文档与收尾验证：实现说明、术语表与使用指南；`prepare()` 的耗时实测；全量测试；Xcode 26.6 编译。
 
 ## 决策日志
 
@@ -137,3 +141,4 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 | 2026-10-31 | 第 3、4 步合成一个提交 | 新开关一加进 `VisibilityOption`，`ObjCMarkedInterfaceTests` 就按 `allCases` 把它放进投影组合；只做普通打印、不做标记，这组测试必然是红的，两步分开就没有一步能单独通过 |
 | 2026-10-31 | 被排除的类与类别用 `markAtoms(from:visibleUnder:)` 原地标，不包 `VisibilityRegion` | 方案原写包一层 `VisibilityRegion`。对照测试比文本、span 与 identifier：包一层会在声明外多出一层普通打印没有的元素；`markAtoms` 只改原子的 identifier，元素边界不变，MachOSwiftSection 0083 的 `visible(under:)` 也是这样做的。它在 swift-semantic-string 0.4.0 就有，依赖下限不用动 |
 | 2026-10-31 | 第 3、4 步完成 | fixture 上 30 个测试、Foundation 全量的标记对照 6 个测试全过。中途对照测试抓到一个错：普通打印在开关关着时也给未导出的类打了条件标记（文字不变、identifier 表多一项），改为只在标记模式下标。实测开关打开后 Foundation 891 个类有 529 个打印为空、213 个去掉了部分 ivar，AppKit 2773 / 2062 / 595，SwiftUI 361 / 321 / 20；三个框架的类别一个都没被去掉——链接器默认把同一镜像里加在本镜像类上的类别并进类本身，这条规则由 fixture（`-Wl,-no_objc_category_merging`）覆盖 |
+| 2026-10-31 | 第 5 步完成；实现完成，待用户看过后收尾 | 验证在 JH's Mac Studio Ultra 上，用仓库提交的 `Package.resolved`，与 CI 同一组测试（`swift test --skip MachOObjCSectionTests`）：Xcode 26.6（Swift 6.3.3，CI 的版本，单独的构建目录）构建与测试原始退出码都是 0，46 个套件 319 个测试全过；默认的 Xcode 27.2（Swift 6.4.2）原始退出码 0。不跳过时只有 `MachOObjCSectionTests`（XCTest）失败：它的 `setUp` 读本机不存在的 `/Users/JH/Downloads/iOS18.5-SwiftUI`，是上游的测试代码，本分支没动，0008、0011 的记录里也是这样。文档：实现说明「ObjC 导出状态的判定」补了按地址判、打印时怎么用、`prepare()` 实测三部分，泛型化的实现说明补记核心 target 的第二处例外，使用指南加库调用方一节，术语表的 `ObjCExportStatus` 与 marked rendering 条目同步，README 的生成开关一段同步；没有新术语。RuntimeViewer 接入后可从宿主一侧再核对两个列表的标记 |

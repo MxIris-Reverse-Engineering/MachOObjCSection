@@ -523,8 +523,8 @@ let builder = ObjCInterfaceBuilder(indexer: indexer, machO: machO)
 print(builder.classInterface(named: "NSString")?.string ?? "")
 ```
 
-`ObjCGenerationOptions` carries ten switches — six that strip members, four that add
-explanatory comments:
+`ObjCGenerationOptions` carries eleven switches — six that strip members, four that add
+explanatory comments, and one that leaves out what the image provably does not export:
 
 ```swift
 var options = ObjCGenerationOptions.default
@@ -534,6 +534,20 @@ options.addMethodIMPAddressComments = true
 
 let declaration = builder.classInterface(named: "NSError", options: options)
 ```
+
+With `printExportedDeclarationsOnly`, a class no exported symbol publishes renders as an
+empty string, as does a category on such a class of the image, and an ivar whose offset
+variable is not exported is dropped. Methods, properties and protocols have no symbol of
+their own and always stay. The same verdict is there to read without rendering, for every
+class the image lists:
+
+```swift
+let isNotExported = indexer.exportStatus(ofClassNamed: "_NSSomeInternalClass")?.isDefinitelyNotExported == true
+```
+
+`nil` means no verdict — a class of another image, or one with no class object — never
+"not exported". A Swift class is judged by its type metadata symbol, so the verdict agrees
+with MachOSwiftSection's for the same class.
 
 C primitive types can be substituted, and the ivar-offset comment reworded:
 
@@ -611,8 +625,8 @@ objc-section interface NSError --uses-system-dyld-shared-cache -n Foundation
 objc-section dump /path/to/Universal -a arm64e
 ```
 
-Each of the ten `ObjCGenerationOptions` switches has a flag, and all of them default to off,
-so a bare `dump` prints the metadata as it stands:
+Each strip and comment switch of `ObjCGenerationOptions` has a flag (`printExportedDeclarationsOnly`
+is library-only), and all of them default to off, so a bare `dump` prints the metadata as it stands:
 
 ```bash
 objc-section interface ACAssetSymbolGeneratorOptions ./AssetCatalogFoundation \

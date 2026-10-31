@@ -101,8 +101,12 @@ swift-semantic-string 的 `VisibilityRegion`（整个被导出过滤排除的类
 3. **查询是 per-image 的。** 只能拿本镜像列出的记录去问。按名字查的旧接口（已 deprecated）
    对 Foundation 查 `NSArray` 得到 `notExported`——该类由 CoreFoundation 定义并导出。
 
+生成开关 `printExportedDeclarationsOnly` 按它去掉确定未导出的类、ivar 与类别；宿主不经打印时问
+`ObjCInterfaceIndexer.exportStatus(ofClassNamed:)`，`nil` 表示没有结论（别的镜像的类、宿主补充的类）。
+
 - **主要出现在**：`Sources/ObjCMetadataSource/ObjCExportStatus.swift`、
-  `Sources/ObjCMetadataSource/ObjCExportIndex.swift`
+  `Sources/ObjCMetadataSource/ObjCExportIndex.swift`、`Sources/ObjCIndexing/ObjCInterfaceIndexer.swift`、
+  `Sources/ObjCInterface/ObjCInterfaceBuilder.swift`
 - **延伸阅读**：[实现说明](Internal/ObjCExportStatusResolution.md)、
   [提案 0008](Evolutions/0008-objc-export-status.md)、
   [只打印导出的 ObjC 声明](Evolutions/draft-objc-exported-declarations-only.md)

@@ -1,7 +1,7 @@
 # objc-section 使用指南
 
-- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）、[0014](../Evolutions/0014-host-supplied-classes.md)（由宿主补充的类，库调用方）、[0015](../Evolutions/0015-objc-evolution-interface.md)（合并多个版本、带演进标注的头文件，库调用方）、[0016](../Evolutions/0016-objc-evolution-image-groups.md)（几个 image 当作一个 API 面，库调用方）
-- **最后更新**: 2026-10-29
+- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）、[0014](../Evolutions/0014-host-supplied-classes.md)（由宿主补充的类，库调用方）、[0015](../Evolutions/0015-objc-evolution-interface.md)（合并多个版本、带演进标注的头文件，库调用方）、[0016](../Evolutions/0016-objc-evolution-image-groups.md)（几个 image 当作一个 API 面，库调用方）、[只打印导出的 ObjC 声明](../Evolutions/draft-objc-exported-declarations-only.md)（库调用方）
+- **最后更新**: 2026-10-31
 
 这份文档写给两类人：用 `objc-section` 命令行导出 ObjC 头的人，以及直接调用
 `ObjCInterfaceIndexer` / `ObjCInterfaceBuilder` 处理磁盘上二进制的人。
@@ -130,6 +130,9 @@ fat 二进制不指定 `-a` 会报错，并把可选架构列出来。
 | `--emit-property-attributes` | 每个属性后面加原始 attribute 串 |
 | `--emit-method-imp-addresses` | 每个方法后面加 `// IMP: 0x…` |
 | `--emit-property-accessor-addresses` | 每个属性后面加 getter / setter 的 IMP 地址 |
+
+库里还有第十一个开关 `printExportedDeclarationsOnly`，命令行没有对应的 flag，见下文
+[库调用方：只打印导出的声明](#库调用方只打印导出的声明)。
 
 ### 注释模板
 
@@ -328,6 +331,34 @@ func makeIndexer() -> ObjCInterfaceIndexer<MachOImage>
   `CMt`，没有 `CMs`）。所以这些 category 按 `class_ro_t` 里的名字（`_TtC…`）归位，strip 过
   也一样，`classStubOffset` 用不上；补充类换了别的写法，类和它的 category 就分在两个名字下。
 
+## 库调用方：只打印导出的声明
+
+`ObjCGenerationOptions.printExportedDeclarationsOnly`（可见性选项 `objc.printExportedDeclarationsOnly`）打开后，
+`ObjCInterfaceBuilder` 去掉镜像确定没有导出的东西；宿主不经打印、想直接给类列表打标时，`prepare()` 之后问
+`ObjCInterfaceIndexer.exportStatus(ofClassNamed:)`。「导出」指 export trie 里有符号落在它的位置上，是链接层面的
+事实，不是访问级别，术语见 [ObjCExportStatus](../Glossary.md#objcexportstatus导出状态)。下面几条在签名里看不出来：
+
+- **只按「确定未导出」动手。** 只有 `notExported` 会让东西消失。镜像没有导出信息（`imageHasNoExportInformation`）时
+  什么都不去掉；方法、属性、协议、C struct / union 没有自己的导出符号，永远保留。宿主打标同样只认
+  `isDefinitelyNotExported`。
+- **`nil` 不是「未导出」。** `exportStatus(ofClassNamed:)` 对本镜像类列表里没有的名字返回 `nil`：别的镜像的类
+  （Foundation 问 `NSArray`，它归 CoreFoundation 导出），以及宿主补充的类（没有类对象可判）。`nil` 一律当作没有证据。
+- **未导出的类打印成空串，不是 `nil`。** `classInterface(named:options:…)` 开着这个开关时，对未导出的类返回空的
+  `SemanticString`；`nil` 仍只表示镜像里没有这个类。宿主据此显示占位说明、批量导出时跳过它。
+- **类别跟着目标类走。** 目标类是本镜像列出的类、且未导出时，整个类别打印成空串；目标类在别的镜像时整个保留。
+  系统框架里几乎碰不到前一种：链接器默认把同一镜像里加在本镜像类上的类别并进类本身。
+- **Swift 类按类型元数据判，与 MachOSwiftSection 一致。** 没有 ObjC 祖先的 Swift 类没有 `_OBJC_CLASS_$_` 符号，
+  判断看类对象上的 `$s…CN`，结论与 MachOSwiftSection 对同一个类型的 `exportStatus` 相同（macOS 27.2 上 977 个
+  Swift 类逐个核对过）。
+- **Swift 类的 ivar 基本都会消失。** ivar 看偏移变量有没有导出，Swift 的偏移变量是字段偏移 `$s…Wvd`，苹果的 Swift
+  框架几乎不导出它（SwiftUI 0 个）。用 `@objc @implementation` 写的 ObjC 类也一样，AppKit 例外地导出了其中一些。
+- **标记模式投影后与普通打印逐字一致。** `markedClassInterface` / `markedCategoryInterface` 把被去掉的部分照常打印、
+  标上「开关关着才可见」；被排除的整个类或类别在开关打开时投影出来恰好是空串，连换行也没有。
+- **ivar 的结论在打印时才读。** `prepare()` 只为类算结论；ivar 要再读一遍类的 ivar 列表，由打印器只为正在打印的
+  那个类读。要逐个 ivar 结论的宿主，用事实层的 `ObjCExportIndex.exportStatus(ofIvarOffsetVariableAt:)` 配合
+  `ObjCMetadataSource.objcIvarOffsetVariableOffsets(of:)`。按名字查的 `ObjCExportIndex.exportStatus(ofClassNamed:)` /
+  `exportStatus(ofIvarNamed:inClassNamed:)` 已 deprecated，它们只认 clang 的拼法，会把上两条里的 Swift 类与 ivar 判成未导出。
+
 ## 库调用方：把 N 个版本合并成一份带演进标注的头文件
 
 `ObjCEvolutionInterfaceBuilder`（`ObjCInterface`）把同一个二进制 N ≥ 2 个版本的头文件按声明合并成一份：外观与
@@ -353,7 +384,7 @@ let merged = try builder.build(availabilityPlatform: "macos")
 - **`addVersion` 返回后就不再引用索引器和 MachO。** 宿主可以逐个版本加载，加完就释放。builder 留下的是每个版本的快照、
   每个声明最新的渲染，以及渲染变过的那几版。在 M3 Ultra 上合并 macOS 11.0.1 到 15.0 的 8 个 AppKit：每个版本 6–8 秒，
   每加一个版本进程占用涨 25–35 MB，`build` 之后共 451 MB。
-- **用 `ObjCGenerationOptions.default` 渲染，十个生成开关都不适用。** 剥掉的成员没有行可以挂标注，地址和偏移注释每版都不同。
+- **用 `ObjCGenerationOptions.default` 渲染，生成开关一个都不适用。** 剥掉的成员没有行可以挂标注，地址和偏移注释每版都不同。
   `cTypeReplacements` 在 `init` 里给，对每个版本都生效。
 - **没有标注就是整条轴上都在、从没变过。** 加入或删掉的容器只在它那一行标注，成员不再各自标注，它们跟着容器存在。
   superclass 和采纳的协议都写在 `@interface` 那一行里，它们的变化写成那一行上方的注释行。
