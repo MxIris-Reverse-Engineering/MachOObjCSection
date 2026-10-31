@@ -145,6 +145,9 @@ AnnotationRegion(.impAddress) {
   原子，逐个原子断言。
 - `SuppliedClassRenderingTests`：宿主补充的类上方那行是一个注释原子；开着开关时依次是 `note`、`ivarOffset`、
   `ivarOffsetUnknown` 三个区域。
+- 使用方验证：RuntimeViewer 对着 `635fe17`（连同 swift-semantic-string 的 `next` `2698750`）做了端到端验证，全部
+  通过。它打印 libobjc 的 `NSObject`、四个注释开关全开，开关开与关的 `interfaceString` 文本、span、identifier 完全
+  相等，每条注释都在表里、从 `//` 开始，出现的 kind 与角色都在约定清单里。见 RuntimeViewer 的提交 `c3ad6ca7`。
 
 ### 依赖与发版
 
