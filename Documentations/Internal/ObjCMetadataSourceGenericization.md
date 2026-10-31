@@ -52,7 +52,7 @@ objc-section              命令行
 > 原样保留；上游改了类或 category 的组装方式，`ReadOnlyDataClassInfoTests` 的一致性比对会先失败。
 >
 > **2026-10-31 补记**：按地址判断 ivar 是否导出（提案
-> [只打印导出的 ObjC 声明](../Evolutions/draft-objc-exported-declarations-only.md)）是第二处例外。要拿到
+> [0018](../Evolutions/0018-objc-exported-declarations-only.md)）是第二处例外。要拿到
 > ivar 偏移变量的位置，得照 `ObjCIvarProtocol.offset(in:)` 的同一条路解析偏移指针，文件模式用的是核心 target
 > 内部的 `resolveRebase(_:)`，进程内模式用的是同一文件里 `private` 的 `data(in:)`（类被 runtime realize 之后
 > 要经 RW data 找 RO data）。所以 `ObjCClassProtocol.ivarOffsetVariableOffsets(in:)` 同样追加在
