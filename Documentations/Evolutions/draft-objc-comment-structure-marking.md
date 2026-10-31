@@ -151,11 +151,11 @@ AnnotationRegion(.impAddress) {
 
 ### 依赖与发版
 
-需要 swift-semantic-string 带新组件的版本。它发布后把依赖下限从 0.4.0 抬上去，在此之前本地构建把
-swift-semantic-string 这一个依赖用 `swift package edit swift-semantic-string --path <它的 next 检出>` 换成本地的。
-不用 `USING_LOCAL_DEPENDENCIES`：它会把 MachOKit、MachOKitExtensions 也一起换成本地检出。MachOSwiftSection 的依赖
-范围包含本库每个新的补丁版本，所以本库的 tag 要等 swift-semantic-string 先发版。落地前照例再用 CI 的 Xcode 26.6
-编一遍。
+需要 swift-semantic-string 带新组件的版本，即 0.6.0：依赖下限从 0.4.0 抬到 0.6.0，`Package.resolved` 只动这一个
+pin。它发布之前，本地构建用 `swift package edit swift-semantic-string --path <它的 next 检出>` 只把这一个依赖换成
+本地的；不用 `USING_LOCAL_DEPENDENCIES`，因为它会把 MachOKit、MachOKitExtensions 也一起换成本地检出。抬下限之后
+只用远端依赖验证，与 CI 一致，Xcode 27.2 与 CI 用的 26.6 各跑一遍。MachOSwiftSection 的依赖范围包含本库每个新的
+补丁版本，所以本库带这个功能的 tag 不能早于 swift-semantic-string 0.6.0，现在已经满足。
 
 使用指南的「库调用方：标出注释的结构」一节与代码同批写好：怎么打开与读回、kind 与各段、签名里看不出来的几条契约。
 
@@ -165,15 +165,11 @@ swift-semantic-string 这一个依赖用 `swift package edit swift-semantic-stri
    `ObjCRenderingContext.comment(_:)` 输出。开关还不存在，输出与改动前逐个原子相同。`CommentAtomTests` 用手工构造的
    ivar、属性、方法钉住每条注释的原子和整行文本，`SuppliedClassRenderingTests` 钉住宿主补充类上方那行；这批测试在
    改动前的代码上同样通过。
-2. **开关与标注输出**（依赖 swift-semantic-string 的 `AnnotationRegion`）——已完成，对着它本地的 `next` 构建：
+2. **开关与标注输出**（依赖 swift-semantic-string 的 `AnnotationRegion`）——已完成：
    `ObjCRenderingContext` 与 `ObjCInterfaceBuilder` 上的 `marksCommentStructure`，开着时的标注输出，
-   `AnnotationRegion.Kind` 的六个常量，宿主措辞的 ivar 偏移注释的切分规则；测试按「测试」一节。
+   `AnnotationRegion.Kind` 的六个常量，宿主措辞的 ivar 偏移注释的切分规则；测试按「测试」一节。先对着
+   swift-semantic-string 本地的 `next` 构建，它发布 0.6.0 后依赖下限抬到 0.6.0。
 3. **文档**——已完成：使用指南「库调用方：标出注释的结构」一节，术语表的 comment structure marking 一条，文档索引。
-
-### 待定
-
-- swift-semantic-string 发版后，把依赖下限抬到那个版本，退出 edit 模式，用发布的版本和 Xcode 26.6 各验证一遍，
-  才能收尾。
 
 ## 决策日志
 
@@ -194,3 +190,5 @@ swift-semantic-string 这一个依赖用 `swift package edit swift-semantic-stri
 | 2026-10-31 | 发版前的本地构建用 `swift package edit` 只换 swift-semantic-string，不用 `USING_LOCAL_DEPENDENCIES` | 后者把 MachOKit、MachOKitExtensions 也换成本地检出，测到的就不只是本案的改动。 |
 | 2026-10-31 | 加了一条术语 comment structure marking | 与已有的 marked rendering 同用「标记」一词，却是两回事，不写清楚容易混。 |
 | 2026-10-31 | 实现完成，等 swift-semantic-string 发版、抬依赖下限后再收尾 | 现在只能对着它本地的 `next` 构建；本库的 tag 不能早于它发版。 |
+| 2026-10-31 | swift-semantic-string 0.6.0 发布，依赖下限抬到 0.6.0，`Package.resolved` 只动这一个 pin | 与 0.4.0 那次一样单独一个提交；只用远端依赖验证，与 CI 一致。 |
+| 2026-10-31 | 实现完成，待用户看过后收尾 | — |

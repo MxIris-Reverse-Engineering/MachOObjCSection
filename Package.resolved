@@ -1,5 +1,5 @@
 {
-  "originHash" : "5287d6e8236b85177aa5b7e9de9ff3fd3f0fb954f33c06c4c508dfc1bc545fab",
+  "originHash" : "830a9f4a8543eb1980b97e9fadd01d3ea54208f2250ff08500b5db11723265c3",
   "pins" : [
     {
       "identity" : "associatedobject",
@@ -150,8 +150,8 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/MxIris-Reverse-Engineering/swift-semantic-string",
       "state" : {
-        "revision" : "9c01fc2d37623fd3bd146cf72b811f3702857f76",
-        "version" : "0.4.0"
+        "revision" : "fd7e93c5a1e5e9bf4fffe60b289de01bb3321845",
+        "version" : "0.6.0"
       }
     },
     {
