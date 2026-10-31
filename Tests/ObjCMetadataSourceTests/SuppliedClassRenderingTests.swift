@@ -40,6 +40,15 @@ struct SuppliedClassRenderingTests {
         #expect(markedLines.first == "// Generic Swift class, instantiated at runtime")
     }
 
+    @Test("The kind comment is one comment atom")
+    func kindCommentAtom() async throws {
+        let (indexer, machO, suppliedClass) = try await Self.templateIndexer()
+
+        let rendering = try #require(ObjCInterfaceBuilder(indexer: indexer, machO: machO).classInterface(named: suppliedClass.name))
+
+        #expect(rendering.components.first == AtomicComponent(string: "// Generic Swift class, instantiated at runtime", type: .comment))
+    }
+
     @Test("The kind comment names each kind")
     func kindCommentForEachKind() async throws {
         let (_, machO, templateClass) = try await Self.templateIndexer()

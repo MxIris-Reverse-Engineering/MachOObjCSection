@@ -214,14 +214,14 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
 
         let declaration = finalClassInfo.semanticString(using: context)
         let rendering = suppliedClassGroup.map {
-            Self.declaration(declaration, under: $0.suppliedClass.kind.declarationComment)
+            Self.declaration(declaration, under: context.comment(.note($0.suppliedClass.kind.declarationComment)))
         } ?? declaration
         return isExcludedByExportFilter && marksOptionalContent ? Self.visibleWhileExportFilterIsOff(rendering) : rendering
     }
 
     @SemanticStringBuilder
-    private static func declaration(_ declaration: SemanticString, under comment: String) -> SemanticString {
-        Comment(comment)
+    private static func declaration(_ declaration: SemanticString, under comment: SemanticString) -> SemanticString {
+        comment
         BreakLine()
         declaration
     }

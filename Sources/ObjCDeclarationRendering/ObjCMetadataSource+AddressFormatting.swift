@@ -19,18 +19,14 @@ extension ObjCMetadataSource {
         return "0x\(String(resolvedAddress, radix: 16, uppercase: true))"
     }
 
-    /// Build a ``Comment`` component for an IMP address.
-    ///
-    /// Produces a normal comment (e.g. `// IMP: 0x1A2B3C`) when the address
-    /// is valid, or an ``Error`` component (e.g. `// IMP: <invalid 0x0>`)
+    /// The comment for an IMP address: `// IMP: 0x1A2B3C` when the address is
+    /// valid, `// IMP: <invalid 0x0>` — the raw value written as an error —
     /// when it is not.
-    @SemanticStringBuilder
-    func impAddressComment(label: String, rawValue: UInt64) -> SemanticString {
+    func impAddressComment(label: String, rawValue: UInt64) -> ObjCComment {
         if let resolved = formattedAddress(forRawValue: rawValue) {
-            Comment("\(label): \(resolved)")
+            .impAddress(label: label, address: resolved)
         } else {
-            Comment("\(label): ")
-            Error("<invalid 0x\(String(UInt(rawValue), radix: 16, uppercase: true))>")
+            .impAddress(label: label, invalidAddress: "<invalid 0x\(String(UInt(rawValue), radix: 16, uppercase: true))>")
         }
     }
 

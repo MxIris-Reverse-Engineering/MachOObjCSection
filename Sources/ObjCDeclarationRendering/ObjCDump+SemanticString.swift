@@ -310,11 +310,11 @@ extension ObjCIvarInfo {
         context.optionalContent(.addIvarOffsetComments) {
             Space()
             if context.ivarNamesWithUnknownOffset.contains(name) {
-                Comment("offset: unknown")
+                context.comment(.unknownIvarOffset)
             } else if let ivarOffsetCommentBuilder = context.ivarOffsetCommentBuilder {
-                Comment(ivarOffsetCommentBuilder(offset))
+                context.comment(.ivarOffset(wordedByHost: ivarOffsetCommentBuilder(offset)))
             } else {
-                Comment("offset: \(offset)")
+                context.comment(.ivarOffset(offset))
             }
         }
     }
@@ -387,15 +387,11 @@ extension ObjCPropertyInfo {
         context.optionalContent(.addPropertyAttributesComments) {
             Joined(separator: " ", prefix: " ") {
                 if attributes.contains(.dynamic) {
-                    Comment("@dynamic \(name)")
+                    context.comment(.propertyDynamic(propertyName: name))
                 }
 
                 if let ivar {
-                    if ivar == name {
-                        Comment("@synthesize \(ivar)")
-                    } else {
-                        Comment("@synthesize \(name) = \(ivar)")
-                    }
+                    context.comment(.propertySynthesis(propertyName: name, ivarName: ivar))
                 }
             }
         }
@@ -407,10 +403,10 @@ extension ObjCPropertyInfo {
 
             Joined(separator: " ", prefix: " ") {
                 if let getterIMP = imps[getterName] {
-                    context.machO.impAddressComment(label: "getter IMP", rawValue: getterIMP)
+                    context.comment(context.machO.impAddressComment(label: "getter IMP", rawValue: getterIMP))
                 }
                 if let setterIMP = imps[setterName] {
-                    context.machO.impAddressComment(label: "setter IMP", rawValue: setterIMP)
+                    context.comment(context.machO.impAddressComment(label: "setter IMP", rawValue: setterIMP))
                 }
             }
         }
@@ -471,7 +467,7 @@ extension ObjCMethodInfo {
         
         context.optionalContent(.addMethodIMPAddressComments) {
             Space()
-            context.machO.impAddressComment(label: "IMP", rawValue: imp)
+            context.comment(context.machO.impAddressComment(label: "IMP", rawValue: imp))
         }
     }
 }
@@ -775,14 +771,14 @@ extension ObjCType {
             } else {
                 Keyword("id")
                 Space()
-                InlineComment("block")
+                context.comment(.typeNote("block"))
             }
         case .functionPointer:
             Keyword("void")
             Space()
             "*"
             Space()
-            InlineComment("function pointer")
+            context.comment(.typeNote("function pointer"))
         case .array:
             // Declarations write the dimensions after the name they declare
             // (see `arrayElementTypeAndDimensions`); an array reached here has

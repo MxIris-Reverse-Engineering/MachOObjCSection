@@ -1,6 +1,6 @@
 # Draft - 给 ObjC 注释标出种类和各段的角色
 
-- **状态**: Accepted
+- **状态**: In Progress
 - **创建日期**: 2026-10-31
 - **最后更新**: 2026-10-31
 - **实现分支**: `feature/objc-comment-structure-marking`（worktree `.worktrees/MachOObjCSection-CommentStructureMarking`，
@@ -150,18 +150,18 @@ swift-semantic-string 先发版。落地前照例再用 CI 的 Xcode 26.6 编一
 
 ### 落地步骤
 
-1. **注释改由一份描述产出**（不依赖新 API）：新增 `ObjCComment`（kind 加一串段），八处注释都经
-   `ObjCRenderingContext.comment(_:)` 输出。开关还不存在，输出与改动前逐个原子相同。测试用手工构造的 fixture
-   钉住每条注释的原子和整行文本。
-2. **自定义 ivar 偏移注释的切分规则**（不依赖新 API）：单元测试覆盖三个自带模板，以及不含 `: ` 的情形。
-3. **开关与标注输出**（依赖 swift-semantic-string 的 `AnnotationRegion`）：`ObjCRenderingContext` 与
-   `ObjCInterfaceBuilder` 上的 `marksCommentStructure`，开着时的标注输出，`AnnotationRegion.Kind` 的六个常量；测试按
-   「测试」一节。在对方发版之前走本地依赖，发版后抬依赖下限。
-4. **文档**：使用指南「库调用方」部分，文档索引。
+1. **注释改由一份描述产出**（不依赖新 API）——已完成：新增 `ObjCComment`（kind 加一串段），八处注释都经
+   `ObjCRenderingContext.comment(_:)` 输出。开关还不存在，输出与改动前逐个原子相同。`CommentAtomTests` 用手工构造的
+   ivar、属性、方法钉住每条注释的原子和整行文本，`SuppliedClassRenderingTests` 钉住宿主补充类上方那行；这批测试在
+   改动前的代码上同样通过。
+2. **开关与标注输出**（依赖 swift-semantic-string 的 `AnnotationRegion`）：`ObjCRenderingContext` 与
+   `ObjCInterfaceBuilder` 上的 `marksCommentStructure`，开着时的标注输出，`AnnotationRegion.Kind` 的六个常量，自定义
+   ivar 偏移注释的切分规则；测试按「测试」一节。在对方发版之前走本地依赖，发版后抬依赖下限。
+3. **文档**：使用指南「库调用方」部分，文档索引。
 
 ### 待定
 
-- swift-semantic-string 的 API 还是草案，等它的用户批准，签名可能微调；落地前按它发布的版本核对一遍。第 3 步要等
+- swift-semantic-string 的 API 还是草案，等它的用户批准，签名可能微调；落地前按它发布的版本核对一遍。第 2 步要等
   它实现出来才能开工。
 
 ## 决策日志
@@ -179,3 +179,4 @@ swift-semantic-string 先发版。落地前照例再用 CI 的 Xcode 26.6 编一
 | 2026-10-31 | 不用 swift-semantic-string 提议的 OutputTransformer 模板分段 | 渲染层只拿到 `(Int) -> String` 的闭包，按第一个 `: ` 切；`Transformer.ObjCIvarOffset` 只有一个占位符、代入的是数字，逐个替换与扫描一遍的结果相同，也不必改走新函数。 |
 | 2026-10-31 | 用户批准，开始实现 | — |
 | 2026-10-31 | 功能分支叠在 `feature/objc-exported-declarations-only` 上切；提案随功能分支提交，不提交到 `next` | 本案覆盖 `printExportedDeclarationsOnly` 标记模式下的情形，依赖那个还没推到 `origin/next` 的功能。本地 `next` 上那次合并还在等用户过目，从它切或在它上面提交，用户撤销那次合并时，本分支就会带着它。 |
+| 2026-10-31 | 自定义 ivar 偏移注释的切分规则并进标注输出那一步，原来单列的一步取消 | 切分的结果只在标注输出里看得到；在那一步经公开接口测，不针对内部实现单独测。 |
