@@ -49,6 +49,18 @@ struct SuppliedClassRenderingTests {
         #expect(rendering.components.first == AtomicComponent(string: "// Generic Swift class, instantiated at runtime", type: .comment))
     }
 
+    @Test("Marked, the kind comment is a note and an ivar of unknown offset has a kind of its own")
+    func markedCommentKinds() async throws {
+        let (indexer, machO, suppliedClass) = try await Self.templateIndexer()
+        let builder = ObjCInterfaceBuilder(indexer: indexer, machO: machO, marksCommentStructure: true)
+        var options = ObjCGenerationOptions.default
+        options.addIvarOffsetComments = true
+
+        let rendering = try #require(builder.classInterface(named: suppliedClass.name, options: options))
+
+        #expect(rendering.frozen().separatingAnnotationRegions().annotations.regions.map(\.kind) == [.note, .ivarOffset, .ivarOffsetUnknown])
+    }
+
     @Test("The kind comment names each kind")
     func kindCommentForEachKind() async throws {
         let (_, machO, templateClass) = try await Self.templateIndexer()

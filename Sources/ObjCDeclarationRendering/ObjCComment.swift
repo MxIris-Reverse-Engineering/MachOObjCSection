@@ -7,50 +7,16 @@ import Semantic
 /// Rendered plain, each run of adjacent segments of one semantic type is one
 /// atom, which is what these comments have always been: `// offset: 8` is one
 /// `.comment` atom, and `// IMP: <invalid 0x0>` a `.comment` atom followed by
-/// an `.error` one.
+/// an `.error` one. With its structure marked, the same atoms come in pieces
+/// inside annotation regions, and separating the regions gives the plain
+/// rendering back, span for span.
 package struct ObjCComment: Sendable {
-    /// What a comment says.
-    package enum Kind: Sendable {
-        /// `// IMP: 0x1A2B` after a method, `// getter IMP: 0x1A2B` and
-        /// `// setter IMP: 0x1A2B` after a property.
-        case impAddress
-        /// `// offset: 8` after an ivar, or the host's wording of it.
-        case ivarOffset
-        /// `// offset: unknown` after an ivar whose offset the image does not
-        /// record.
-        case ivarOffsetUnknown
-        /// `// @synthesize name`, or `// @synthesize name = ivar`.
-        case propertySynthesis
-        /// `// @dynamic name`.
-        case propertyDynamic
-        /// `/* block */` and `/* function pointer */` inside a type.
-        case typeNote
-        /// Explanatory text, such as the line above a host-supplied class.
-        case note
-    }
-
-    /// What one segment of a comment is.
-    package enum Role: Sendable {
-        /// `// `, `/* ` or ` */`.
-        case marker
-        /// What the value is: `IMP`, `offset`, `@synthesize`.
-        case label
-        /// `: `, ` = `, or the space after `@synthesize`.
-        case separator
-        /// The name of the property a comment is about.
-        case name
-        /// An address, an offset, an ivar name.
-        case value
-        /// Explanatory text.
-        case text
-    }
-
     package struct Segment: Sendable {
-        package let role: Role
+        package let role: AnnotationSegment.Role
         package let text: String
         package let type: SemanticType
 
-        package init(_ role: Role, _ text: String, type: SemanticType = .comment) {
+        package init(_ role: AnnotationSegment.Role, _ text: String, type: SemanticType = .comment) {
             self.role = role
             self.text = text
             self.type = type
@@ -62,32 +28,55 @@ package struct ObjCComment: Sendable {
         static let colonSeparator = Segment(.separator, ": ")
     }
 
-    package let kind: Kind
+    package let kind: AnnotationRegion.Kind
     package let segments: [Segment]
 
-    package init(kind: Kind, segments: [Segment]) {
+    package init(kind: AnnotationRegion.Kind, segments: [Segment]) {
         self.kind = kind
         self.segments = segments
+    }
+
+    /// The segments that render anything, in runs of one semantic type: the
+    /// atoms of the plain rendering.
+    private var atomRuns: [(type: SemanticType, segments: [Segment])] {
+        var runs: [(type: SemanticType, segments: [Segment])] = []
+        for segment in segments where !segment.text.isEmpty {
+            if let lastRun = runs.last, lastRun.type == segment.type {
+                runs[runs.count - 1].segments.append(segment)
+            } else {
+                runs.append((segment.type, [segment]))
+            }
+        }
+        return runs
     }
 
     /// The comment as plain text: each run of adjacent segments of one
     /// semantic type is one atom.
     package var plainRendering: SemanticString {
         var rendering = SemanticString()
-        var runText = ""
-        var runType: SemanticType?
-        for segment in segments where !segment.text.isEmpty {
-            if let runType, runType != segment.type {
-                rendering.append(runText, type: runType)
-                runText = ""
-            }
-            runType = segment.type
-            runText += segment.text
-        }
-        if let runType {
-            rendering.append(runText, type: runType)
+        for run in atomRuns {
+            rendering.append(run.segments.map(\.text).joined(), type: run.type)
         }
         return rendering
+    }
+
+    /// The comment with its structure marked: an `AnnotationRegion` of its
+    /// kind around it, an `AnnotatedAtom` for each atom of the plain
+    /// rendering, and an `AnnotationSegment` of its role around each segment.
+    @SemanticStringBuilder
+    package var markedRendering: SemanticString {
+        let atomRuns = atomRuns
+        AnnotationRegion(kind) {
+            for run in atomRuns {
+                AnnotatedAtom(type: run.type) {
+                    for segment in run.segments {
+                        AnnotationSegment(segment.role) {
+                            segment.text
+                        }
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -126,11 +115,20 @@ extension ObjCComment {
     }
 
     /// The ivar offset comment as the host worded it
-    /// (``ObjCRenderingContext/ivarOffsetCommentBuilder``).
+    /// (``ObjCRenderingContext/ivarOffsetCommentBuilder``), in segments by
+    /// one rule, since the wording is the host's: up to the first `: ` is the
+    /// label, the rest the value, and wording without `: ` is all value.
+    /// `Transformer.ObjCIvarOffset`'s own templates — `offset: ${offset}`,
+    /// `ivar offset: ${offset}`, `${offset}` — split exactly so.
     package static func ivarOffset(wordedByHost body: String) -> ObjCComment {
-        ObjCComment(kind: .ivarOffset, segments: [
+        guard let separatorRange = body.range(of: ": ") else {
+            return ObjCComment(kind: .ivarOffset, segments: [.lineCommentMarker, Segment(.value, body)])
+        }
+        return ObjCComment(kind: .ivarOffset, segments: [
             .lineCommentMarker,
-            Segment(.value, body),
+            Segment(.label, String(body[..<separatorRange.lowerBound])),
+            .colonSeparator,
+            Segment(.value, String(body[separatorRange.upperBound...])),
         ])
     }
 
@@ -190,9 +188,10 @@ extension ObjCComment {
 // MARK: - Rendering
 
 extension ObjCRenderingContext {
-    /// `comment` as this rendering writes it. Every comment a declaration
-    /// rendering adds goes through here.
+    /// `comment` as this rendering writes it: marked with its structure when
+    /// ``marksCommentStructure`` is set, plain otherwise. Every comment a
+    /// declaration rendering adds goes through here.
     package func comment(_ comment: ObjCComment) -> SemanticString {
-        comment.plainRendering
+        marksCommentStructure ? comment.markedRendering : comment.plainRendering
     }
 }

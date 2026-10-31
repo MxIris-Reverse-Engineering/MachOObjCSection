@@ -5,6 +5,8 @@
 - **最后更新**: 2026-10-31
 - **实现分支**: `feature/objc-comment-structure-marking`（worktree `.worktrees/MachOObjCSection-CommentStructureMarking`，
   叠在 `feature/objc-exported-declarations-only` 上切）
+- **配套文档**: 使用指南[「库调用方：标出注释的结构」](../Guides/ObjCSectionCommandLine.md#库调用方标出注释的结构)；术语表的
+  [comment structure marking](../Glossary.md#comment-structure-marking注释结构标记)
 - **关联提案**: [0011](0011-visibility-regions.md)（标记模式：注释在其中各自带可见性条件）；RuntimeViewer 的
   `draft-source-editor-comment-annotations`（使用方：SourceEditor 面板把注释画成标签）；swift-semantic-string 的
   设计记录 `docs/AnnotationRegions.md`（提供 `AnnotationRegion`、`AnnotationSegment`、`AnnotatedAtom` 与分离入口，
@@ -129,24 +131,30 @@ AnnotationRegion(.impAddress) {
 
 ### 测试
 
-- 用手工构造的 `ObjCClassInfo` 作 fixture，不依赖二进制，地址可控：一个属性同时带 `@synthesize name = ivar` 和
-  getter、setter 两个地址；一个 IMP 为 0 的方法（地址无效）；一个 `@?` 的 ivar（block）和一个 `^?` 的 ivar（函数
-  指针）；自定义 ivar 偏移注释的三个模板各一次，外加一个不含 `: ` 的模板。断言分离出的表里每个区域的 kind，以及
-  每一段的角色和文本。
-- 照 `ObjCMarkedInterfaceTests` 的做法，对 Foundation 的每个类、协议、类别，在注释全开时比较开关开与关：开着时
-  冻结、分离出的字符串与关着时冻结的字符串相等（`FrozenSemanticString` 的 `==` 连 span 一起比）。
-- 开关关着时，fixture 的每条注释仍是改动前的样子：一个原子，地址无效时是一个注释原子加一个 `.error` 原子。逐个原子
-  断言。
-- 标记模式加开关：投影后与普通模式加开关的分离结果相同；打印导出声明时，未导出的类也是如此。
-- 宿主补充的类沿用 `SuppliedClassRenderingTests` 的 fixture，断言 `note` 与 `ivarOffsetUnknown`。
+- `CommentStructureMarkingTests`：用手工构造的 ivar、属性、方法作 fixture，不依赖二进制，地址可控：一个属性同时带
+  `@synthesize name = ivar` 和 getter、setter 两个地址（setter 的地址无效）；同名 ivar 的 `@synthesize` 与 `@dynamic`；
+  有效与无效的方法 IMP；`@?` 的 ivar（block）和 `^?` 的 ivar（函数指针）；宿主措辞的 ivar 偏移注释，三个自带模板的
+  写法各一次，外加一个不含 `: ` 的。断言分离出的表里每个区域的 kind、覆盖的文字，以及每一段的角色和文字。再拿一个
+  集齐这些成员的类，断言开着时分离出的字符串与关着时完全相等。
+- `ObjCCommentStructureMarkingTests`：对 Foundation 的每个类、协议、类别、struct、union，在注释全开时比较开关开与关，
+  开着时冻结、分离出的字符串与关着时冻结的字符串相等（`FrozenSemanticString` 的 `==` 连 span 一起比），并断言其中
+  确实标出了 `impAddress`、`ivarOffset`、`propertySynthesis`、`typeNote`。标记渲染同样比：每个类、协议、类别的
+  `marked…` 渲染开着开关、分离注释标记后，与不开开关的标记渲染完全相等，其中包括被导出过滤排除、事后用
+  `markAtoms` 整段标记的类。投影的正确性仍由 `ObjCMarkedInterfaceTests` 保证。
+- `CommentAtomTests`：开关关着时，每条注释仍是改动前的样子，一个原子，地址无效时是一个注释原子加一个 `.error`
+  原子，逐个原子断言。
+- `SuppliedClassRenderingTests`：宿主补充的类上方那行是一个注释原子；开着开关时依次是 `note`、`ivarOffset`、
+  `ivarOffsetUnknown` 三个区域。
 
 ### 依赖与发版
 
-需要 swift-semantic-string 带新组件的版本。它发布后把依赖下限从 0.4.0 抬上去，在此之前本地构建走
-`USING_LOCAL_DEPENDENCIES`。MachOSwiftSection 的依赖范围包含本库每个新的补丁版本，所以本库的 tag 要等
-swift-semantic-string 先发版。落地前照例再用 CI 的 Xcode 26.6 编一遍。
+需要 swift-semantic-string 带新组件的版本。它发布后把依赖下限从 0.4.0 抬上去，在此之前本地构建把
+swift-semantic-string 这一个依赖用 `swift package edit swift-semantic-string --path <它的 next 检出>` 换成本地的。
+不用 `USING_LOCAL_DEPENDENCIES`：它会把 MachOKit、MachOKitExtensions 也一起换成本地检出。MachOSwiftSection 的依赖
+范围包含本库每个新的补丁版本，所以本库的 tag 要等 swift-semantic-string 先发版。落地前照例再用 CI 的 Xcode 26.6
+编一遍。
 
-落地时同批更新使用指南的「库调用方」部分：怎么打开开关、kind 与角色表、自定义 ivar 偏移注释的切分规则。
+使用指南的「库调用方：标出注释的结构」一节与代码同批写好：怎么打开与读回、kind 与各段、签名里看不出来的几条契约。
 
 ### 落地步骤
 
@@ -154,15 +162,15 @@ swift-semantic-string 先发版。落地前照例再用 CI 的 Xcode 26.6 编一
    `ObjCRenderingContext.comment(_:)` 输出。开关还不存在，输出与改动前逐个原子相同。`CommentAtomTests` 用手工构造的
    ivar、属性、方法钉住每条注释的原子和整行文本，`SuppliedClassRenderingTests` 钉住宿主补充类上方那行；这批测试在
    改动前的代码上同样通过。
-2. **开关与标注输出**（依赖 swift-semantic-string 的 `AnnotationRegion`）：`ObjCRenderingContext` 与
-   `ObjCInterfaceBuilder` 上的 `marksCommentStructure`，开着时的标注输出，`AnnotationRegion.Kind` 的六个常量，自定义
-   ivar 偏移注释的切分规则；测试按「测试」一节。在对方发版之前走本地依赖，发版后抬依赖下限。
-3. **文档**：使用指南「库调用方」部分，文档索引。
+2. **开关与标注输出**（依赖 swift-semantic-string 的 `AnnotationRegion`）——已完成，对着它本地的 `next` 构建：
+   `ObjCRenderingContext` 与 `ObjCInterfaceBuilder` 上的 `marksCommentStructure`，开着时的标注输出，
+   `AnnotationRegion.Kind` 的六个常量，宿主措辞的 ivar 偏移注释的切分规则；测试按「测试」一节。
+3. **文档**——已完成：使用指南「库调用方：标出注释的结构」一节，术语表的 comment structure marking 一条，文档索引。
 
 ### 待定
 
-- swift-semantic-string 的 API 还是草案，等它的用户批准，签名可能微调；落地前按它发布的版本核对一遍。第 2 步要等
-  它实现出来才能开工。
+- swift-semantic-string 发版后，把依赖下限抬到那个版本，退出 edit 模式，用发布的版本和 Xcode 26.6 各验证一遍，
+  才能收尾。
 
 ## 决策日志
 
@@ -180,3 +188,6 @@ swift-semantic-string 先发版。落地前照例再用 CI 的 Xcode 26.6 编一
 | 2026-10-31 | 用户批准，开始实现 | — |
 | 2026-10-31 | 功能分支叠在 `feature/objc-exported-declarations-only` 上切；提案随功能分支提交，不提交到 `next` | 本案覆盖 `printExportedDeclarationsOnly` 标记模式下的情形，依赖那个还没推到 `origin/next` 的功能。本地 `next` 上那次合并还在等用户过目，从它切或在它上面提交，用户撤销那次合并时，本分支就会带着它。 |
 | 2026-10-31 | 自定义 ivar 偏移注释的切分规则并进标注输出那一步，原来单列的一步取消 | 切分的结果只在标注输出里看得到；在那一步经公开接口测，不针对内部实现单独测。 |
+| 2026-10-31 | 发版前的本地构建用 `swift package edit` 只换 swift-semantic-string，不用 `USING_LOCAL_DEPENDENCIES` | 后者把 MachOKit、MachOKitExtensions 也换成本地检出，测到的就不只是本案的改动。 |
+| 2026-10-31 | 加了一条术语 comment structure marking | 与已有的 marked rendering 同用「标记」一词，却是两回事，不写清楚容易混。 |
+| 2026-10-31 | 实现完成，等 swift-semantic-string 发版、抬依赖下限后再收尾 | 现在只能对着它本地的 `next` 构建；本库的 tag 不能早于它发版。 |

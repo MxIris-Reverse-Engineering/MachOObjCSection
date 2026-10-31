@@ -11,20 +11,13 @@ import Semantic
 @Suite("Comment atoms")
 struct CommentAtomTests {
     private static func foundationImage() throws -> MachOImage {
-        try #require(MachOImage(name: "Foundation"))
+        try CommentFixtures.foundationImage()
     }
 
-    private static let everyComment = ObjCGenerationOptions(
-        addIvarOffsetComments: true,
-        addPropertyAttributesComments: true,
-        addMethodIMPAddressComments: true,
-        addPropertyAccessorAddressComments: true
-    )
+    private static let everyComment = CommentFixtures.everyComment
 
-    /// A raw IMP value that resolves to an address in `machO`: one past its
-    /// header.
     private static func resolvableIMP(in machO: MachOImage) -> UInt64 {
-        UInt64(UInt(bitPattern: machO.ptr)) + 0x1000
+        CommentFixtures.resolvableIMP(in: machO)
     }
 
     /// The atoms of `rendering` a host draws as comments, errors included.

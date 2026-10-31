@@ -13,6 +13,20 @@ MachOObjCSection 专有名词与约定用法。
 
 按英文名 / 标识符字母序排列。
 
+### comment structure marking（注释结构标记）
+
+`marksCommentStructure`（`ObjCInterfaceBuilder` 的构造参数、`ObjCRenderingContext` 的属性）打开后，渲染出的每条注释
+都包进 swift-semantic-string 的 `AnnotationRegion`，标出它是哪一种（`impAddress`、`ivarOffset`……），每一段（`// `、
+label、separator、value……）包进 `AnnotationSegment`，标出它的角色；冻结后用 `separatingAnnotationRegions()` 读回一张表，
+文字与不打标记时完全相同。宿主据此把注释画成标签，而不必解析注释文本。与 [marked rendering](#marked-rendering标记渲染)
+是两回事：标记渲染标的是「哪段内容受哪个开关控制」，本条标的是「注释的每一段是什么」，两者可以叠用。
+MachOSwiftSection 的同名开关在 `SwiftDeclarationPrintConfiguration` 上。
+
+- **主要出现在**：`Sources/ObjCDeclarationRendering/ObjCComment.swift`、
+  `Sources/ObjCDeclarationRendering/AnnotationRegion+ObjCCommentKinds.swift`
+- **延伸阅读**：[提案「给 ObjC 注释标出种类和各段的角色」](Evolutions/draft-objc-comment-structure-marking.md)、
+  [使用指南](Guides/ObjCSectionCommandLine.md#库调用方标出注释的结构)
+
 ### evolution interface（演进合并头文件）
 
 同一个二进制 N ≥ 2 个版本的头文件按声明合并成的一份：外观与 `objc dump` 相同，有变化的声明带存在位图和

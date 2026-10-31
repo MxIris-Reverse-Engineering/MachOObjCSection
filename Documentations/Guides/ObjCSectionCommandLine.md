@@ -1,6 +1,6 @@
 # objc-section 使用指南
 
-- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）、[0014](../Evolutions/0014-host-supplied-classes.md)（由宿主补充的类，库调用方）、[0015](../Evolutions/0015-objc-evolution-interface.md)（合并多个版本、带演进标注的头文件，库调用方）、[0016](../Evolutions/0016-objc-evolution-image-groups.md)（几个 image 当作一个 API 面，库调用方）、[只打印导出的 ObjC 声明](../Evolutions/draft-objc-exported-declarations-only.md)（库调用方）
+- **对应提案**: [0002](../Evolutions/0002-objc-machofile-genericization-and-cli.md)（dump / interface）、[0006](../Evolutions/0006-objc-api-diff-and-evolution.md)（snapshot / diff / evolution）、[0007](../Evolutions/0007-dump-sections-spelling-and-empty-diagnostics.md)（`--sections` 写法与空结果诊断）、[0009](../Evolutions/0009-objc-section-release-automation.md)（预编译二进制）、[0014](../Evolutions/0014-host-supplied-classes.md)（由宿主补充的类，库调用方）、[0015](../Evolutions/0015-objc-evolution-interface.md)（合并多个版本、带演进标注的头文件，库调用方）、[0016](../Evolutions/0016-objc-evolution-image-groups.md)（几个 image 当作一个 API 面，库调用方）、[只打印导出的 ObjC 声明](../Evolutions/draft-objc-exported-declarations-only.md)（库调用方）、[给 ObjC 注释标出种类和各段的角色](../Evolutions/draft-objc-comment-structure-marking.md)（库调用方）
 - **最后更新**: 2026-10-31
 
 这份文档写给两类人：用 `objc-section` 命令行导出 ObjC 头的人，以及直接调用
@@ -358,6 +358,52 @@ func makeIndexer() -> ObjCInterfaceIndexer<MachOImage>
   那个类读。要逐个 ivar 结论的宿主，用事实层的 `ObjCExportIndex.exportStatus(ofIvarOffsetVariableAt:)` 配合
   `ObjCMetadataSource.objcIvarOffsetVariableOffsets(of:)`。按名字查的 `ObjCExportIndex.exportStatus(ofClassNamed:)` /
   `exportStatus(ofIvarNamed:inClassNamed:)` 已 deprecated，它们只认 clang 的拼法，会把上两条里的 Swift 类与 ivar 判成未导出。
+
+## 库调用方：标出注释的结构
+
+宿主要把注释画成标签（RuntimeViewer 的 SourceEditor 面板）、又不想解析注释文本时，用
+`ObjCInterfaceBuilder(indexer:machO:marksCommentStructure: true)` 建 builder。它渲染的每条注释都标出是哪一种、每一段
+是什么，术语见 [comment structure marking](../Glossary.md#comment-structure-marking注释结构标记)。直接调用渲染器的，设
+`ObjCRenderingContext.marksCommentStructure`。读回的方法：
+
+```swift
+let builder = ObjCInterfaceBuilder(indexer: indexer, machO: machO, marksCommentStructure: true)
+if let printed = builder.classInterface(named: "NSView", options: options) {
+    let (text, annotations) = printed.frozen().separatingAnnotationRegions()
+    for (regionIndex, region) in annotations.regions.enumerated() where region.kind == .impAddress {
+        let value = annotations.segments(inRegionAt: regionIndex).first { $0.role == .value }
+        // The utf8Offset and utf8Length of region and value count bytes of text.
+    }
+}
+```
+
+| kind | 注释 | 各段 |
+|---|---|---|
+| `impAddress` | `// IMP: 0x1A2B`、`// getter IMP: …`、`// setter IMP: …` | marker、label、separator、value |
+| `ivarOffset` | `// offset: 8` | marker、label、separator、value |
+| `ivarOffsetUnknown` | `// offset: unknown` | marker、label、separator、value |
+| `propertySynthesis` | `// @synthesize width = _width`、`// @synthesize width` | marker、label、separator、name，后者到此为止，前者再接 separator、value |
+| `propertyDynamic` | `// @dynamic width` | marker、label、separator、name |
+| `typeNote` | `/* block */`、`/* function pointer */` | marker、text、marker |
+| `note` | 宿主补充的类上方那行说明 | marker、text |
+
+`note` 是 swift-semantic-string 自带的、与 MachOSwiftSection 共用的 kind，其余六个由 `ObjCDeclarationRendering` 扩展到
+`AnnotationRegion.Kind` 上；角色是 swift-semantic-string 的 `AnnotationSegment.Role`。下面几条在签名里看不出来：
+
+- **标注版要先冻结再分离，不能直接显示。** 分离之前，标记写在原子的 identifier 里，注释也拆成了几片原子；
+  `separatingAnnotationRegions()` 去掉标记、把同一条注释的片并回去。分离出的 `text` 与不开开关时冻结的结果完全相等，
+  span 也一个不差，所以拿它显示、导出、搜索都与今天一样。
+- **范围是 UTF-8 字节。** 表里的 `utf8Offset` / `utf8Length` 数的是 `text` 的 UTF-8 字节，交给 AppKit 之类按 UTF-16
+  计数的接口前要换算。
+- **一条注释一个区域，从 `// ` 到最后一段。** 注释前的空格、属性行尾几条注释之间的空格都不在区域里，
+  `@property … width; // @synthesize width = _width // getter IMP: 0x4550 // setter IMP: 0x4558` 读回是三个区域。
+- **地址无效时，value 是 `.error` 原子。** `// IMP: <invalid 0x0>` 的 value 段是 `<invalid 0x0>`，它的语义类型是
+  `.error`，不必再看文字判断地址是否有效。偏移未知同理，单独是 `ivarOffsetUnknown`，不必比较 value 是不是 `unknown`。
+- **宿主自己措辞的 ivar 偏移注释按第一个 `: ` 切。** `ivarOffsetCommentBuilder` 交来的整串，第一个 `: ` 之前是 label，
+  之后是 value；没有 `: ` 时整串是 value。`Transformer.ObjCIvarOffset` 自带的三个模板都切得准，其他写法退化成一个值。
+- **能和标记渲染叠用。** `markedClassInterface` 这类标记渲染开着这个开关时，注释区域嵌在各自的 `VisibilityRegion`
+  里；`separatingAnnotationRegions()` 与 `separatingVisibilityRegions()` 先做哪个都行，结果相同。
+- **演进头文件不标。** `ObjCEvolutionInterfaceBuilder` 合并出的头文件里的位图与说明注释不受这个开关影响。
 
 ## 库调用方：把 N 个版本合并成一份带演进标注的头文件
 
