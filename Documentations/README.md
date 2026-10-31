@@ -33,7 +33,7 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [0015](Evolutions/0015-objc-evolution-interface.md) | 带演进标注的合并 ObjC 头文件 | Implemented |
 | [0016](Evolutions/0016-objc-evolution-image-groups.md) | ObjC 演进按 image 组比较，并报出搬家 | Implemented |
 | [0017](Evolutions/0017-objc-duplicate-member-selection.md) | 同一容器里的重复成员按来源取舍，内容相同的不再告警 | Implemented |
-| [draft](Evolutions/draft-objc-exported-declarations-only.md) | 只打印导出的 ObjC 声明，导出判断改按地址 | Accepted |
+| [draft](Evolutions/draft-objc-exported-declarations-only.md) | 只打印导出的 ObjC 声明，导出判断改按地址 | In Progress |
 
 ## 使用指南
 

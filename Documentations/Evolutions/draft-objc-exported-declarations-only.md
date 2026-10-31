@@ -1,6 +1,6 @@
 # Draft - 只打印导出的 ObjC 声明，导出判断改按地址
 
-- **状态**: Accepted
+- **状态**: In Progress
 - **创建日期**: 2026-10-31
 - **最后更新**: 2026-10-31
 - **实现分支**: `feature/objc-exported-declarations-only`（worktree `.worktrees/MachOObjCSection-ExportedDeclarationsOnly`，从 `next` 切）
@@ -33,14 +33,16 @@ ivar 被去掉；没有自己导出符号的方法、属性、协议一律保留
 - **类**：类对象所在位置上有没有导出符号。clang 的 `_OBJC_CLASS_$_`、Swift 的 `_OBJC_CLASS_$_` 别名与类型元数据 `$s…CN`
   都落在类对象上（抽查 macOS 27.2 上 15 个两者都导出的 Swift 类，偏移全部相同）。clang 编译的类结论与原判据相同。
 - **ivar**：ivar 记录的偏移指针所指的变量上有没有导出符号，clang 的 `_OBJC_IVAR_$_` 与 Swift 的 `Wvd` 都在这里。偏移指针
-  为空（Swift 在运行时才布局的字段）的给不出结论，为此 `ObjCExportStatus` 新增 `declarationHasNoSymbol`，与 MachOSwiftSection
-  `ExportStatus` 的同名 case 对应。
-- **建表仍是一趟 export trie**：额外记下名字以 `_OBJC_CLASS_$_`、`_OBJC_IVAR_$_` 开头或以 `CN`、`Wvd` 结尾的导出符号的偏移。
-  比较前把 ObjC 记录的偏移换成 export trie 的口径（相对镜像 header）：进程内镜像两者本就相同；cache 里的文件差
-  「`sharedRegionStart` 减 header 地址」这一个常数；独立文件沿用本库「文件偏移等于相对 header 的偏移」的既有约定
-  （`address(forOffset:)` 也是这样算的）。
-- `ObjCMetadataSource` 加一个要求：给出一个类每个 ivar 的偏移变量位置，两种模式各自解析指针。该协议的文档本来就说明
-  要求会随索引层的需要增长，且只有本库的两个遵循者。
+  为空（Swift 在运行时才布局的字段）的 ivar 本来就不在 `ObjCClassInfo.ivars` 里（`ObjCIvarProtocol.info(in:)` 读不到偏移
+  就丢掉它），不需要为它加状态，`ObjCExportStatus` 不变。
+- **建表仍是一趟 export trie**：额外记下名字以 `_OBJC_CLASS_$_`、`_OBJC_IVAR_$_` 开头或以 `CN`、`Wvd` 结尾的导出符号的位置，
+  换成 ObjC 记录的 offset 口径存下（export trie 从镜像 header 算起）：进程内镜像两者本就相同；cache 里的文件是 header 地址加
+  条目 offset 再减 `sharedRegionStart`；独立文件经 `fileOffset(of:)` 换成文件偏移，与解析指针时同一条路。查询是按位置的
+  `exportStatus(ofClassObjectAt:)` 与 `exportStatus(ofIvarOffsetVariableAt:)`。
+- `ObjCMetadataSource` 加两个要求：一个类每个 ivar 的偏移变量位置（`objcIvarOffsetVariableOffsets(of:)`），以及把一批 export
+  trie 条目换成本来源的 offset 口径（`objcOffsets(ofExportedSymbolOffsets:)`）。该协议的文档本来就说明要求会随索引层的需要
+  增长，且只有本库的两个遵循者。偏移变量的位置要照 `ObjCIvarProtocol.offset(in:)` 的路解析指针，用的是核心 target 内部的
+  函数，所以照 0014 的先例，`ObjCClassProtocol.ivarOffsetVariableOffsets(in:)` 追加在 `Support/ObjCDump.swift` 末尾，上游代码不动。
 - 按名字查的 `exportStatus(ofClassNamed:)` 与 `exportStatus(ofIvarNamed:inClassNamed:)` 标 deprecated，消息指向下面
   indexer 上的查询。RuntimeViewer、MachOSwiftSection、MachOKitUI、MachOViewer、swift-decompiler 都没有用它们。
 
@@ -103,8 +105,8 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 
 **落地步骤。** 每一步单独构建通过、相关测试通过后提交一次。
 
-1. 事实层：`ObjCExportStatus.declarationHasNoSymbol`；`ObjCExportIndex` 建表时记下四类符号的偏移，按位置判断类对象与 ivar
-   偏移变量；`ObjCMetadataSource.objcIvarOffsetVariableOffsets(of:)`；按名字查的两个查询标 deprecated。测试：两个现场编译的
+1. ✅ 事实层：`ObjCExportIndex` 建表时记下四类符号的位置，按位置判断类对象与 ivar 偏移变量；`ObjCMetadataSource` 的两个
+   新要求与核心 target 末尾的 `ivarOffsetVariableOffsets(in:)`；按名字查的两个查询标 deprecated。测试：两个现场编译的
    fixture 与 Foundation 上的交叉验证，纯 Swift 类与 Swift ivar 两条先对着旧判据跑红。
 2. indexer：`prepare()` 里算出每个类与 ivar 的结论，提供两个查询。测试：fixture 与 Foundation 上的结论、补充类与别的镜像的类
    返回 `nil`。
@@ -125,3 +127,8 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 | 2026-10-31 | Swift 生成的 ivar 按 `Wvd` 是否导出判，不当作判断不了 | 偏移变量本来就是 `Wvd`，这正是「偏移变量没导出」的字面判据；苹果的 Swift 框架普遍不导出 `Wvd`（SwiftUI 0 个、Foundation 1 个），开关一开 Swift 类的 ivar 基本都会去掉，这与 ObjC 客户端拿不到这些 ivar 的事实相符 |
 | 2026-10-31 | RuntimeViewer 确认按草案的 API 能接；验收加一条：被排除的类与类别在标记模式下开关打开时投影恰好为空串 | RuntimeViewer 没用过 `ObjCExportIndex` / `ObjCExportStatus`，改判据与新增 case 不影响它；它的 Find 语料把投影为空的条目当作不存在，剩一个空行或注释就会留下空条目 |
 | 2026-10-31 | 用户批准，开始实现；状态 Draft → Accepted | 方案与落地步骤如上，实现在 `feature/objc-exported-declarations-only` |
+| 2026-10-31 | Accepted → In Progress；第 1 步完成 | 两个现场编译的 fixture 先对着按名字查的旧判据跑：公开的纯 Swift 类、两个 Swift 类的公开 ivar 共 3 条断言失败（原始退出码 1）；改按位置后 fixture 与 Foundation 上 14 个测试全过 |
+| 2026-10-31 | 不新增 `ObjCExportStatus.declarationHasNoSymbol` | 草案为偏移指针为空的 ivar 准备了这一态。实测这种 ivar 根本到不了判断这一步：`ObjCIvarProtocol.info(in:)` 读不到偏移就丢掉它，`ObjCClassInfo.ivars` 里没有它，列出的类不会遇到；宿主补充的类本来就不判。不加 case，枚举对穷举它的调用方保持源码兼容 |
+| 2026-10-31 | 偏移变量的位置由核心 target 末尾新加的 `ObjCClassProtocol.ivarOffsetVariableOffsets(in:)` 读，照 0014 的先例 | 要与 `offset(in:)` 走同一条指针解析的路（文件模式的 `resolveRebase(_:)` 是核心 target 内部的，进程内要经 `private` 的 `data(in:)` 找 RO data）；MachOKitExtensions 公开的 `resolveRebase(fileOffset:)` 缺少自绑定与旧格式 rebase 的兜底，照抄核心的逻辑又会出现两份。追加在文件末尾、标明属于本 fork，上游代码一行不动 |
+| 2026-10-31 | export trie 条目换口径成为 `ObjCMetadataSource` 的批量要求 `objcOffsets(ofExportedSymbolOffsets:)`，独立文件经 `fileOffset(of:)` 换 | 草案打算沿用「文件偏移等于相对 header 的偏移」的约定；改为与解析指针时同一个函数换算，两边口径由构造保证一致，不靠这个约定。批量是为了只读一次 load commands |
+| 2026-10-31 | 0008 里依赖按名字查询的测试改用新查询，`classDefinedInAnotherImageReadsAsUnexportedHere` 与 `ivarLookupIsQualifiedByDeclaringClass` 删去 | 两条测的是已 deprecated 的按名字查询的行为，新查询按位置，不存在「问错镜像得到误导性负面答案」与「名字拼错」这两种情形；per-image 的约束改由第 2 步的 indexer 查询对别的镜像的类返回 `nil` 来体现 |

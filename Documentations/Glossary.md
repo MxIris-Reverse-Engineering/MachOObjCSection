@@ -85,8 +85,9 @@ image 组演进里的一种记录：声明在一次跳变两侧都在，所在�
 
 ### ObjCExportStatus（导出状态）
 
-一个 ObjC 类或实例变量的**链接可见性**——它的符号（`_OBJC_CLASS_$_<类名>` /
-`_OBJC_IVAR_$_<类名>.<ivar 名>`）在不在镜像的 export trie 里。三态：`exported` /
+一个 ObjC 类或实例变量的**链接可见性**——镜像的 export trie 里有没有符号落在它的位置上：类看
+类对象，实例变量看偏移指针所指的变量。clang 在那里放 `_OBJC_CLASS_$_<类名>` /
+`_OBJC_IVAR_$_<类名>.<ivar 名>`，Swift 放类型元数据 `$s…CN` / 字段偏移 `$s…Wvd`。三态：`exported` /
 `notExported` / `imageHasNoExportInformation`，最后一态是**镜像级**的「无从判断」
 （`.o` 目标文件、读不到 linkedit 的镜像），绝不可当作「未导出」使用。
 
@@ -96,13 +97,14 @@ image 组演进里的一种记录：声明在一次跳变两侧都在，所在�
    能说的只有「dyld 能不能从别的镜像解析到这个符号」。
 2. **协议与分类判不了，不是漏做。** ObjC 协议符号一律 `private extern`，从不进
    export trie；分类没有自己的符号。所以 API 里没有这两个入口。
-3. **查询是 per-image 的。** 对 Foundation 查 `NSArray` 得到 `notExported`——该类由
-   CoreFoundation 定义并导出。只能拿本镜像自己定义的类去查。
+3. **查询是 per-image 的。** 只能拿本镜像列出的记录去问。按名字查的旧接口（已 deprecated）
+   对 Foundation 查 `NSArray` 得到 `notExported`——该类由 CoreFoundation 定义并导出。
 
 - **主要出现在**：`Sources/ObjCMetadataSource/ObjCExportStatus.swift`、
   `Sources/ObjCMetadataSource/ObjCExportIndex.swift`
 - **延伸阅读**：[实现说明](Internal/ObjCExportStatusResolution.md)、
-  [提案 0008](Evolutions/0008-objc-export-status.md)
+  [提案 0008](Evolutions/0008-objc-export-status.md)、
+  [只打印导出的 ObjC 声明](Evolutions/draft-objc-exported-declarations-only.md)
 
 ### protocol copy（协议副本）
 

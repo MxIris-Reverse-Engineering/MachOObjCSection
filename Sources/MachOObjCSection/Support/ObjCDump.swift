@@ -1092,3 +1092,52 @@ extension ObjCCategoryProtocol {
         )
     }
 }
+
+// MARK: - Ivar Offset Variables
+//
+// Added by this fork for the exported declarations proposal, and kept to the
+// end of the file like the block above. An ivar record's offset pointer
+// points at the variable the runtime keeps the ivar's offset in, and that
+// variable is what a linker symbol publishes: `_OBJC_IVAR_$_<class>.<ivar>`
+// from clang, the field offset `$s…Wvd` from Swift. Whether it is exported
+// is a question about where it is, which `offset(in:)` reads through and
+// drops; the functions below keep it.
+
+extension ObjCClassProtocol {
+    /// Where each ivar of this class keeps its offset: the offset of the
+    /// variable its record's offset pointer points at, by ivar name.
+    ///
+    /// Offsets follow the convention of ``offset``: a file offset within the
+    /// slice for a standalone binary, an offset from the main cache's start
+    /// for an image in a dyld shared cache. An ivar whose pointer resolves to
+    /// nothing is absent, as it is from `info(in:options:)`, which drops an
+    /// ivar it cannot read the offset of.
+    public func ivarOffsetVariableOffsets(in machO: MachOFile) -> [String: Int] {
+        guard let ivars = classROData(in: machO)?.ivarList(in: machO)?.ivars(in: machO) else { return [:] }
+        var offsetVariableOffsetByIvarName: [String: Int] = [:]
+        for ivar in ivars {
+            // Resolved as `offset(in:)` resolves it, the bind to the image's
+            // own export an `-interposable` dylib points an exported ivar's
+            // offset with included.
+            guard let name = ivar.name(in: machO),
+                  let resolved = machO.resolveRebase(ivar.unresolvedValue(of: .offset))
+            else { continue }
+            offsetVariableOffsetByIvarName[name] = Int(resolved.offset)
+        }
+        return offsetVariableOffsetByIvarName
+    }
+
+    /// Where each ivar of this class keeps its offset: the offset of the
+    /// variable its record's offset pointer points at from `machO`'s header,
+    /// by ivar name. An ivar whose pointer is null is absent, as it is from
+    /// `info(in:options:)`.
+    public func ivarOffsetVariableOffsets(in machO: MachOImage) -> [String: Int] {
+        guard let ivars = data(in: machO)?.data.ivarList(in: machO)?.ivars(in: machO) else { return [:] }
+        var offsetVariableOffsetByIvarName: [String: Int] = [:]
+        for ivar in ivars where ivar.layout.offset != 0 {
+            let offsetVariableAddress = machO.stripPointerTags(of: numericCast(ivar.layout.offset))
+            offsetVariableOffsetByIvarName[ivar.name(in: machO)] = Int(offsetVariableAddress) - Int(bitPattern: machO.ptr)
+        }
+        return offsetVariableOffsetByIvarName
+    }
+}
