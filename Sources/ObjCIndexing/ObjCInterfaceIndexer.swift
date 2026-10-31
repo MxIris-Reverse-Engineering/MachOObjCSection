@@ -40,6 +40,14 @@ import SwiftStdlibToolbox
 /// are looked up through ``suppliedClassGroup(forName:)`` rather than
 /// ``classGroup(forName:)``, since no class object stands behind them.
 ///
+/// ## Export verdicts
+///
+/// `prepare()` also reads, for every listed class, whether an exported symbol
+/// publishes its class object (``exportStatus(ofClassNamed:)``), so a host can
+/// mark a whole class list without printing anything, and
+/// `ObjCInterfaceBuilder` filters by the same verdicts. The cost is one pass
+/// over the export trie and a set lookup per class.
+///
 /// This index answers "what is in this binary". It deliberately does not
 /// answer "what subclasses what" — inheritance and protocol adoption are
 /// broadcast through ``ObjCIndexingEvent`` as the walk discovers them, and
@@ -144,6 +152,12 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
     @Mutex
     private var unions: [String: CStructOrUnion] = [:]
 
+    @Mutex
+    private var classExportStatuses: [String: ObjCExportStatus] = [:]
+
+    @Mutex
+    private var storedExportIndex: ObjCExportIndex?
+
     private let suppliedClasses: [ObjCSuppliedClass]
 
     private let eventHandler: (@Sendable (ObjCIndexingEvent) -> Void)?
@@ -198,8 +212,9 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
     // MARK: - Preparation
 
     /// Parse this indexer's Mach-O image (`machO`, bound at `init`) into the
-    /// data store: every class / protocol / category, plus the C struct /
-    /// union definitions harvested from their type encodings.
+    /// data store: every class / protocol / category, the C struct / union
+    /// definitions harvested from their type encodings, and the export
+    /// verdicts of the listed classes.
     ///
     /// Call once after construction, after which the store is immutable.
     ///
@@ -238,6 +253,10 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
         var structsByName: [String: CStructOrUnion] = [:]
         var unionsByName: [String: CStructOrUnion] = [:]
         var classInfoCache: [String: ObjCClassInfo] = [:]
+        var classExportStatusByName: [String: ObjCExportStatus] = [:]
+
+        // One pass over the export trie, then a set lookup per class.
+        let exportIndex = ObjCExportIndex(machO: machO)
 
         func setObjCType(_ type: ObjCType) {
             switch type {
@@ -332,6 +351,7 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
             let objcClassGroup: ObjCClassGroup = (objcClass, infoWithSuperclasses(class: objcClass, in: machO, cache: &classInfoCache))
             guard let objcClassInfo = objcClassGroup.info.first else { continue }
             classByName[objcClassInfo.name] = objcClassGroup
+            classExportStatusByName[objcClassInfo.name] = exportIndex.exportStatus(ofClassObjectAt: objcClass.offset)
             eventHandler?(ObjCIndexingEvent.progress(
                 phase: .loadingClasses,
                 itemDescription: objcClassInfo.name,
@@ -592,6 +612,8 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
         categories = categoryByName
         structs = structsByName
         unions = unionsByName
+        classExportStatuses = classExportStatusByName
+        storedExportIndex = exportIndex
     }
 
     /// Resolve `cls` to its own `ObjCClassInfo` followed by the
@@ -680,6 +702,33 @@ public final class ObjCInterfaceIndexer<MachO: ObjCMetadataSource>: @unchecked S
     /// The category record for `uniqueName`, or `nil` if absent.
     public func categoryGroup(forName uniqueName: String) -> ObjCCategoryGroup? {
         categories[uniqueName]
+    }
+
+    // MARK: - Export Query
+
+    /// Whether an exported symbol publishes the class object of the class
+    /// named `className` — read during ``prepare()``, see ``ObjCExportIndex``.
+    ///
+    /// `nil` when this image lists no class object of that name: a class of
+    /// another image, whose export this image cannot speak for (`NSArray`
+    /// asked of Foundation, which leaves it to CoreFoundation), and a class
+    /// the host supplied, which has no class object to judge. A host marks a
+    /// class only on ``ObjCExportStatus/isDefinitelyNotExported``; every other
+    /// answer, `nil` among them, is no evidence.
+    public func exportStatus(ofClassNamed className: String) -> ObjCExportStatus? {
+        classExportStatuses[className]
+    }
+
+    /// The export index ``prepare()`` built, for a renderer to judge the ivars
+    /// of the one class it renders; `nil` before ``prepare()``.
+    ///
+    /// The ivars are judged there rather than here because reading where an
+    /// ivar keeps its offset means reading the class's ivar list once more,
+    /// and in image mode every such read probes the memory first: done for
+    /// every class during ``prepare()``, it added about 4% to it on AppKit,
+    /// for verdicts a host reads one class at a time.
+    package var exportIndex: ObjCExportIndex? {
+        storedExportIndex
     }
 
     /// Names of every class in this image, the supplied classes among them

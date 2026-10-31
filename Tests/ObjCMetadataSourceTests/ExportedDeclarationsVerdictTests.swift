@@ -15,31 +15,10 @@ import ObjCMetadataSource
 @Suite("Export verdicts on compiled fixtures")
 struct ExportedDeclarationsVerdictTests {
     private typealias SwiftClassName = ExportedDeclarationsFixture.SwiftClassName
-    private typealias ObjectiveCName = ExportedDeclarationsFixture.ObjectiveCName
-
-    struct Verdict: Equatable, CustomStringConvertible {
-        var classStatus: ObjCExportStatus
-        var ivarStatusByName: [String: ObjCExportStatus]
-
-        var description: String {
-            "\(classStatus) \(ivarStatusByName.sorted { $0.key < $1.key })"
-        }
-    }
-
-    private static let swiftImageVerdicts: [String: Verdict] = [
-        SwiftClassName.publicSwiftRoot: Verdict(classStatus: .exported, ivarStatusByName: ["publicValue": .exported, "internalValue": .notExported]),
-        SwiftClassName.internalSwiftRoot: Verdict(classStatus: .notExported, ivarStatusByName: ["value": .notExported]),
-        SwiftClassName.publicObjCSubclass: Verdict(classStatus: .exported, ivarStatusByName: ["publicValue": .exported, "internalValue": .notExported]),
-        SwiftClassName.internalObjCSubclass: Verdict(classStatus: .notExported, ivarStatusByName: ["value": .notExported]),
-    ]
-
-    private static let objectiveCImageVerdicts: [String: Verdict] = [
-        ObjectiveCName.exportedClass: Verdict(classStatus: .exported, ivarStatusByName: ["publicIvar": .exported, "privateIvar": .notExported]),
-        ObjectiveCName.hiddenClass: Verdict(classStatus: .notExported, ivarStatusByName: ["publicIvarOfHiddenClass": .notExported]),
-    ]
+    private typealias Verdict = ExportedDeclarationsFixture.Verdict
 
     /// Every class `machO` lists, by name, with its verdicts.
-    private static func verdicts<MachO: ObjCMetadataSource>(in machO: MachO) -> [String: Verdict] {
+    static func verdicts<MachO: ObjCMetadataSource>(in machO: MachO) -> [String: ExportedDeclarationsFixture.Verdict] {
         let exportIndex = ObjCExportIndex(machO: machO)
         let classRecords = (machO.objc.classes64 ?? []) as [any ObjCClassProtocol]
             + ((machO.objc.classes32 ?? []) as [any ObjCClassProtocol])
@@ -77,24 +56,24 @@ struct ExportedDeclarationsVerdictTests {
     @Test("Every class and ivar of the Swift image, read from the file")
     func swiftImageInFile() throws {
         let verdicts = Self.verdicts(in: try ExportedDeclarationsFixture.swiftLibraryFile())
-        #expect(verdicts == Self.swiftImageVerdicts)
+        #expect(verdicts == ExportedDeclarationsFixture.swiftImageVerdicts)
     }
 
     @Test("Every class and ivar of the Swift image, loaded")
     func swiftImageLoaded() throws {
         let verdicts = Self.verdicts(in: try ExportedDeclarationsFixture.swiftLibraryImage())
-        #expect(verdicts == Self.swiftImageVerdicts)
+        #expect(verdicts == ExportedDeclarationsFixture.swiftImageVerdicts)
     }
 
     @Test("Every class and ivar of the Objective-C image, read from the file")
     func objectiveCImageInFile() throws {
         let verdicts = Self.verdicts(in: try ExportedDeclarationsFixture.objectiveCLibraryFile())
-        #expect(verdicts == Self.objectiveCImageVerdicts)
+        #expect(verdicts == ExportedDeclarationsFixture.objectiveCImageVerdicts)
     }
 
     @Test("Every class and ivar of the Objective-C image, loaded")
     func objectiveCImageLoaded() throws {
         let verdicts = Self.verdicts(in: try ExportedDeclarationsFixture.objectiveCLibraryImage())
-        #expect(verdicts == Self.objectiveCImageVerdicts)
+        #expect(verdicts == ExportedDeclarationsFixture.objectiveCImageVerdicts)
     }
 }

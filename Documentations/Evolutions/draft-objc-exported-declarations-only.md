@@ -43,22 +43,22 @@ ivar 被去掉；没有自己导出符号的方法、属性、协议一律保留
   trie 条目换成本来源的 offset 口径（`objcOffsets(ofExportedSymbolOffsets:)`）。该协议的文档本来就说明要求会随索引层的需要
   增长，且只有本库的两个遵循者。偏移变量的位置要照 `ObjCIvarProtocol.offset(in:)` 的路解析指针，用的是核心 target 内部的
   函数，所以照 0014 的先例，`ObjCClassProtocol.ivarOffsetVariableOffsets(in:)` 追加在 `Support/ObjCDump.swift` 末尾，上游代码不动。
-- 按名字查的 `exportStatus(ofClassNamed:)` 与 `exportStatus(ofIvarNamed:inClassNamed:)` 标 deprecated，消息指向下面
-  indexer 上的查询。RuntimeViewer、MachOSwiftSection、MachOKitUI、MachOViewer、swift-decompiler 都没有用它们。
+- 按名字查的 `exportStatus(ofClassNamed:)` 与 `exportStatus(ofIvarNamed:inClassNamed:)` 标 deprecated，消息指向按位置的
+  查询与下面 indexer 上的类查询。RuntimeViewer、MachOSwiftSection、MachOKitUI、MachOViewer、swift-decompiler 都没有用它们。
 
-**2. indexer 在 `prepare()` 里算好每个类的结论。** 建一次 `ObjCExportIndex`，对类列表里的每个类算出类与 ivar 的结论存下：
+**2. indexer 在 `prepare()` 里算好每个类的结论。** 建一次 `ObjCExportIndex`，对类列表里的每个类查一次类对象的结论存下：
 
 ```swift
 extension ObjCInterfaceIndexer {
     /// `nil`: this image lists no class object of that name — a class of another image, or one the host supplied.
     public func exportStatus(ofClassNamed className: String) -> ObjCExportStatus?
-    /// `nil`: no such listed class, or the class declares no such ivar.
-    public func exportStatus(ofIvarNamed ivarName: String, inClassNamed className: String) -> ObjCExportStatus?
+    /// The index `prepare()` built, for the builder to judge the ivars of the one class it renders.
+    package var exportIndex: ObjCExportIndex? { get }
 }
 ```
 
 宿主补充的类（0014：泛型 Swift 类与经 stub 注册的类）没有类对象可比，返回 `nil`，不判。宿主只按
-`isDefinitelyNotExported` 打标。
+`isDefinitelyNotExported` 打标。ivar 的结论不在 `prepare()` 里算，由打印器在打印某个类时当场算（见决策日志）。
 
 **3. 打印。** `ObjCGenerationOptions.printExportedDeclarationsOnly`（默认关，旧设置解码为关），可见性选项
 `objc.printExportedDeclarationsOnly`，名字与 MachOSwiftSection 的 `printExportedDeclarationsOnly` /
@@ -85,7 +85,7 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 - 渲染：fixture 与 Foundation 上开关开、关两种普通打印；`ObjCMarkedInterfaceTests` 的组合加入新开关（全开、全关、单开、
   单关），断言投影与普通打印逐字一致，并断言 Foundation 上确实有被过滤的类、ivar 与类别，免得测试空跑。被排除的类与
   类别另断言开关打开时的投影恰好是空串。
-- `prepare()` 的额外耗时（多读一遍每个类的 ivar 列表）实测后记下。
+- `prepare()` 的额外耗时实测后记下（实测见决策日志与实现说明）。
 - 照仓库惯例，用 CI 的 Xcode 26.6 再编一遍。
 
 **与 Swift 一侧的一致性。** 按上面的类判据，macOS 27.2 的 AppKit、SwiftUI、Foundation、SwiftUICore 类列表里 977 个以 `_Tt`
@@ -108,8 +108,8 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 1. ✅ 事实层：`ObjCExportIndex` 建表时记下四类符号的位置，按位置判断类对象与 ivar 偏移变量；`ObjCMetadataSource` 的两个
    新要求与核心 target 末尾的 `ivarOffsetVariableOffsets(in:)`；按名字查的两个查询标 deprecated。测试：两个现场编译的
    fixture 与 Foundation 上的交叉验证，纯 Swift 类与 Swift ivar 两条先对着旧判据跑红。
-2. indexer：`prepare()` 里算出每个类与 ivar 的结论，提供两个查询。测试：fixture 与 Foundation 上的结论、补充类与别的镜像的类
-   返回 `nil`。
+2. ✅ indexer：`prepare()` 里建索引、算出每个类的结论，提供 `exportStatus(ofClassNamed:)`。测试：fixture 与 Foundation 上的
+   结论、补充类与别的镜像的类返回 `nil`。
 3. 打印：`printExportedDeclarationsOnly` 与可见性选项；普通打印按结论去掉类、ivar 与类别。测试：开关开、关两种打印，旧设置的
    解码。
 4. 标记模式：类、类别与 ivar 的标记。测试：投影与普通打印逐字一致，被排除的类与类别开关打开时投影恰好为空串。
@@ -132,3 +132,4 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 | 2026-10-31 | 偏移变量的位置由核心 target 末尾新加的 `ObjCClassProtocol.ivarOffsetVariableOffsets(in:)` 读，照 0014 的先例 | 要与 `offset(in:)` 走同一条指针解析的路（文件模式的 `resolveRebase(_:)` 是核心 target 内部的，进程内要经 `private` 的 `data(in:)` 找 RO data）；MachOKitExtensions 公开的 `resolveRebase(fileOffset:)` 缺少自绑定与旧格式 rebase 的兜底，照抄核心的逻辑又会出现两份。追加在文件末尾、标明属于本 fork，上游代码一行不动 |
 | 2026-10-31 | export trie 条目换口径成为 `ObjCMetadataSource` 的批量要求 `objcOffsets(ofExportedSymbolOffsets:)`，独立文件经 `fileOffset(of:)` 换 | 草案打算沿用「文件偏移等于相对 header 的偏移」的约定；改为与解析指针时同一个函数换算，两边口径由构造保证一致，不靠这个约定。批量是为了只读一次 load commands |
 | 2026-10-31 | 0008 里依赖按名字查询的测试改用新查询，`classDefinedInAnotherImageReadsAsUnexportedHere` 与 `ivarLookupIsQualifiedByDeclaringClass` 删去 | 两条测的是已 deprecated 的按名字查询的行为，新查询按位置，不存在「问错镜像得到误导性负面答案」与「名字拼错」这两种情形；per-image 的约束改由第 2 步的 indexer 查询对别的镜像的类返回 `nil` 来体现 |
+| 2026-10-31 | 第 2 步完成；ivar 的结论不在 `prepare()` 里算，indexer 不提供 `exportStatus(ofIvarNamed:inClassNamed:)`，改由打印器在打印某个类时当场算 | 实测（调试构建，机器负载 30–44）：在 `prepare()` 里为每个类再读一遍 ivar 列表，AppKit 多 159–177 ms，约占 `prepare()` 的 4%——进程内每读一次类数据都先用 `mach_vm_read_overwrite` 探测内存。只算类的结论时，AppKit 只多 31 ms（0.8%），Foundation 45 ms（4.5%）、SwiftUI 43 ms（6.6%），几乎全是 MachOKit 解析 trie。侧栏只要类的结论，ivar 的结论只在打印那一个类时有用；indexer 把 `ObjCExportIndex` 以 `package` 的 `exportIndex` 留给打印器。宿主要逐个 ivar 的结论，可直接用事实层的 `exportStatus(ofIvarOffsetVariableAt:)` 与 `objcIvarOffsetVariableOffsets(of:)`。RuntimeViewer 只用类的查询，不受影响 |

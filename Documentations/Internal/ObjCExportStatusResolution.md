@@ -127,7 +127,9 @@ SwiftUICore 类列表里 977 个 `_Tt` 命名的 Swift 类，与 MachOSwiftSecti
 里的类名，经常属于别的镜像，拿去查会得到一串毫无意义的负面答案。
 
 这个坑属于按名字查的旧接口。按位置查时只能拿本镜像列出的记录去问：别的镜像的记录从别处
-起算，它的 offset 在这里没有意义。
+起算，它的 offset 在这里没有意义。宿主按名字查用 `ObjCInterfaceIndexer.exportStatus(ofClassNamed:)`，
+它对本镜像没列出的类返回 `nil`（Foundation 问 `NSArray` 即如此），不再给出误导性的「未导出」；宿主
+补充的类没有类对象可判，也返回 `nil`。
 
 ### 二、导出符号为零算「无信息」，不算「全都没导出」
 
@@ -172,6 +174,26 @@ macOS 26.x / arm64e，dyld shared cache 内的镜像，10 次取中位数：
   这是正常的，不是读取失败 —— 区分二者靠的是 `exportedSymbols` 总数不为零。
 
 Set 的规模跟着类符号数走（百量级的短字符串），内存不构成考量。
+
+### 2026-10-31：放进 `prepare()` 之后
+
+`ObjCInterfaceIndexer.prepare()` 现在建一次 `ObjCExportIndex`，并对每个列出的类查一次类对象的结论，
+存进 indexer。macOS 27.2 / arm64e，进程内镜像，调试构建，5 次取中位数；测量时机器上还有别的会话在编译，
+负载 30–44，绝对值偏大，比例可参考：
+
+| 镜像 | 类数 | `prepare()` | 建索引 + 每类一次查找 | 占比 | 若再读一遍每个类的 ivar 列表 |
+|---|---|---|---|---|---|
+| Foundation | 891 | 1.00 s | 45 ms | 4.5% | 另加 25–61 ms |
+| AppKit | 2773 | 4.00 s | 31 ms | 0.8% | 另加 159–177 ms |
+| SwiftUI | 361 | 0.65 s | 43 ms | 6.6% | 另加 11–16 ms |
+
+`prepare()` 比 0008 测量时快了一个数量级（AppKit 27.2 s → 3–5 s），所以建索引那一趟（20–60 ms，几乎
+全是 MachOKit 解析 trie）在 ObjC 类少的框架上占到几个百分点。
+
+**ivar 的结论不在 `prepare()` 里算**，最后一列就是原因：要知道偏移变量在哪，得再读一遍类的 ivar 列表，
+进程内每读一次类数据都先用 `mach_vm_read_overwrite` 探测内存是否可读（`MachOObjCSectionC/memory_probe.c`），
+对每个类都做一遍，AppKit 的 `prepare()` 要多 4% 左右。侧栏只要类的结论，ivar 的结论只在打印那一个类时
+有用，所以由打印器当场算，indexer 只把 `ObjCExportIndex` 留给它（`package var exportIndex`）。
 
 ## 测试怎么钉住这些
 

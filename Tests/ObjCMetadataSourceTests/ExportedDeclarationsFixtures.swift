@@ -2,6 +2,7 @@ import Testing
 import Foundation
 import MachO
 import MachOKit
+import ObjCMetadataSource
 
 /// Two images, compiled once per process, whose classes and ivars cover each
 /// way a linker symbol publishes them or leaves them unpublished: one written
@@ -104,6 +105,30 @@ enum ExportedDeclarationsFixture {
         static let categoryOnHiddenClass = "HiddenFixtureClass(FixtureCategory)"
         static let categoryOnAnotherImagesClass = "NSObject(ExportedDeclarationsFixture)"
     }
+
+    /// The verdict on one class and on each ivar it declares.
+    struct Verdict: Equatable, CustomStringConvertible {
+        var classStatus: ObjCExportStatus
+        var ivarStatusByName: [String: ObjCExportStatus]
+
+        var description: String {
+            "\(classStatus) \(ivarStatusByName.sorted { $0.key < $1.key })"
+        }
+    }
+
+    /// Every class the Swift image lists, with its verdicts.
+    static let swiftImageVerdicts: [String: Verdict] = [
+        SwiftClassName.publicSwiftRoot: Verdict(classStatus: .exported, ivarStatusByName: ["publicValue": .exported, "internalValue": .notExported]),
+        SwiftClassName.internalSwiftRoot: Verdict(classStatus: .notExported, ivarStatusByName: ["value": .notExported]),
+        SwiftClassName.publicObjCSubclass: Verdict(classStatus: .exported, ivarStatusByName: ["publicValue": .exported, "internalValue": .notExported]),
+        SwiftClassName.internalObjCSubclass: Verdict(classStatus: .notExported, ivarStatusByName: ["value": .notExported]),
+    ]
+
+    /// Every class the Objective-C image lists, with its verdicts.
+    static let objectiveCImageVerdicts: [String: Verdict] = [
+        ObjectiveCName.exportedClass: Verdict(classStatus: .exported, ivarStatusByName: ["publicIvar": .exported, "privateIvar": .notExported]),
+        ObjectiveCName.hiddenClass: Verdict(classStatus: .notExported, ivarStatusByName: ["publicIvarOfHiddenClass": .notExported]),
+    ]
 
     struct Libraries {
         let swiftLibraryURL: URL

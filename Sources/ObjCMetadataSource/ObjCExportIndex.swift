@@ -14,7 +14,7 @@ import MachOKitExtensions
 /// ```
 ///
 /// `ObjCInterfaceIndexer` builds one during `prepare()` and keeps the verdict
-/// of every class it lists and of their ivars; a host with an indexer asks it
+/// of every class it lists; a host with an indexer asks it about a class
 /// rather than this.
 ///
 /// ## Judged by location
@@ -224,7 +224,7 @@ public struct ObjCExportIndex: Sendable {
     /// Only clang's spelling is looked for, so every exported ivar Swift
     /// emits reads ``ObjCExportStatus/notExported``: its offset variable is a
     /// `$s…Wvd` field offset.
-    @available(*, deprecated, message: "Misreads every ivar Swift emits, whose offset variable is a $s…Wvd field offset; use ObjCInterfaceIndexer.exportStatus(ofIvarNamed:inClassNamed:) or exportStatus(ofIvarOffsetVariableAt:)")
+    @available(*, deprecated, message: "Misreads every ivar Swift emits, whose offset variable is a $s…Wvd field offset; use exportStatus(ofIvarOffsetVariableAt:) with ObjCMetadataSource.objcIvarOffsetVariableOffsets(of:)")
     public func exportStatus(
         ofIvarNamed ivarName: String,
         inClassNamed className: String
