@@ -13,7 +13,8 @@ import Semantic
 /// This is the layer where ``ObjCGenerationOptions`` actually bites: the strip
 /// switches are applied here, by building a filtered copy of the metadata
 /// before handing it to the renderer, while the comment switches are passed
-/// through to the renderer untouched.
+/// through to the renderer untouched. `printExportedDeclarationsOnly` is
+/// applied here too, by the export verdicts the indexer read in `prepare()`.
 ///
 /// ```swift
 /// let indexer = ObjCInterfaceIndexer(machO: image, imagePath: image.imagePath)
@@ -86,9 +87,16 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
     /// The rendered `@interface` for the class named `name`, or `nil` when the
     /// indexed image has no such class.
     ///
+    /// With `printExportedDeclarationsOnly`, a class the image provably does
+    /// not export renders as an empty string — `nil` keeps meaning there is
+    /// no such class — and an exported one renders without the ivars whose
+    /// offset variable is not exported. See
+    /// ``ObjCIndexing/ObjCInterfaceIndexer/exportStatus(ofClassNamed:)``.
+    ///
     /// A class the host supplied (``ObjCIndexing/ObjCSuppliedClass``) renders
     /// under a comment line saying why the image keeps no class object for
-    /// it, whatever the options.
+    /// it, whatever the options. Having no class object, it is never judged
+    /// unexported.
     public func classInterface(
         named name: String,
         options: ObjCGenerationOptions = .default,
@@ -152,6 +160,12 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         }
         guard let currentClassInfo = classInfos.first else { return nil }
 
+        // A supplied class has no verdict: it has no class object to judge.
+        let isExcludedByExportFilter = indexer.exportStatus(ofClassNamed: name)?.isDefinitelyNotExported == true
+        if isExcludedByExportFilter, !marksOptionalContent, options.printExportedDeclarationsOnly {
+            return SemanticString()
+        }
+
         let context = makeContext(
             options: options,
             cTypeReplacements: cTypeReplacements,
@@ -159,7 +173,11 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         )
         context.ivarNamesWithUnknownOffset = suppliedClassGroup?.ivarNamesWithUnknownOffset ?? []
 
-        let strippedMembersByOption = strippedMembers(ofClass: currentClassInfo, superclassInfos: classInfos.dropFirst())
+        var strippedMembersByOption = strippedMembers(ofClass: currentClassInfo, superclassInfos: classInfos.dropFirst())
+        if marksOptionalContent || options.printExportedDeclarationsOnly,
+           let objcClass = indexer.classGroup(forName: name)?.objcClass {
+            strippedMembersByOption[.printExportedDeclarationsOnly] = StrippedMembers(ivars: unexportedIvarNames(of: objcClass))
+        }
 
         let finalClassInfo: ObjCClassInfo
         if marksOptionalContent {
@@ -195,8 +213,10 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         }
 
         let declaration = finalClassInfo.semanticString(using: context)
-        guard let suppliedClassGroup else { return declaration }
-        return Self.declaration(declaration, under: suppliedClassGroup.suppliedClass.kind.declarationComment)
+        let rendering = suppliedClassGroup.map {
+            Self.declaration(declaration, under: $0.suppliedClass.kind.declarationComment)
+        } ?? declaration
+        return isExcludedByExportFilter && marksOptionalContent ? Self.visibleWhileExportFilterIsOff(rendering) : rendering
     }
 
     @SemanticStringBuilder
@@ -204,6 +224,37 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         Comment(comment)
         BreakLine()
         declaration
+    }
+
+    /// `declaration` with every atom visible only while
+    /// `printExportedDeclarationsOnly` is off: what a marked rendering makes
+    /// of a declaration the plain one leaves out. Projected with the switch on
+    /// it reads as nothing at all, not even a line break, as the plain
+    /// rendering's empty string does; with it off, as the declaration itself.
+    ///
+    /// The atoms are marked in place rather than wrapped in a
+    /// `VisibilityRegion`, which would add an element around the declaration
+    /// that the plain rendering does not have.
+    private static func visibleWhileExportFilterIsOff(_ declaration: SemanticString) -> SemanticString {
+        var marked = declaration
+        marked.markAtoms(from: 0, visibleUnder: .disabled(ObjCGenerationOptions.VisibilityOption.printExportedDeclarationsOnly.rawValue))
+        return marked
+    }
+
+    /// The ivars of `objcClass` whose offset variable the image provably does
+    /// not export, read for the one class being rendered: reading where an
+    /// ivar keeps its offset takes another pass over the ivar list, which
+    /// ``ObjCIndexing/ObjCInterfaceIndexer/prepare()`` does not pay for every
+    /// class. Empty without export information, since no verdict is then
+    /// definite.
+    private func unexportedIvarNames(of objcClass: some ObjCClassProtocol) -> Set<String> {
+        guard let exportIndex = indexer.exportIndex else { return [] }
+        var unexportedIvarNames: Set<String> = []
+        for (ivarName, offsetVariableOffset) in machO.objcIvarOffsetVariableOffsets(of: objcClass)
+        where exportIndex.exportStatus(ofIvarOffsetVariableAt: offsetVariableOffset).isDefinitelyNotExported {
+            unexportedIvarNames.insert(ivarName)
+        }
+        return unexportedIvarNames
     }
 
     /// The members each strip switch removes from a class, switch by switch,
@@ -361,7 +412,10 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
     /// such category.
     ///
     /// Categories carry no strip switches of their own — the switches all
-    /// describe class or protocol members — so only the comment options apply.
+    /// describe class or protocol members — so only the comment options
+    /// apply, and `printExportedDeclarationsOnly`: a category on a class this
+    /// image lists and provably does not export renders as an empty string.
+    /// One on another image's class stays whole.
     public func categoryInterface(
         uniqueName: String,
         options: ObjCGenerationOptions = .default,
@@ -403,6 +457,16 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
     ) -> SemanticString? {
         guard let categoryInfo = indexer.categoryGroup(forName: uniqueName)?.info else { return nil }
 
+        // A category on a class this image lists and provably does not export
+        // goes with it, as MachOSwiftSection drops an extension of an
+        // unexported type of its image. One on another image's class, whose
+        // export this image cannot speak for, stays whole: its members have
+        // no symbols to be judged by.
+        let isExcludedByExportFilter = indexer.exportStatus(ofClassNamed: categoryInfo.className)?.isDefinitelyNotExported == true
+        if isExcludedByExportFilter, !marksOptionalContent, options.printExportedDeclarationsOnly {
+            return SemanticString()
+        }
+
         let context = makeContext(
             options: options,
             cTypeReplacements: cTypeReplacements,
@@ -421,7 +485,8 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
             }
         }
 
-        return categoryInfo.semanticString(using: context)
+        let declaration = categoryInfo.semanticString(using: context)
+        return isExcludedByExportFilter && marksOptionalContent ? Self.visibleWhileExportFilterIsOff(declaration) : declaration
     }
 
     // MARK: - Stripped Members

@@ -3,8 +3,8 @@ import Semantic
 // MARK: - Option Names
 
 extension ObjCGenerationOptions {
-    /// The ten switches, as the option names the `VisibilityRegion`s of a
-    /// marked rendering are conditioned on (see
+    /// The switches, as the option names the `VisibilityRegion`s of a marked
+    /// rendering are conditioned on (see
     /// `ObjCInterfaceBuilder.markedClassInterface(named:cTypeReplacements:ivarOffsetCommentBuilder:)`).
     public enum VisibilityOption: String, CaseIterable, Sendable {
         case stripProtocolConformance = "objc.stripProtocolConformance"
@@ -17,6 +17,7 @@ extension ObjCGenerationOptions {
         case addPropertyAttributesComments = "objc.addPropertyAttributesComments"
         case addMethodIMPAddressComments = "objc.addMethodIMPAddressComments"
         case addPropertyAccessorAddressComments = "objc.addPropertyAccessorAddressComments"
+        case printExportedDeclarationsOnly = "objc.printExportedDeclarationsOnly"
     }
 
     /// Whether `option` is on.
@@ -32,6 +33,7 @@ extension ObjCGenerationOptions {
         case .addPropertyAttributesComments: addPropertyAttributesComments
         case .addMethodIMPAddressComments: addMethodIMPAddressComments
         case .addPropertyAccessorAddressComments: addPropertyAccessorAddressComments
+        case .printExportedDeclarationsOnly: printExportedDeclarationsOnly
         }
     }
 
@@ -46,7 +48,8 @@ extension ObjCGenerationOptions {
 // MARK: - Marking
 
 /// What a marked rendering needs besides the metadata: for each member some
-/// strip switch would remove, the switches that would.
+/// switch would remove — a strip switch, or `printExportedDeclarationsOnly`
+/// for an ivar the image does not export — the switches that would.
 ///
 /// A member is visible when every one of its switches is off. Comments need
 /// nothing here: in a marked rendering each comment is conditioned on its
@@ -72,8 +75,8 @@ public struct ObjCOptionalContentMarking: Sendable {
         }
     }
 
-    /// The strip switches that would remove each member; a member absent
-    /// here is always shown.
+    /// The switches that would remove each member; a member absent here is
+    /// always shown.
     public var strippingOptionsByMember: [Member: Set<ObjCGenerationOptions.VisibilityOption>]
 
     public init(strippingOptionsByMember: [Member: Set<ObjCGenerationOptions.VisibilityOption>] = [:]) {

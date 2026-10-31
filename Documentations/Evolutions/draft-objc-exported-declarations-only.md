@@ -65,14 +65,15 @@ extension ObjCInterfaceIndexer {
 `swift.printExportedDeclarationsOnly` 一致，宿主一个开关映射到两边。开着时：
 
 - **类**：明确未导出的打印为空。返回空的 `SemanticString`，不是 `nil`，`nil` 仍只表示镜像里没有这个类。
-- **ivar**：明确未导出的去掉，与 strip 开关走同一张 `StrippedMembers` 表。
+- **ivar**：明确未导出的去掉，与 strip 开关走同一张 `StrippedMembers` 表。结论在打印这个类时当场读（见第 2 点）。
 - **类别**：目标类是本镜像列出的类、且明确未导出时打印为空，照 0083 / 0016 对「本镜像未导出类型的扩展」的规则；目标类在
   别的镜像、或判断不了，整个保留。类别的成员没有导出符号，不逐个判断。
 - **方法、属性、协议、C struct / union** 都没有自己的导出符号，不动。
 
 **4. 标记模式。** 上面每处「不输出」改为照常输出，标上 `.disabled("objc.printExportedDeclarationsOnly")`：整个类或类别
-包一层 `VisibilityRegion`，ivar 进 `ObjCOptionalContentMarking`，与 strip 开关同一张表。投影结果与普通打印逐字一致；
-开关关着时，普通打印逐字节不变。被排除的类与类别必须整段落在这个区域里，开关打开时投影出来恰好是空串，不剩空行或注释：
+用 swift-semantic-string 的 `markAtoms(from: 0, visibleUnder:)` 原地标上每个原子（与 MachOSwiftSection 0083 的
+`visible(under:)` 同一做法），ivar 进 `ObjCOptionalContentMarking`，与 strip 开关同一张表。投影结果与普通打印逐字一致；
+开关关着时，普通打印逐字节不变。被排除的类与类别整段都带这个条件，开关打开时投影出来恰好是空串，不剩空行或注释：
 RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 
 **测试。**
@@ -83,8 +84,8 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 - 真实镜像上的交叉验证：Foundation 进程内与 cache 文件两种模式，每个类、每个 ivar 的结论一致；每个以 `CN` 结尾、落在列出
   的类对象上的导出符号，对应的类读作已导出；clang 编译的类新旧判据一致。
 - 渲染：fixture 与 Foundation 上开关开、关两种普通打印；`ObjCMarkedInterfaceTests` 的组合加入新开关（全开、全关、单开、
-  单关），断言投影与普通打印逐字一致，并断言 Foundation 上确实有被过滤的类、ivar 与类别，免得测试空跑。被排除的类与
-  类别另断言开关打开时的投影恰好是空串。
+  单关），断言投影与普通打印逐字一致，并断言 Foundation 上确实有被过滤的类与 ivar，免得测试空跑（Foundation 没有会被
+  过滤的类别，类别由 fixture 覆盖）。被排除的类与类别另断言开关打开时的投影恰好是空串。
 - `prepare()` 的额外耗时实测后记下（实测见决策日志与实现说明）。
 - 照仓库惯例，用 CI 的 Xcode 26.6 再编一遍。
 
@@ -110,9 +111,9 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
    fixture 与 Foundation 上的交叉验证，纯 Swift 类与 Swift ivar 两条先对着旧判据跑红。
 2. ✅ indexer：`prepare()` 里建索引、算出每个类的结论，提供 `exportStatus(ofClassNamed:)`。测试：fixture 与 Foundation 上的
    结论、补充类与别的镜像的类返回 `nil`。
-3. 打印：`printExportedDeclarationsOnly` 与可见性选项；普通打印按结论去掉类、ivar 与类别。测试：开关开、关两种打印，旧设置的
-   解码。
-4. 标记模式：类、类别与 ivar 的标记。测试：投影与普通打印逐字一致，被排除的类与类别开关打开时投影恰好为空串。
+3. ✅ 打印：`printExportedDeclarationsOnly` 与可见性选项；普通打印按结论去掉类、ivar 与类别。测试：开关开、关两种打印，旧设置的
+   解码。（与第 4 步同一个提交，见决策日志。）
+4. ✅ 标记模式：类、类别与 ivar 的标记。测试：投影与普通打印逐字一致，被排除的类与类别开关打开时投影恰好为空串。
 5. 文档与收尾验证：实现说明、术语表与使用指南；`prepare()` 的耗时实测；全量测试；Xcode 26.6 编译。
 
 ## 决策日志
@@ -133,3 +134,6 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 | 2026-10-31 | export trie 条目换口径成为 `ObjCMetadataSource` 的批量要求 `objcOffsets(ofExportedSymbolOffsets:)`，独立文件经 `fileOffset(of:)` 换 | 草案打算沿用「文件偏移等于相对 header 的偏移」的约定；改为与解析指针时同一个函数换算，两边口径由构造保证一致，不靠这个约定。批量是为了只读一次 load commands |
 | 2026-10-31 | 0008 里依赖按名字查询的测试改用新查询，`classDefinedInAnotherImageReadsAsUnexportedHere` 与 `ivarLookupIsQualifiedByDeclaringClass` 删去 | 两条测的是已 deprecated 的按名字查询的行为，新查询按位置，不存在「问错镜像得到误导性负面答案」与「名字拼错」这两种情形；per-image 的约束改由第 2 步的 indexer 查询对别的镜像的类返回 `nil` 来体现 |
 | 2026-10-31 | 第 2 步完成；ivar 的结论不在 `prepare()` 里算，indexer 不提供 `exportStatus(ofIvarNamed:inClassNamed:)`，改由打印器在打印某个类时当场算 | 实测（调试构建，机器负载 30–44）：在 `prepare()` 里为每个类再读一遍 ivar 列表，AppKit 多 159–177 ms，约占 `prepare()` 的 4%——进程内每读一次类数据都先用 `mach_vm_read_overwrite` 探测内存。只算类的结论时，AppKit 只多 31 ms（0.8%），Foundation 45 ms（4.5%）、SwiftUI 43 ms（6.6%），几乎全是 MachOKit 解析 trie。侧栏只要类的结论，ivar 的结论只在打印那一个类时有用；indexer 把 `ObjCExportIndex` 以 `package` 的 `exportIndex` 留给打印器。宿主要逐个 ivar 的结论，可直接用事实层的 `exportStatus(ofIvarOffsetVariableAt:)` 与 `objcIvarOffsetVariableOffsets(of:)`。RuntimeViewer 只用类的查询，不受影响 |
+| 2026-10-31 | 第 3、4 步合成一个提交 | 新开关一加进 `VisibilityOption`，`ObjCMarkedInterfaceTests` 就按 `allCases` 把它放进投影组合；只做普通打印、不做标记，这组测试必然是红的，两步分开就没有一步能单独通过 |
+| 2026-10-31 | 被排除的类与类别用 `markAtoms(from:visibleUnder:)` 原地标，不包 `VisibilityRegion` | 方案原写包一层 `VisibilityRegion`。对照测试比文本、span 与 identifier：包一层会在声明外多出一层普通打印没有的元素；`markAtoms` 只改原子的 identifier，元素边界不变，MachOSwiftSection 0083 的 `visible(under:)` 也是这样做的。它在 swift-semantic-string 0.4.0 就有，依赖下限不用动 |
+| 2026-10-31 | 第 3、4 步完成 | fixture 上 30 个测试、Foundation 全量的标记对照 6 个测试全过。中途对照测试抓到一个错：普通打印在开关关着时也给未导出的类打了条件标记（文字不变、identifier 表多一项），改为只在标记模式下标。实测开关打开后 Foundation 891 个类有 529 个打印为空、213 个去掉了部分 ivar，AppKit 2773 / 2062 / 595，SwiftUI 361 / 321 / 20；三个框架的类别一个都没被去掉——链接器默认把同一镜像里加在本镜像类上的类别并进类本身，这条规则由 fixture（`-Wl,-no_objc_category_merging`）覆盖 |

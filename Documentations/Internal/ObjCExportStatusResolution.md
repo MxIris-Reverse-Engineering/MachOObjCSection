@@ -195,6 +195,38 @@ Set 的规模跟着类符号数走（百量级的短字符串），内存不构�
 对每个类都做一遍，AppKit 的 `prepare()` 要多 4% 左右。侧栏只要类的结论，ivar 的结论只在打印那一个类时
 有用，所以由打印器当场算，indexer 只把 `ObjCExportIndex` 留给它（`package var exportIndex`）。
 
+## 打印时怎么用这些结论
+
+`ObjCGenerationOptions.printExportedDeclarationsOnly`（可见性选项 `objc.printExportedDeclarationsOnly`，名字照
+MachOSwiftSection 的同名开关取）由 `ObjCInterfaceBuilder` 执行，只在有确定的「未导出」时动手：
+
+- **类**：`indexer.exportStatus(ofClassNamed:)` 是 `notExported` 的打印成空串。返回的是空的 `SemanticString`，
+  不是 `nil`，`nil` 仍只表示镜像里没有这个类；宿主据此显示占位说明、批量导出跳过它。宿主补充的类没有结论，
+  不受影响。
+- **ivar**：在打印这个类时当场读偏移变量的位置，按 `indexer.exportIndex` 判，未导出的进 `StrippedMembers`，与
+  strip 开关走同一张表。普通打印取并集过滤，标记模式据此给成员标条件。
+- **类别**：目标类是本镜像列出的类、且结论是 `notExported` 时整个打印成空串，照 MachOSwiftSection 0083 / 0016
+  删「本镜像未导出类型的扩展」的规则；目标类在别的镜像（没有结论）的整个保留，成员没有符号可判。实测系统框架里
+  这种类别一个也没有：链接器默认把同一镜像里加在本镜像类上的类别并进类本身（见
+  [提案 0017](../Evolutions/0017-objc-duplicate-member-selection.md)），所以这条规则落在不合并类别的镜像上，
+  fixture 用 `-Wl,-no_objc_category_merging` 造出这种形态。
+- **方法、属性、协议、C struct / union** 都没有自己的导出符号，不动。
+
+**标记模式下整个声明怎么标。** 被排除的类与类别照常打印，再用 swift-semantic-string 的
+`markAtoms(from: 0, visibleUnder: .disabled("objc.printExportedDeclarationsOnly"))` 把每个原子标上「开关关着才可见」。
+不能包一层 `VisibilityRegion`：那会在声明外面多一层普通打印没有的元素，投影的 span 与普通打印对不上（对照测试比的是
+文本、span 与 identifier 三样）。`markAtoms` 只改 identifier，文本、类型、原子数与元素边界都不变，开关打开时投影出来
+恰好是空串，连换行也没有——RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。MachOSwiftSection 0083 的
+`visible(under:)` 是同一个做法。
+
+实测（macOS 27.2，进程内）开关打开后：
+
+| 镜像 | 类 | 打印为空 | 去掉了部分 ivar | 类别 | 打印为空的类别 |
+|---|---|---|---|---|---|
+| Foundation | 891 | 529 | 213 | 73 | 0 |
+| AppKit | 2773 | 2062 | 595 | 69 | 0 |
+| SwiftUI | 361 | 321 | 20 | 10 | 0 |
+
 ## 测试怎么钉住这些
 
 `Tests/ObjCMetadataSourceTests/ObjCExportIndexTests.swift` 跑在 Foundation 上，主力是几条交叉验证：
@@ -225,10 +257,16 @@ ivar 的结论，另有一条确认 Swift dylib 确实只用 Swift 的拼法发�
 没有任何 `_OBJC_IVAR_$_`）。按名字查时，公开的纯 Swift 类与两个 Swift 类的公开 ivar 读作未导出，这条
 测试在修复前对着旧判据跑过、确认是红的。
 
+打印由 `Tests/ObjCMetadataSourceTests/ExportedDeclarationsRenderingTests.swift` 钉住：两个 fixture、两种模式下开关打开时
+去掉了什么、留下了什么，每个类与类别的标记打印按全关、全开、每个开关单开与单关投影后与普通打印逐字一致，打印为空的投影
+也必须为空。`ObjCMarkedInterfaceTests` 在 Foundation 全部声明上做同样的投影比对，组合里含这个开关，另有一条确认开关在
+Foundation 上确实去掉了类与 ivar，免得投影比对空跑。
+
 ## 本轮不做的
 
-- **CLI 一个字节没动**。MachOSwiftSection 提案 0008 的 `// not exported` 标注与 0016 的
-  `--exported-only` 过滤都没有 ObjC 对应物，本轮只铺事实层。
+- **CLI 一个字节没动**。MachOSwiftSection 提案 0008 的 `// not exported` 标注没有 ObjC 对应物；
+  0016 的 `--exported-only` 过滤后来有了库层面的对应物（`printExportedDeclarationsOnly`，见上文「打印时怎么用这些
+  结论」），`objc-section` 命令行按 0010 退役，没有加这个 flag。
 - **不进 `ObjCAPISnapshot` / `ObjCDiffing`**。导出状态是符号化状态，不是 API 事实；
   加字段还会破坏既有 baseline 的 `formatVersion` 契约。
 - **没有进程级缓存**。本库没有 MachOSwiftSection 那套 `SharedCache` 基座，

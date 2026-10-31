@@ -64,8 +64,9 @@ image 组演进里的一种记录：声明在一次跳变两侧都在，所在�
 ### marked rendering（标记渲染）
 
 `ObjCInterfaceBuilder` 的 `markedClassInterface` / `markedProtocolInterface` / `markedCategoryInterface` 产出的渲染：
-不按十个生成开关过滤，所有成员与注释都渲染出来，每段受开关控制的内容包进 swift-semantic-string 的
-`VisibilityRegion`，条件记在原子的 `identifier` 上，所以文字与「全部显示」逐字节相同。冻结后用
+不按生成开关过滤（strip、注释与 `printExportedDeclarationsOnly`），所有成员与注释都渲染出来，每段受开关控制的内容包进
+swift-semantic-string 的 `VisibilityRegion`（整个被导出过滤排除的类或类别则用 `markAtoms` 原地标），条件记在原子的
+`identifier` 上，所以文字与「全部显示」逐字节相同。冻结后用
 `separatingVisibilityRegions()` 拆出区域表，再按某组开关的 `isVisibilityOptionEnabled(_:)` 投影，得到的结果与
 普通入口（不带 `marked` 的那三个）按这组开关渲染完全相同。「可见性区域」「投影」是 swift-semantic-string 的术语，
 定义见其 `docs/VisibilityRegions.md`。
