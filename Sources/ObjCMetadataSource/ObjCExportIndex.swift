@@ -3,15 +3,45 @@ import MachOKit
 import MachOKitExtensions
 
 /// One image's Objective-C export symbol index: build it once, then ask it
-/// about every class in that image.
+/// about every class and ivar in that image.
 ///
 /// ```swift
 /// let exportIndex = ObjCExportIndex(machO: machO)
-/// for className in indexer.classNames {
-///     let status = exportIndex.exportStatus(ofClassNamed: className)
+/// for objcClass in machO.objc.classes64 ?? [] {
+///     let status = exportIndex.exportStatus(ofClassObjectAt: objcClass.offset)
 ///     // …mark the row
 /// }
 /// ```
+///
+/// `ObjCInterfaceIndexer` builds one during `prepare()` and keeps the verdict
+/// of every class it lists; a host with an indexer asks it about a class
+/// rather than this.
+///
+/// ## Judged by location
+///
+/// A verdict asks whether some exported symbol sits where the declaration
+/// is — at the class object for a class, at the variable its record's offset
+/// pointer points at for an ivar — because the two compilers that emit
+/// Objective-C metadata name those places differently:
+///
+/// - clang publishes a class object under `_OBJC_CLASS_$_<name>` and an ivar's
+///   offset variable under `_OBJC_IVAR_$_<class>.<ivar>`.
+/// - Swift publishes a class object under its type metadata symbol `$s…CN`,
+///   and adds an `_OBJC_CLASS_$_` alias at the same address only for a class
+///   with an Objective-C ancestor (`emitObjCClassSymbol` in
+///   `swift/lib/IRGen/GenMeta.cpp` runs only when `isObjC()`). A class rooted
+///   in `Swift._SwiftObject` has no Objective-C symbol at all, yet sits in
+///   `__objc_classlist` like any other. An ivar Swift emits — for a Swift
+///   class, or for an `@objc @implementation` one — points at the field
+///   offset `$s…Wvd` (`buildIvar` in `GenClass.cpp`), never at an
+///   `_OBJC_IVAR_$_` symbol.
+///
+/// So the trie pass keeps the locations of all four kinds, and a lookup is a
+/// set membership test on an offset. The superseded queries by name,
+/// ``exportStatus(ofClassNamed:)`` and
+/// ``exportStatus(ofIvarNamed:inClassNamed:)``, find only the clang spellings
+/// and answer ``ObjCExportStatus/notExported`` for every exported Swift class
+/// without an Objective-C ancestor and every exported ivar Swift emits.
 ///
 /// ## Built for the whole-image sweep
 ///
@@ -20,51 +50,65 @@ import MachOKitExtensions
 /// the cost is paid once in ``init(machO:)`` — a single pass over the export
 /// trie — and every query after it is a hash lookup.
 ///
-/// That is also why there is no `machO.objcExportStatus(ofClassNamed:)`
-/// convenience on ``ObjCMetadataSource`` itself. Such a call would have to
-/// re-reach for `exportTrie` each time (on a `MachOFile` that means walking
-/// the load commands, which is file I/O) and walk the trie again — turning
-/// the sweep into O(n) I/O. A shortcut whose only plausible use is the one
-/// that makes it quadratic is better left unwritten.
+/// That is also why there is no `machO.objcExportStatus(of:)` convenience on
+/// ``ObjCMetadataSource`` itself. Such a call would have to re-reach for
+/// `exportTrie` each time (on a `MachOFile` that means walking the load
+/// commands, which is file I/O) and walk the trie again — turning the sweep
+/// into O(n) I/O. A shortcut whose only plausible use is the one that makes
+/// it quadratic is better left unwritten.
 ///
 /// ## Lifetime is the caller's
 ///
-/// This is a value holding two `Set<String>`, so it is `Sendable` without
-/// ceremony: build it on the background pass that indexes the image, read it
-/// from wherever renders. There is no process-wide cache behind it — a host
-/// keeps it alive alongside whatever else it holds for that image, and drops
-/// it with them.
+/// This is a value holding sets, so it is `Sendable` without ceremony: build
+/// it on the background pass that indexes the image, read it from wherever
+/// renders. There is no process-wide cache behind it — a host keeps it alive
+/// alongside whatever else it holds for that image, and drops it with them.
 public struct ObjCExportIndex: Sendable {
-    /// The linker symbol a class's metadata is published under. Note the
+    /// The linker symbol clang publishes a class object under. Note the
     /// leading underscore: the export trie stores the linker's own spelling,
     /// and MachOKit hands the trie labels back verbatim.
-    ///
-    /// A Swift class needs no special handling — its symbol is this prefix
-    /// plus the mangled runtime name exactly as the ObjC metadata already
-    /// spells it (`_OBJC_CLASS_$__TtC6DVTKit35DVTPathControlNavigationPopoverItem`),
-    /// so the concatenation below matches without any remangling step.
     private static let classSymbolPrefix = "_OBJC_CLASS_$_"
 
-    /// The linker symbol an ivar's offset variable is published under, whose
-    /// suffix is `<class name>.<ivar name>`.
+    /// The linker symbol clang publishes an ivar's offset variable under,
+    /// whose suffix is `<class name>.<ivar name>`.
     private static let ivarSymbolPrefix = "_OBJC_IVAR_$_"
 
+    /// The suffix of a Swift class's type metadata symbol (`$s…CN`), which
+    /// sits at the class object.
+    ///
+    /// Matched on the suffix alone: a symbol of another kind that happens to
+    /// end this way is harmless, since only a symbol at a class object's exact
+    /// location can affect a verdict, and one there publishes that object.
+    private static let swiftClassMetadataSymbolSuffix = "CN"
+
+    /// The suffix of a Swift field offset symbol (`$s…Wvd`), the variable an
+    /// ivar Swift emits keeps its offset in. Matched on the suffix alone, for
+    /// the same reason.
+    private static let swiftFieldOffsetSymbolSuffix = "Wvd"
+
     /// Exported class names, prefix already stripped (`NSAlert`, not
-    /// `_OBJC_CLASS_$_NSAlert`). Stripping at build time rather than
-    /// concatenating at query time saves one string construction per lookup,
-    /// which over a whole-image sweep is one per class.
+    /// `_OBJC_CLASS_$_NSAlert`). Read only by the superseded
+    /// ``exportStatus(ofClassNamed:)``.
     private let exportedClassNames: Set<String>
 
-    /// Exported ivars keyed `<class name>.<ivar name>`, prefix stripped. The
-    /// separator is safe to key on: neither an ObjC class name nor a Swift
-    /// mangled runtime name contains a `.`.
+    /// Exported ivars keyed `<class name>.<ivar name>`, prefix stripped. Read
+    /// only by the superseded ``exportStatus(ofIvarNamed:inClassNamed:)``.
     private let exportedIvarQualifiedNames: Set<String>
+
+    /// Where an exported symbol publishes a class object, in the source's
+    /// offset convention (the one `ObjCClassProtocol.offset` reads back).
+    private let exportedClassObjectOffsets: Set<Int>
+
+    /// Where an exported symbol publishes an ivar's offset variable, in the
+    /// source's offset convention.
+    private let exportedIvarOffsetVariableOffsets: Set<Int>
 
     /// Whether this image yielded any export information at all. Drives the
     /// ``ObjCExportStatus/imageHasNoExportInformation`` answer.
     private let hasExportInformation: Bool
 
-    /// Walks the image's export trie once and keeps the Objective-C entries.
+    /// Walks the image's export trie once and keeps the entries that can
+    /// publish a class object or an ivar's offset variable.
     ///
     /// ## Why the whole trie, and not a prefix search
     ///
@@ -78,16 +122,19 @@ public struct ObjCExportIndex: Sendable {
     /// happening to have a node boundary right at the prefix — which the usual
     /// export-trie writers do produce, but "usually correct" is not something
     /// to build a verdict on. A missed branch would report a batch of exported
-    /// classes as internal, with nothing to show for it.
+    /// classes as internal, with nothing to show for it. Two of the four
+    /// kinds are told apart by a suffix, which no prefix search reaches anyway.
     ///
-    /// A full pass costs one traversal per image (AppKit: 8774 entries in,
-    /// 667 class names and 230 ivar names out) and is what
-    /// `MachOSwiftSection`'s `SymbolIndexStore` does for the same purpose.
+    /// A full pass costs one traversal per image (AppKit: 8774 entries in) and
+    /// is what `MachOSwiftSection`'s `SymbolIndexStore` does for the same
+    /// purpose.
     public init(machO: some ObjCMetadataSource) {
         let exportedSymbols = machO.exportedSymbols
 
         var exportedClassNames: Set<String> = []
         var exportedIvarQualifiedNames: Set<String> = []
+        var classObjectSymbolOffsets: [Int] = []
+        var ivarOffsetVariableSymbolOffsets: [Int] = []
 
         for exportedSymbol in exportedSymbols {
             let symbolName = exportedSymbol.name
@@ -95,10 +142,24 @@ public struct ObjCExportIndex: Sendable {
                 exportedClassNames.insert(
                     String(symbolName.dropFirst(Self.classSymbolPrefix.count))
                 )
+                if let symbolOffset = exportedSymbol.offset {
+                    classObjectSymbolOffsets.append(symbolOffset)
+                }
             } else if symbolName.hasPrefix(Self.ivarSymbolPrefix) {
                 exportedIvarQualifiedNames.insert(
                     String(symbolName.dropFirst(Self.ivarSymbolPrefix.count))
                 )
+                if let symbolOffset = exportedSymbol.offset {
+                    ivarOffsetVariableSymbolOffsets.append(symbolOffset)
+                }
+            } else if symbolName.hasSuffix(Self.swiftClassMetadataSymbolSuffix) {
+                if let symbolOffset = exportedSymbol.offset {
+                    classObjectSymbolOffsets.append(symbolOffset)
+                }
+            } else if symbolName.hasSuffix(Self.swiftFieldOffsetSymbolSuffix) {
+                if let symbolOffset = exportedSymbol.offset {
+                    ivarOffsetVariableSymbolOffsets.append(symbolOffset)
+                }
             }
         }
 
@@ -115,30 +176,44 @@ public struct ObjCExportIndex: Sendable {
         self.hasExportInformation = !exportedSymbols.isEmpty
         self.exportedClassNames = exportedClassNames
         self.exportedIvarQualifiedNames = exportedIvarQualifiedNames
+        self.exportedClassObjectOffsets = Set(
+            machO.objcOffsets(ofExportedSymbolOffsets: classObjectSymbolOffsets).compactMap(\.self)
+        )
+        self.exportedIvarOffsetVariableOffsets = Set(
+            machO.objcOffsets(ofExportedSymbolOffsets: ivarOffsetVariableSymbolOffsets).compactMap(\.self)
+        )
+    }
+
+    /// Whether an exported symbol publishes the class object at `offset`.
+    ///
+    /// `offset` is a class record's own, in the source's offset convention —
+    /// what `ObjCClassProtocol.offset` reads back for a record this image
+    /// lists. A record of another image counts from somewhere else, and its
+    /// offset means nothing here.
+    public func exportStatus(ofClassObjectAt offset: Int) -> ObjCExportStatus {
+        exportStatus(at: offset, in: exportedClassObjectOffsets)
+    }
+
+    /// Whether an exported symbol publishes the ivar offset variable at
+    /// `offset`.
+    ///
+    /// `offset` is where an ivar's record points, in the source's offset
+    /// convention — what `ObjCMetadataSource.objcIvarOffsetVariableOffsets(of:)`
+    /// reads.
+    public func exportStatus(ofIvarOffsetVariableAt offset: Int) -> ObjCExportStatus {
+        exportStatus(at: offset, in: exportedIvarOffsetVariableOffsets)
     }
 
     /// Whether `_OBJC_CLASS_$_<className>` is in the export trie **of the
     /// image this index was built from**.
     ///
-    /// `className` is the name as the Objective-C metadata spells it — which
-    /// for a Swift class is its mangled runtime name, and needs no
-    /// preprocessing.
-    ///
-    /// ## Only ask about classes this image defines
-    ///
-    /// The answer is per-image, and there is no "defined elsewhere" case to
-    /// tell you when you have strayed: a class this image does not define
-    /// comes back ``ObjCExportStatus/notExported``, indistinguishable from one
-    /// it defines and keeps internal. `NSArray` asked of Foundation is
-    /// `notExported`, because the class belongs to CoreFoundation (toll-free
-    /// bridging; `NSDate`, `NSURL` and `NSDictionary` are the same story) —
-    /// a true answer to the question asked, and a badly misleading one if the
-    /// question meant "is NSArray public".
-    ///
-    /// So drive this from the image's own class list. A superclass name or an
-    /// adopted class read out of some class's metadata routinely names another
-    /// image's class, and passing those in produces a stream of meaningless
-    /// negatives.
+    /// Only clang's spelling is looked for, so every exported Swift class
+    /// without an Objective-C ancestor reads ``ObjCExportStatus/notExported``:
+    /// Swift publishes it under its type metadata symbol alone. A class this
+    /// image does not define reads the same, indistinguishable from one it
+    /// keeps internal (`NSArray` asked of Foundation, which leaves it to
+    /// CoreFoundation).
+    @available(*, deprecated, message: "Misreads every Swift class without an Objective-C ancestor, which has no _OBJC_CLASS_$_ symbol; use ObjCInterfaceIndexer.exportStatus(ofClassNamed:) or exportStatus(ofClassObjectAt:)")
     public func exportStatus(ofClassNamed className: String) -> ObjCExportStatus {
         exportStatus(ofSymbolSuffix: className, in: exportedClassNames)
     }
@@ -146,12 +221,10 @@ public struct ObjCExportIndex: Sendable {
     /// Whether `_OBJC_IVAR_$_<className>.<ivarName>` is in the image's export
     /// trie.
     ///
-    /// `className` must be the class that *declares* the ivar, not a subclass
-    /// that inherits it: the offset variable is published under the declaring
-    /// class's name, so passing a subclass produces a symbol name that exists
-    /// nowhere and reads back as ``ObjCExportStatus/notExported``. Taking both
-    /// from the same `ObjCClassInfo` is correct — its `ivars` are the class's
-    /// own, straight out of `class_ro_t`.
+    /// Only clang's spelling is looked for, so every exported ivar Swift
+    /// emits reads ``ObjCExportStatus/notExported``: its offset variable is a
+    /// `$s…Wvd` field offset.
+    @available(*, deprecated, message: "Misreads every ivar Swift emits, whose offset variable is a $s…Wvd field offset; use exportStatus(ofIvarOffsetVariableAt:) with ObjCMetadataSource.objcIvarOffsetVariableOffsets(of:)")
     public func exportStatus(
         ofIvarNamed ivarName: String,
         inClassNamed className: String
@@ -160,6 +233,11 @@ public struct ObjCExportIndex: Sendable {
             ofSymbolSuffix: "\(className).\(ivarName)",
             in: exportedIvarQualifiedNames
         )
+    }
+
+    private func exportStatus(at offset: Int, in exportedOffsets: Set<Int>) -> ObjCExportStatus {
+        guard hasExportInformation else { return .imageHasNoExportInformation }
+        return exportedOffsets.contains(offset) ? .exported : .notExported
     }
 
     private func exportStatus(

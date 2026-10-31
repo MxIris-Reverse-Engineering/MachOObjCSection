@@ -114,4 +114,14 @@ extension MachOImage: ObjCMetadataSource {
         }
         return address(forOffset: offset)
     }
+
+    public func objcIvarOffsetVariableOffsets<Class: ObjCClassProtocol>(of objcClass: Class) -> [String: Int] {
+        objcClass.ivarOffsetVariableOffsets(in: self)
+    }
+
+    /// An export trie counts from the image's header, as this source's
+    /// offsets do, so each entry is its own location.
+    public func objcOffsets(ofExportedSymbolOffsets exportedSymbolOffsets: [Int]) -> [Int?] {
+        exportedSymbolOffsets
+    }
 }

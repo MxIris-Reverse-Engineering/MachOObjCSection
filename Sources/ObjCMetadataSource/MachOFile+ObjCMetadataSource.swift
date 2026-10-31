@@ -112,4 +112,39 @@ extension MachOFile: ObjCMetadataSource {
         guard rawValue != 0, let offset = Int(exactly: rawValue) else { return nil }
         return address(forOffset: offset)
     }
+
+    public func objcIvarOffsetVariableOffsets<Class: ObjCClassProtocol>(of objcClass: Class) -> [String: Int] {
+        objcClass.ivarOffsetVariableOffsets(in: self)
+    }
+
+    /// An image's header sits at its `__TEXT` address. In a dyld shared cache
+    /// an entry is that address plus its offset, counted from the shared
+    /// region's start. In a standalone binary the address goes through the
+    /// segment that maps it to a file offset, as a resolved pointer does.
+    public func objcOffsets(ofExportedSymbolOffsets exportedSymbolOffsets: [Int]) -> [Int?] {
+        let loadCommands = loadCommands
+        guard let headerAddress = loadCommands.text64?.virtualMemoryAddress ?? loadCommands.text?.virtualMemoryAddress,
+              headerAddress >= 0
+        else {
+            return exportedSymbolOffsets.map { _ in nil }
+        }
+        func address(ofExportedSymbolOffset exportedSymbolOffset: Int) -> UInt64? {
+            guard exportedSymbolOffset >= 0 else { return nil }
+            return UInt64(headerAddress) + UInt64(exportedSymbolOffset)
+        }
+        if let cache {
+            let sharedRegionStart = cache.mainCacheHeader.sharedRegionStart
+            return exportedSymbolOffsets.map { exportedSymbolOffset in
+                guard let address = address(ofExportedSymbolOffset: exportedSymbolOffset),
+                      address >= sharedRegionStart
+                else { return nil }
+                return Int(exactly: address - sharedRegionStart)
+            }
+        }
+        return exportedSymbolOffsets.map { exportedSymbolOffset in
+            address(ofExportedSymbolOffset: exportedSymbolOffset)
+                .flatMap { fileOffset(of: $0) }
+                .flatMap { Int(exactly: $0) }
+        }
+    }
 }

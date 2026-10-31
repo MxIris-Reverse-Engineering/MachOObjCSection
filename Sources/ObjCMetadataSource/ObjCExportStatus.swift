@@ -1,8 +1,9 @@
 import Foundation
 
-/// Whether an Objective-C declaration's linker symbol has an entry in the
-/// image's export trie — the fact that separates a framework's public classes
-/// from its internal implementation ones.
+/// Whether an exported symbol publishes an Objective-C declaration — sits in
+/// the image's export trie at the declaration's location — the fact that
+/// separates a framework's public classes from its internal implementation
+/// ones. See ``ObjCExportIndex`` for the symbols that count.
 ///
 /// ## This is a symbol-table fact, not an access level
 ///
@@ -31,10 +32,11 @@ import Foundation
 /// there is no entry point, and a caller that needs to represent those in a
 /// uniform list spells that with `Optional<ObjCExportStatus>` of its own.
 public enum ObjCExportStatus: Sendable, Hashable {
-    /// The symbol is in the image's export trie.
+    /// An exported symbol sits at the declaration.
     case exported
 
-    /// The image has export information, and this symbol is provably not in it.
+    /// The image has export information, and no exported symbol sits at the
+    /// declaration.
     case notExported
 
     /// No verdict is available for **any** symbol of this image, because the

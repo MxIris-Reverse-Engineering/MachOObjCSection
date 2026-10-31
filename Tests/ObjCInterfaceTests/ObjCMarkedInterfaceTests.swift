@@ -6,11 +6,11 @@ import ObjCIndexing
 import Semantic
 @testable import ObjCInterface
 
-/// A marked rendering, projected to any combination of the ten switches,
-/// reads exactly as the plain rendering with those switches — checked for
-/// every class, protocol and category of Foundation. RuntimeViewer's Find
-/// searches one marked rendering per declaration under whatever switches the
-/// user displays with, so this is the contract it stands on.
+/// A marked rendering, projected to any combination of the switches, reads
+/// exactly as the plain rendering with those switches — checked for every
+/// class, protocol and category of Foundation. RuntimeViewer's Find searches
+/// one marked rendering per declaration under whatever switches the user
+/// displays with, so this is the contract it stands on.
 @Suite("Marked ObjC interfaces")
 struct ObjCMarkedInterfaceTests {
     private typealias VisibilityOption = ObjCGenerationOptions.VisibilityOption
@@ -26,8 +26,17 @@ struct ObjCMarkedInterfaceTests {
             addIvarOffsetComments: enabled.contains(.addIvarOffsetComments),
             addPropertyAttributesComments: enabled.contains(.addPropertyAttributesComments),
             addMethodIMPAddressComments: enabled.contains(.addMethodIMPAddressComments),
-            addPropertyAccessorAddressComments: enabled.contains(.addPropertyAccessorAddressComments)
+            addPropertyAccessorAddressComments: enabled.contains(.addPropertyAccessorAddressComments),
+            printExportedDeclarationsOnly: enabled.contains(.printExportedDeclarationsOnly)
         )
+    }
+
+    /// Every switch, set: one this helper forgot would never be turned on, and
+    /// the combinations below would pass without ever trying it.
+    @Test("the option helper turns every switch on")
+    func optionHelperCoversEverySwitch() {
+        let allOn = Self.options(enabling: Set(VisibilityOption.allCases))
+        #expect(VisibilityOption.allCases.allSatisfy(allOn.isEnabled))
     }
 
     /// Everything off, everything on, each switch alone, each switch left
@@ -114,6 +123,29 @@ struct ObjCMarkedInterfaceTests {
             builder.categoryInterface(uniqueName: $0, options: $1)
         }
         #expect(mismatches.isEmpty, "\(mismatches.joined(separator: "\n\n"))")
+    }
+
+    /// The projections above prove something about the export filter only if
+    /// it leaves something out of Foundation: some class renders empty with
+    /// it, and some exported class loses an ivar.
+    @Test("the export filter leaves classes and ivars of Foundation out")
+    func exportFilterLeavesSomethingOut() async throws {
+        let (builder, indexer) = try await Self.makeBuilder()
+        let exportedOnly = ObjCGenerationOptions(printExportedDeclarationsOnly: true)
+        var emptiedClassCount = 0
+        var trimmedClassCount = 0
+        for className in indexer.classNames {
+            guard let everything = builder.classInterface(named: className)?.string,
+                  let exported = builder.classInterface(named: className, options: exportedOnly)?.string
+            else { continue }
+            if exported.isEmpty {
+                emptiedClassCount += 1
+            } else if exported != everything {
+                trimmedClassCount += 1
+            }
+        }
+        #expect(emptiedClassCount > 0, "no class of Foundation renders empty")
+        #expect(trimmedClassCount > 0, "no exported class of Foundation loses an ivar")
     }
 
     @Test("a customized ivar offset comment and C type spelling project the same way")

@@ -151,6 +151,28 @@ public protocol ObjCMetadataSource: MachOObjCSectionRepresentable, MachORepresen
     /// Each conformance normalizes its own spelling before handing the result
     /// to `address(forOffset:)`.
     func objcResolvedIMPAddress(forRawValue rawValue: UInt64) -> UInt64?
+
+    /// Where each ivar of `objcClass` keeps its offset: the offset of the
+    /// variable its record's offset pointer points at, by ivar name, in this
+    /// source's offset convention (the one `ObjCClassProtocol.offset` reads
+    /// back).
+    ///
+    /// That variable is what a linker symbol publishes for an ivar —
+    /// `_OBJC_IVAR_$_<class>.<ivar>` from clang, the field offset `$s…Wvd`
+    /// from Swift — so it is where ``ObjCExportIndex`` reads an ivar's verdict.
+    /// An ivar whose pointer resolves to nothing is absent, as it is from
+    /// ``objcClassInfo(of:)``.
+    func objcIvarOffsetVariableOffsets<Class: ObjCClassProtocol>(of objcClass: Class) -> [String: Int]
+
+    /// The locations export trie entries name, in this source's offset
+    /// convention: one for each of `exportedSymbolOffsets`, `nil` for one that
+    /// lies in no segment.
+    ///
+    /// An export trie counts from the image's header, and neither offset
+    /// convention of a `MachOFile` does — a standalone binary's are file
+    /// offsets, a dyld shared cache image's count from the main cache's start.
+    /// A batch converts with one read of the load commands.
+    func objcOffsets(ofExportedSymbolOffsets exportedSymbolOffsets: [Int]) -> [Int?]
 }
 
 extension ObjCMetadataSource {
