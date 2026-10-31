@@ -2,7 +2,7 @@
 
 > 面向维护者的实现说明。对应提案
 > [0008](../Evolutions/0008-objc-export-status.md)，以及把判据改按地址的
-> [只打印导出的 ObjC 声明](../Evolutions/draft-objc-exported-declarations-only.md)。
+> [0018](../Evolutions/0018-objc-exported-declarations-only.md)。
 > 记录 `ObjCExportIndex` / `ObjCExportStatus` 的判据来源、为什么按地址判、三处反直觉的边界，
 > 以及建索引的实测开销。
 >

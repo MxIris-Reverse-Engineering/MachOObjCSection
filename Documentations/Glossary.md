@@ -123,7 +123,7 @@ swift-semantic-string 的 `VisibilityRegion`（整个被导出过滤排除的类
   `Sources/ObjCInterface/ObjCInterfaceBuilder.swift`
 - **延伸阅读**：[实现说明](Internal/ObjCExportStatusResolution.md)、
   [提案 0008](Evolutions/0008-objc-export-status.md)、
-  [只打印导出的 ObjC 声明](Evolutions/draft-objc-exported-declarations-only.md)
+  [提案 0018](Evolutions/0018-objc-exported-declarations-only.md)
 
 ### protocol copy（协议副本）
 

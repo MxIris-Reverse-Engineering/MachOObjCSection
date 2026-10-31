@@ -1,9 +1,9 @@
-# Draft - 只打印导出的 ObjC 声明，导出判断改按地址
+# 0018 - 只打印导出的 ObjC 声明，导出判断改按地址
 
-- **状态**: In Progress
+- **状态**: Implemented
 - **创建日期**: 2026-10-31
 - **最后更新**: 2026-10-31
-- **实现分支**: `feature/objc-exported-declarations-only`（worktree `.worktrees/MachOObjCSection-ExportedDeclarationsOnly`，从 `next` 切）
+- **实现分支**: `feature/objc-exported-declarations-only`（worktree `.worktrees/MachOObjCSection-ExportedDeclarationsOnly`，从 `next` 切），2026-10-31 合入 `next`
 - **配套文档**: [实现说明「ObjC 导出状态的判定」](../Internal/ObjCExportStatusResolution.md)（按地址判、打印时怎么用、实测）；
   使用指南[「库调用方：只打印导出的声明」](../Guides/ObjCSectionCommandLine.md#库调用方只打印导出的声明)；术语表的
   [ObjCExportStatus](../Glossary.md#objcexportstatus导出状态)
@@ -142,3 +142,4 @@ RuntimeViewer 的 Find 语料把投影为空的条目当作不存在。
 | 2026-10-31 | 被排除的类与类别用 `markAtoms(from:visibleUnder:)` 原地标，不包 `VisibilityRegion` | 方案原写包一层 `VisibilityRegion`。对照测试比文本、span 与 identifier：包一层会在声明外多出一层普通打印没有的元素；`markAtoms` 只改原子的 identifier，元素边界不变，MachOSwiftSection 0083 的 `visible(under:)` 也是这样做的。它在 swift-semantic-string 0.4.0 就有，依赖下限不用动 |
 | 2026-10-31 | 第 3、4 步完成 | fixture 上 30 个测试、Foundation 全量的标记对照 6 个测试全过。中途对照测试抓到一个错：普通打印在开关关着时也给未导出的类打了条件标记（文字不变、identifier 表多一项），改为只在标记模式下标。实测开关打开后 Foundation 891 个类有 529 个打印为空、213 个去掉了部分 ivar，AppKit 2773 / 2062 / 595，SwiftUI 361 / 321 / 20；三个框架的类别一个都没被去掉——链接器默认把同一镜像里加在本镜像类上的类别并进类本身，这条规则由 fixture（`-Wl,-no_objc_category_merging`）覆盖 |
 | 2026-10-31 | 第 5 步完成；实现完成，待用户看过后收尾 | 验证在 JH's Mac Studio Ultra 上，用仓库提交的 `Package.resolved`，与 CI 同一组测试（`swift test --skip MachOObjCSectionTests`）：Xcode 26.6（Swift 6.3.3，CI 的版本，单独的构建目录）构建与测试原始退出码都是 0，46 个套件 319 个测试全过；默认的 Xcode 27.2（Swift 6.4.2）原始退出码 0。不跳过时只有 `MachOObjCSectionTests`（XCTest）失败：它的 `setUp` 读本机不存在的 `/Users/JH/Downloads/iOS18.5-SwiftUI`，是上游的测试代码，本分支没动，0008、0011 的记录里也是这样。文档：实现说明「ObjC 导出状态的判定」补了按地址判、打印时怎么用、`prepare()` 实测三部分，泛型化的实现说明补记核心 target 的第二处例外，使用指南加库调用方一节，术语表的 `ObjCExportStatus` 与 marked rendering 条目同步，README 的生成开关一段同步；没有新术语。RuntimeViewer 接入后可从宿主一侧再核对两个列表的标记 |
+| 2026-10-31 | 合入 `next`，取号 0018，状态改 Implemented | 用户看过本地合并（c401651）后正式收尾。取号时 origin 上的共享分支最大编号是 `next` 的 0017。验证沿用最终代码上的那两次（之后只改过文档）：Xcode 26.6 与 27.2 跑 CI 那组测试，原始退出码都是 0。文档：使用指南与实现说明已写并登记在头部「配套文档」，没有新术语。后续项：RuntimeViewer 抬 pin 接入后，从宿主一侧核对 ObjC 与 Swift 两个列表的标记；`swift-section objc` 要不要加对应的 flag 由 MachOSwiftSection 决定；本次不发版 |
