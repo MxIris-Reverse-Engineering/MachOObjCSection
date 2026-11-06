@@ -15,8 +15,19 @@ import Foundation
 final class DyldCacheImageLookup: @unchecked Sendable {
     private static let lookups = OwnerAttachedValues<any FileHandleIdentity & AnyObject, DyldCacheImageLookup>()
 
+    /// The cache's Objective-C header infos by index, read once: the header
+    /// optimization lives in one of the cache's files, and finding it walks
+    /// them all.
+    struct ObjCHeaderInfos {
+        let headerOptimizationRO64: DyldCache.LocatedValue<ObjCHeaderOptimizationRO64>?
+        let headerInfos64ByIndex: [Int: ObjCHeaderInfoRO64]
+        let headerOptimizationRO32: DyldCache.LocatedValue<ObjCHeaderOptimizationRO32>?
+        let headerInfos32ByIndex: [Int: ObjCHeaderInfoRO32]
+    }
+
     private let lock = NSLock()
     private var addressTable: CacheImageAddressTable<MachOFile>?
+    private var objcHeaderInfos: ObjCHeaderInfos?
     private var locatedImagesByHeaderIndex: [Int: DyldCache.LocatedValue<MachOFile>?] = [:]
 
     private init() {}
@@ -49,6 +60,41 @@ final class DyldCacheImageLookup: @unchecked Sendable {
             locatedImagesByHeaderIndex[index] = .some(locatedImage)
             return locatedImage
         }
+    }
+
+    /// The cache's Objective-C header infos, read the first time they are
+    /// asked for. The first header listed under an index answers for it, as
+    /// the search over the list did.
+    func objcHeaderInfos(of cache: DyldCache) -> ObjCHeaderInfos {
+        if let objcHeaderInfos = lock.withLock({ objcHeaderInfos }) {
+            return objcHeaderInfos
+        }
+        let headerOptimizationRO64 = cache._headerOptimizationRO64
+        let headerOptimizationRO32 = cache._headerOptimizationRO32
+        let builtHeaderInfos = ObjCHeaderInfos(
+            headerOptimizationRO64: headerOptimizationRO64,
+            headerInfos64ByIndex: Self.headerInfosByIndex(headerOptimizationRO64.flatMap { $0.value.headerInfos(in: $0.cache) }),
+            headerOptimizationRO32: headerOptimizationRO32,
+            headerInfos32ByIndex: Self.headerInfosByIndex(headerOptimizationRO32.flatMap { $0.value.headerInfos(in: $0.cache) })
+        )
+        return lock.withLock {
+            if let objcHeaderInfos {
+                return objcHeaderInfos
+            }
+            objcHeaderInfos = builtHeaderInfos
+            return builtHeaderInfos
+        }
+    }
+
+    private static func headerInfosByIndex<HeaderInfo: ObjCHeaderInfoROProtocol>(
+        _ headerInfos: AnyRandomAccessCollection<HeaderInfo>?
+    ) -> [Int: HeaderInfo] {
+        guard let headerInfos else { return [:] }
+        var headerInfosByIndex: [Int: HeaderInfo] = [:]
+        for headerInfo in headerInfos where headerInfosByIndex[headerInfo.index] == nil {
+            headerInfosByIndex[headerInfo.index] = headerInfo
+        }
+        return headerInfosByIndex
     }
 
     private func addressTable(of cache: DyldCache) -> CacheImageAddressTable<MachOFile> {

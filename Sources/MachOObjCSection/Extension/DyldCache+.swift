@@ -128,32 +128,23 @@ extension DyldCache {
     /// entry names its image by this index, and working it out rebuilds the
     /// whole header info list, searches it and opens sub-cache files.
     func _machO(at index: Int) -> LocatedValue<MachOFile>? {
-        DyldCacheImageLookup.lookup(for: self).locatedImage(atHeaderIndex: index) {
-            locateMachO(at: index)
+        let lookup = DyldCacheImageLookup.lookup(for: self)
+        return lookup.locatedImage(atHeaderIndex: index) {
+            locateMachO(at: index, in: lookup.objcHeaderInfos(of: self))
         }
     }
 
-    private func locateMachO(at index: Int) -> LocatedValue<MachOFile>? {
-        if let located = _headerOptimizationRO64,
+    private func locateMachO(at index: Int, in objcHeaderInfos: DyldCacheImageLookup.ObjCHeaderInfos) -> LocatedValue<MachOFile>? {
+        if let located = objcHeaderInfos.headerOptimizationRO64,
            located.value.contains(index: index) {
-            let headers = located.value.headerInfos(in: located.cache)
-            guard let header = headers?.first(
-                where: {
-                    $0.index == index
-                }
-            ) else {
+            guard let header = objcHeaderInfos.headerInfos64ByIndex[index] else {
                 return nil
             }
             return locateValueSkippingUnreadableSubCaches { header.machO(in: $0) }
         }
-        if let located = _headerOptimizationRO32,
+        if let located = objcHeaderInfos.headerOptimizationRO32,
            located.value.contains(index: index) {
-            let headers = located.value.headerInfos(in: located.cache)
-            guard let header = headers?.first(
-                where: {
-                    $0.index == index
-                }
-            ) else {
+            guard let header = objcHeaderInfos.headerInfos32ByIndex[index] else {
                 return nil
             }
             return locateValueSkippingUnreadableSubCaches { header.machO(in: $0) }
