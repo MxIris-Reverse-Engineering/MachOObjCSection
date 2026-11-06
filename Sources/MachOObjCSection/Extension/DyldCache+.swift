@@ -123,7 +123,17 @@ extension DyldCache {
 }
 
 extension DyldCache {
+    /// The image the Objective-C header at `index` names, worked out once
+    /// per cache file: every relative method, property and protocol list
+    /// entry names its image by this index, and working it out rebuilds the
+    /// whole header info list, searches it and opens sub-cache files.
     func _machO(at index: Int) -> LocatedValue<MachOFile>? {
+        DyldCacheImageLookup.lookup(for: self).locatedImage(atHeaderIndex: index) {
+            locateMachO(at: index)
+        }
+    }
+
+    private func locateMachO(at index: Int) -> LocatedValue<MachOFile>? {
         if let located = _headerOptimizationRO64,
            located.value.contains(index: index) {
             let headers = located.value.headerInfos(in: located.cache)
@@ -154,12 +164,11 @@ extension DyldCache {
 
 // MARK: - mach-o
 extension DyldCache {
+    /// The first of `machOFiles()` one of whose segments contains
+    /// `unslidAddress`, found in a table built once per cache file
+    /// (`CacheImageAddressTable`) instead of walking the cache's thousands of
+    /// images for every protocol, class and category pointer.
     func machO(containing unslidAddress: UInt64) -> MachOFile? {
-        for machO in self.machOFiles() {
-            if machO.contains(unslidAddress: unslidAddress) {
-                return machO
-            }
-        }
-        return nil
+        DyldCacheImageLookup.lookup(for: self).machO(containing: unslidAddress, in: self)
     }
 }
