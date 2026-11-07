@@ -167,21 +167,69 @@ extension DyldCacheLoaded {
 }
 
 extension DyldCacheLoaded {
+    /// The first of `machOImages()` one of whose segments contains `ptr`,
+    /// found in a table built once per loaded cache instead of walking the
+    /// cache's thousands of images for every pointer.
     func machO(containing ptr: UnsafeRawPointer) -> MachOImage? {
-        for machO in machOImages() {
-            if machO.contains(ptr: ptr) {
-                return machO
-            }
-        }
-        return nil
+        LoadedCacheImageAddressTables.shared.tables(for: self).slidAddresses.image(containing: UInt64(UInt(bitPattern: ptr)))
     }
 
+    /// The first of `machOImages()` one of whose segments contains
+    /// `unslidAddress`, found the same way.
     func machO(containing unslidAddress: UInt64) -> MachOImage? {
-        for machO in self.machOImages() {
-            if machO.contains(unslidAddress: unslidAddress) {
-                return machO
-            }
+        LoadedCacheImageAddressTables.shared.tables(for: self).unslidAddresses.image(containing: unslidAddress)
+    }
+}
+
+/// The images of each shared cache loaded into this process by address,
+/// slid and unslid, built the first time the cache is asked. A loaded shared
+/// cache is never unmapped, so the tables live as long as the process.
+private final class LoadedCacheImageAddressTables: @unchecked Sendable {
+    static let shared = LoadedCacheImageAddressTables()
+
+    struct Tables {
+        /// Addresses as the images' segments declare them.
+        let unslidAddresses: CacheImageAddressTable<MachOImage>
+        /// Addresses in this process: each segment moved by its image's slide,
+        /// the way `MachOImage.contains(ptr:)` reads a pointer.
+        let slidAddresses: CacheImageAddressTable<MachOImage>
+    }
+
+    private let lock = NSLock()
+    private var tablesByCacheAddress: [UInt: Tables] = [:]
+
+    private init() {}
+
+    func tables(for cache: DyldCacheLoaded) -> Tables {
+        let cacheAddress = UInt(bitPattern: cache.ptr)
+        if let tables = lock.withLock({ tablesByCacheAddress[cacheAddress] }) {
+            return tables
         }
-        return nil
+        let images = Array(cache.machOImages())
+        let builtTables = Tables(
+            unslidAddresses: CacheImageAddressTable(images: images) { Self.segmentRanges(of: $0) },
+            slidAddresses: CacheImageAddressTable(images: images) { image in
+                let slide = Int64(image.vmaddrSlide ?? 0)
+                return Self.segmentRanges(of: image).compactMap { range in
+                    let slidLowerBound = UInt64(bitPattern: Int64(bitPattern: range.lowerBound) &+ slide)
+                    let slidUpperBound = UInt64(bitPattern: Int64(bitPattern: range.upperBound) &+ slide)
+                    guard slidLowerBound <= slidUpperBound else { return nil }
+                    return slidLowerBound ..< slidUpperBound
+                }
+            }
+        )
+        return lock.withLock {
+            if let tables = tablesByCacheAddress[cacheAddress] {
+                return tables
+            }
+            tablesByCacheAddress[cacheAddress] = builtTables
+            return builtTables
+        }
+    }
+
+    private static func segmentRanges(of image: MachOImage) -> [Range<UInt64>] {
+        image.is64Bit
+            ? image.segments64.compactMap(\.virtualMemoryRange)
+            : image.segments32.compactMap(\.virtualMemoryRange)
     }
 }
