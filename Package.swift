@@ -153,8 +153,11 @@ let package = Package(
                 // back the same instance on every lookup, which `fileHandle`
                 // keys its mapping on. 1.2.0 adds `resolveSelfBind(fileOffset:)`,
                 // which `resolveRebase` needs for a pointer slot bound to the
-                // image's own export.
-                from: "1.2.0"
+                // image's own export. 2.0.0 only adds the MachOReading and
+                // MachOResolving modules, which this package does not use, so
+                // it builds against either major version; MachOSwiftSection
+                // requires 2.0.0 from the release that moved them there.
+                "1.2.0"..<"3.0.0"
             )
         ),
         .package(
