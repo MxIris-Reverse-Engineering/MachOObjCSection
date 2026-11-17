@@ -164,6 +164,19 @@ pattern 中的 `class_ro_t` 模板，`name` 为 NULL、ivar 偏移槽为空）�
 - **延伸阅读**：[提案 0014](Evolutions/0014-host-supplied-classes.md)、
   [使用指南](Guides/ObjCSectionCommandLine.md#库调用方没有-class-object-的类由宿主补充)
 
+### Swift import notes（Swift 导入标注）
+
+头文件里只影响 Swift 怎么导入成员的那些宏所说的事——现在是 `NS_REFINED_FOR_SWIFT`（Swift 里名字前加
+`__`，原名留给包装它的 Swift 声明）。二进制不留它们的痕迹，本库自己读不出；读得到 Swift 一侧的宿主
+（MachOSwiftSection）推出一部分，按成员交给 `ObjCInterfaceBuilder`（`ObjCSwiftImportNotes`），
+渲染时打成声明末尾、分号前的宏。形状照 Clang API notes 文件里的一个类：方法按 selector 与实例/类方法，
+属性按名字与实例/类属性；每个成员的标注是一个按宏加属性的值（`isRefinedForSwift` 对应 API notes 的
+`SwiftPrivate`），`NS_SWIFT_NAME` 留作下一个。不是可选内容，不受 `ObjCGenerationOptions` 的开关管。
+
+- **主要出现在**：`Sources/ObjCDeclarationRendering/ObjCSwiftImportNotes.swift`、`ObjCInterfaceBuilder.swift`
+- **延伸阅读**：[使用指南](Guides/ObjCSectionCommandLine.md#库调用方宿主给的-swift-导入标注)；跨仓库提案
+  MachOSwiftSection 的 `draft-swift-first-imported-declarations`
+
 ### uniqueName
 
 category 的索引与显示身份：`ClassName(CategoryName)`（如 `NSString(MyAdditions)`）。

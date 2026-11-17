@@ -44,6 +44,7 @@
 | [0018](0018-objc-exported-declarations-only.md) | 只打印导出的 ObjC 声明，导出判断改按地址 | Implemented |
 | [draft](draft-objc-comment-structure-marking.md) | 给 ObjC 注释标出种类和各段的角色 | In Progress |
 | [cross-repository draft](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/perf/machofile-performance/Documentations/Evolutions/draft-machofile-performance.md) | 离线读取追平进程内：由 MachOSwiftSection 维护唯一提案；本库的部分是 dyld cache 里按地址、按 header 序号找镜像，每个 cache 只建一次表 | In Progress |
+| [cross-repository draft](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/draft-swift-first-imported-declarations.md) | Swift 实现的类，导入声明以 Swift 一侧为准：由 MachOSwiftSection 维护唯一提案；本库的部分是头文件按宿主给的 Swift 导入标注（`ObjCSwiftImportNotes`）打出 `NS_REFINED_FOR_SWIFT` | In Progress |
 
 0002 以 0001 为前置，两者共同构成「让 MachOObjCSection 具备与 MachOSwiftSection 对等的
 渲染 / 索引 / 命令行能力」这一条完整路线。

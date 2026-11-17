@@ -331,6 +331,33 @@ func makeIndexer() -> ObjCInterfaceIndexer<MachOImage>
   `CMt`，没有 `CMs`）。所以这些 category 按 `class_ro_t` 里的名字（`_TtC…`）归位，strip 过
   也一样，`classStubOffset` 用不上；补充类换了别的写法，类和它的 category 就分在两个名字下。
 
+## 库调用方：宿主给的 Swift 导入标注
+
+头文件里有些宏只影响 Swift 怎么导入成员，二进制不留它们的痕迹。读得到 Swift 一侧的宿主（RuntimeViewer 借
+MachOSwiftSection）能推出其中一部分，经 `ObjCSwiftImportNotes` 交给 `classInterface(named:…:swiftImportNotes:)`
+或 `markedClassInterface(named:…:swiftImportNotes:)`，渲染时打成宏，术语见
+[Swift 导入标注](../Glossary.md#swift-import-notesswift-导入标注)。命令行不接这个入口。
+
+```swift
+var notes = ObjCSwiftImportNotes()
+notes[.property(name: "settings")] = .init(isRefinedForSwift: true)
+notes[.method(selector: "isHostingSceneLayer:")] = .init(isRefinedForSwift: true)
+let header = builder.classInterface(named: "SHScenePresentation", swiftImportNotes: notes)
+// @property (nonatomic, strong) SHScenePresentationSettings *settings NS_REFINED_FOR_SWIFT;
+// - (BOOL)isHostingSceneLayer:(id)isHostingSceneLayer NS_REFINED_FOR_SWIFT;
+```
+
+- **键照 API notes。** 方法按 selector 加是否类方法，属性按名字加是否类属性；两者的默认都是实例成员。
+  类属性的标注不会落到同名的实例属性上，实例方法的标注也不会落到同名的类方法上。
+- **宏打在分号前，注释在后。** 开着 IMP、属性特性之类的注释开关时是
+  `… NS_REFINED_FOR_SWIFT; // IMP: …`。只标在 `@property` 那一行：属性的 getter / setter 方法行
+  不跟着打，要标它们得另给方法的标注。
+- **对不上的标注静默不打。** 类里没有的成员、被开关剥掉的成员、`isRefinedForSwift` 为 `false` 的标注都
+  什么也不打，输出与不传时逐字一致。
+- **不是可选内容。** 宏不受 `ObjCGenerationOptions` 的开关管，标记渲染里不加 `VisibilityRegion`，
+  所以同一份标注下，标记渲染的投影与普通渲染照旧逐字一致——RuntimeViewer 的 Find 语料与显示要传同一份标注。
+- **只接类。** category 与协议的入口还没有这个参数。
+
 ## 库调用方：只打印导出的声明
 
 `ObjCGenerationOptions.printExportedDeclarationsOnly`（可见性选项 `objc.printExportedDeclarationsOnly`）打开后，
