@@ -106,17 +106,25 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
     /// under a comment line saying why the image keeps no class object for
     /// it, whatever the options. Having no class object, it is never judged
     /// unexported.
+    ///
+    /// `swiftImportNotes` are what the host knows the header says about how
+    /// Swift imports the class's members; each prints as its macro
+    /// (`NS_REFINED_FOR_SWIFT`) ahead of the declaration's `;`. A note about a
+    /// member the rendering leaves out, or the class does not have, prints
+    /// nothing. See ``ObjCDeclarationRendering/ObjCSwiftImportNotes``.
     public func classInterface(
         named name: String,
         options: ObjCGenerationOptions = .default,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
-        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil,
+        swiftImportNotes: ObjCSwiftImportNotes = ObjCSwiftImportNotes()
     ) -> SemanticString? {
         renderClassInterface(
             named: name,
             options: options,
             cTypeReplacements: cTypeReplacements,
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            swiftImportNotes: swiftImportNotes,
             marksOptionalContent: false
         )
     }
@@ -133,16 +141,22 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
     /// the switches can differ between projections of one marked rendering;
     /// another replacement or offset comment needs a new one. `nil` when the
     /// indexed image has no such class.
+    ///
+    /// `swiftImportNotes` print as in `classInterface`, under every switch:
+    /// they are not optional content, so the projections still read as the
+    /// plain renderings given the same notes.
     public func markedClassInterface(
         named name: String,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
-        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil,
+        swiftImportNotes: ObjCSwiftImportNotes = ObjCSwiftImportNotes()
     ) -> SemanticString? {
         renderClassInterface(
             named: name,
             options: .default,
             cTypeReplacements: cTypeReplacements,
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            swiftImportNotes: swiftImportNotes,
             marksOptionalContent: true
         )
     }
@@ -152,6 +166,7 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         options: ObjCGenerationOptions,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String],
         ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?,
+        swiftImportNotes: ObjCSwiftImportNotes,
         marksOptionalContent: Bool
     ) -> SemanticString? {
         // A supplied class has no class object, so the indexer keeps it
@@ -181,6 +196,7 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder
         )
         context.ivarNamesWithUnknownOffset = suppliedClassGroup?.ivarNamesWithUnknownOffset ?? []
+        context.swiftImportNotes = swiftImportNotes
 
         var strippedMembersByOption = strippedMembers(ofClass: currentClassInfo, superclassInfos: classInfos.dropFirst())
         if marksOptionalContent || options.printExportedDeclarationsOnly,

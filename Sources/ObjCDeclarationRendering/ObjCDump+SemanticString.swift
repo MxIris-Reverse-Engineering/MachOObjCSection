@@ -70,6 +70,12 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
     /// (`optionalContentMarking`), separated in either order.
     public var marksCommentStructure: Bool
 
+    /// What the host knows the header says about how Swift imports the
+    /// members of the class being rendered, printed as the macros
+    /// (`NS_REFINED_FOR_SWIFT`) at the end of their declarations. Empty by
+    /// default: a binary keeps no trace of them.
+    public var swiftImportNotes: ObjCSwiftImportNotes
+
     public init(
         machO: MachO,
         options: ObjCGenerationOptions = .default,
@@ -80,7 +86,8 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
         isExpandHandler: @escaping (_ name: String?, _ isStruct: Bool) -> Bool = { _, _ in true },
         optionalContentMarking: ObjCOptionalContentMarking? = nil,
         ivarNamesWithUnknownOffset: Set<String> = [],
-        marksCommentStructure: Bool = false
+        marksCommentStructure: Bool = false,
+        swiftImportNotes: ObjCSwiftImportNotes = ObjCSwiftImportNotes()
     ) {
         self.machO = machO
         self.options = options
@@ -92,6 +99,7 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
         self.optionalContentMarking = optionalContentMarking
         self.ivarNamesWithUnknownOffset = ivarNamesWithUnknownOffset
         self.marksCommentStructure = marksCommentStructure
+        self.swiftImportNotes = swiftImportNotes
     }
 }
 
@@ -400,6 +408,7 @@ extension ObjCPropertyInfo {
         }
 
         MemberDeclaration(name)
+        context.swiftImportAttributes(of: .property(name: name, isClassProperty: isClassProperty))
         ";"
 
         context.optionalContent(.addPropertyAttributesComments) {
@@ -481,6 +490,7 @@ extension ObjCMethodInfo {
             }
         }
 
+        context.swiftImportAttributes(of: .method(selector: name, isClassMethod: isClassMethod))
         ";"
         
         context.optionalContent(.addMethodIMPAddressComments) {
