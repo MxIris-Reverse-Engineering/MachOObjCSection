@@ -57,6 +57,7 @@ MachOObjCSection 的内部文档。新增或重命名任何文档都必须同步
 | [relative list of lists 的列表不一定和镜像 header 在同一个文件](Internal/RelativeListsAcrossSubCacheFiles.md) | 一次 bug 修复的记录，没有提案，移植自上游 `10b3dd5`。macOS 26.4 起 cache 把每组镜像的数据单独放进 `.dylddata` 文件，类的属性表、协议表与 header 不在同一个文件；读取器只在 header 所在文件里找，离线读时被别的镜像加过 category 的类（NSView、NSWindow、NSString 等）丢掉全部实例属性和协议列表。内容包括：各版本 cache 的布局与修复前后的数字、受影响的范围、同 PR 的 `ff936fa`（同一镜像的多张列表全部读入）为什么当时没移植、后来随上游 0.8.2 合入（0.8.200），以及验证与耗时数据 |
 | [dyld cache 里相对方法名的起算点随版本而变](Internal/DyldCacheRelativeMethodNameBase.md) | 一次 bug 修复的记录，没有提案。cache builder 写的相对方法列表（flag `0x40000000`）里，方法名在 macOS 12 起从选择器基址 `@selector(🤯)` 算起，在 macOS 11 从字段自身算起；macOS 11 的 cache（`objc_opt_t` v15）不记基址，读取器原来就从 cache 开头算，11.x 上类和分类的方法名全部读成乱码。内容包括：按 objc 优化数据的版本而不是「有没有基址」判定、读不到时留空不猜、进程内按运行时版本判定，Apple 源码与 cache 实测的证据，受影响的范围，来历，以及验证数据 |
 | [交叉引用的 ObjC 层](Internal/ObjCCodeReferences.md) | MachOSwiftSection 提案 move-cross-reference-layers 的配套。`ObjCCodeReferences` 是什么、为什么单独一个 target、接口只开 `Internals` SPI 给 MachOSwiftSection、两条源码规则；怎么工作见 MachOSwiftSection 的模块文档 |
+| [`SymbolLanguage.objectiveC` 在这里定义、加载时注册](Internal/ObjectiveCSymbolLanguage.md) | MachOKitExtensions 提案 0004 split-symbol-language 的配套。ObjC 符号名的判断规则从 MachOKitExtensions 搬来，`MachOObjCSectionC` 的 constructor 在镜像加载时向它的注册表登记 `.objectiveC`；为什么用 `@_cdecl`、怎么单独跑测试 |
 
 ## 发版
 

@@ -165,9 +165,12 @@ let package = Package(
                 // MachOResolving modules, which this package does not use, so
                 // it built against either major version. 2.0.0 also adds
                 // `MachOCodeReferences`, the cross-reference core that
-                // `ObjCCodeReferences` plugs into, so 2.0.0 is the floor from
-                // the release that took that layer in.
-                "2.0.0"..<"3.0.0"
+                // `ObjCCodeReferences` plugs into, so 2.0.0 was the floor from
+                // the release that took that layer in. 3.0.0 takes the
+                // Objective-C symbol-name rules out of `MachOSymbols`: this
+                // package defines `SymbolLanguage.objectiveC` and registers it
+                // (proposal split-symbol-language), so 3.0.0 is the floor now.
+                "3.0.0"..<"4.0.0"
             )
         ),
         .package(
@@ -203,11 +206,14 @@ let package = Package(
         .target(
             name: "MachOObjCSection",
             dependencies: [
+                // Also holds the constructor that registers
+                // `SymbolLanguage.objectiveC` when the image loads.
                 "MachOObjCSectionC",
                 "MachOKit",
                 // Chained-fixup and dyld cache lookups go through its cached
                 // views; MachOKit's own methods walk the fixup chains on every call.
                 .product(name: "MachOKitExtensions", package: "MachOKitExtensions"),
+                .product(name: "MachOSymbols", package: "MachOKitExtensions"),
                 .product(name: "FileIO", package: "swift-fileio"),
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
             ]
@@ -270,7 +276,10 @@ let package = Package(
         ),
         .testTarget(
             name: "MachOObjCSectionTests",
-            dependencies: ["MachOObjCSection"]
+            dependencies: [
+                "MachOObjCSection",
+                .product(name: "MachOSymbols", package: "MachOKitExtensions"),
+            ]
         ),
         // The ObjC-specific transformer modules. They extend the shared
         // `Transformer` namespace from swift-semantic-string, but their
