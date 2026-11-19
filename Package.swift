@@ -91,6 +91,14 @@ let package = Package(
             name: "ObjCDiffing",
             targets: ["ObjCDiffing"]
         ),
+        // The Objective-C layer of MachOSwiftSection's cross-reference analysis.
+        // Its interfaces are `@_spi(Internals)`: they serve MachOSwiftSection's
+        // `CrossReferenceAnalysis` and promise no stable API (MachOSwiftSection
+        // proposal `move-cross-reference-layers`).
+        .library(
+            name: "ObjCCodeReferences",
+            targets: ["ObjCCodeReferences"]
+        ),
         .executable(
             name: "objc-section",
             targets: ["objc-section"]
@@ -155,9 +163,11 @@ let package = Package(
                 // which `resolveRebase` needs for a pointer slot bound to the
                 // image's own export. 2.0.0 only adds the MachOReading and
                 // MachOResolving modules, which this package does not use, so
-                // it builds against either major version; MachOSwiftSection
-                // requires 2.0.0 from the release that moved them there.
-                "1.2.0"..<"3.0.0"
+                // it built against either major version. 2.0.0 also adds
+                // `MachOCodeReferences`, the cross-reference core that
+                // `ObjCCodeReferences` plugs into, so 2.0.0 is the floor from
+                // the release that took that layer in.
+                "2.0.0"..<"3.0.0"
             )
         ),
         .package(
@@ -204,6 +214,17 @@ let package = Package(
         ),
         .target(
             name: "MachOObjCSectionC"
+        ),
+        // The Objective-C recognizer of the cross-reference analysis: message
+        // sends, class references, instance variables, method names. A target
+        // of its own, so the upstream `MachOObjCSection` target stays untouched.
+        .target(
+            name: "ObjCCodeReferences",
+            dependencies: [
+                "MachOKit",
+                "MachOObjCSection",
+                .product(name: "MachOCodeReferences", package: "MachOKitExtensions"),
+            ]
         ),
         // The generic entry point onto Objective-C metadata. It restates
         // MachOObjCSection's parallel `MachOFile` / `MachOImage` overloads as
@@ -371,6 +392,12 @@ let package = Package(
             dependencies: [
                 "ObjCDiffing",
                 .product(name: "ObjCDump", package: "swift-objc-dump"),
+            ]
+        ),
+        .testTarget(
+            name: "ObjCCodeReferencesTests",
+            dependencies: [
+                "ObjCCodeReferences",
             ]
         ),
         .testTarget(
