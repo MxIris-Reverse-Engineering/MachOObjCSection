@@ -46,6 +46,7 @@
 | [cross-repository MachOSwiftSection 0088](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/0088-machofile-performance.md) | 离线读取追平进程内：由 MachOSwiftSection 维护唯一提案；本库的部分是 dyld cache 里按地址、按 header 序号找镜像，每个 cache 只建一次表 | Implemented |
 | [cross-repository MachOSwiftSection 0096](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/0096-swift-first-imported-declarations.md) | Swift 实现的类，导入声明以 Swift 一侧为准：由 MachOSwiftSection 维护唯一提案；本库的部分是头文件按宿主给的 Swift 导入标注（`ObjCSwiftImportNotes`）打出 `NS_REFINED_FOR_SWIFT` | Implemented |
 | [cross-repository MachOSwiftSection 0098](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/0098-move-cross-reference-layers.md) | 交叉引用的核心层与 ObjC 层迁出 MachOSwiftSection：由 MachOSwiftSection 维护唯一提案；本库的部分是新 target `ObjCCodeReferences`（原 MachOSwiftSection 的 `CrossReferenceObjC`，层间接口是 `@_spi(Internals)`），MachOKitExtensions 的下限抬到 2.0.0，随 0.8.207 发布 | Implemented |
+| [cross-repository MachOKitExtensions 0004](https://github.com/MxIris-Reverse-Engineering/MachOKitExtensions/blob/main/Documentations/Evolutions/0004-split-symbol-language.md) | 符号语言的判断归各自的包：由 MachOKitExtensions 维护唯一提案；本库的部分是在这里定义 `SymbolLanguage.objectiveC` 与 Objective-C 符号名的判断，镜像加载时由 `MachOObjCSectionC` 的 constructor 注册；MachOKitExtensions 的范围改为 3.x，随 0.8.208 发布 | Implemented |
 
 0002 以 0001 为前置，两者共同构成「让 MachOObjCSection 具备与 MachOSwiftSection 对等的
 渲染 / 索引 / 命令行能力」这一条完整路线。

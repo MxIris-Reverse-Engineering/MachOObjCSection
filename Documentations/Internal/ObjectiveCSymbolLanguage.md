@@ -1,7 +1,7 @@
 # `SymbolLanguage.objectiveC`：在这里定义，加载时注册
 
 > 面向维护者的实现说明。对应 MachOKitExtensions 的提案
-> [split-symbol-language](https://github.com/MxIris-Reverse-Engineering/MachOKitExtensions/blob/main/Documentations/Evolutions/draft-split-symbol-language.md)：
+> [split-symbol-language](https://github.com/MxIris-Reverse-Engineering/MachOKitExtensions/blob/main/Documentations/Evolutions/0004-split-symbol-language.md)：
 > MachOKitExtensions 3.0.0 起只认 C 与 C++ 的符号名，别的语言由拥有它的包定义、判断并注册。
 
 ## 是什么
