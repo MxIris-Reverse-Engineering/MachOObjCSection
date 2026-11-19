@@ -269,5 +269,6 @@ Foundation 上确实去掉了类与 ivar，免得投影比对空跑。
   结论」），`objc-section` 命令行按 0010 退役，没有加这个 flag。
 - **不进 `ObjCAPISnapshot` / `ObjCDiffing`**。导出状态是符号化状态，不是 API 事实；
   加字段还会破坏既有 baseline 的 `formatVersion` 契约。
-- **没有进程级缓存**。本库没有 MachOSwiftSection 那套 `SharedCache` 基座，
-  `ObjCExportIndex` 是值类型，生命周期由调用方掌握。
+- **没有进程级缓存**。`ObjCExportIndex` 是值类型，生命周期由调用方掌握，不挂在 `SharedCache` 上。写这一节时
+  这套基座还在 MachOSwiftSection 里，本库用不到；MachOKitExtensions 2.0.0 起它在 `MachOCaches` 里，本库已能依赖，
+  要不要改用另议。
