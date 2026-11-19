@@ -126,8 +126,9 @@ public struct ObjCExportIndex: Sendable {
     /// kinds are told apart by a suffix, which no prefix search reaches anyway.
     ///
     /// A full pass costs one traversal per image (AppKit: 8774 entries in) and
-    /// is what `MachOSwiftSection`'s `SymbolIndexStore` does for the same
-    /// purpose.
+    /// is what MachOKitExtensions' `SymbolSweep` — the pass behind both its
+    /// `SymbolIndexStore` and MachOSwiftSection's `SwiftSymbolIndexStore` —
+    /// does for the same purpose.
     public init(machO: some ObjCMetadataSource) {
         let exportedSymbols = machO.exportedSymbols
 
