@@ -1,6 +1,7 @@
 import XCTest
 @testable import MachOObjCSection
 @testable import MachOKit
+import ObjCDump
 
 
 final class MachOObjCSectionTests: XCTestCase {

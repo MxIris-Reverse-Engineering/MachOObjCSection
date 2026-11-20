@@ -5,6 +5,7 @@ import MachOObjCSection
 import ObjCDump
 import ObjCIndexing
 import ObjCMetadataSource
+import MachOKitExtensions
 
 /// The classes a host supplies to `ObjCInterfaceIndexer`, for the Swift
 /// classes the image keeps no class object for (proposal "host-supplied

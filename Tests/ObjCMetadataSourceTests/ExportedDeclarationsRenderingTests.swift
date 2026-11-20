@@ -6,6 +6,7 @@ import ObjCIndexing
 import ObjCInterface
 import ObjCMetadataSource
 import Semantic
+import MachOKitExtensions
 
 /// `printExportedDeclarationsOnly` on the compiled fixtures: what a plain
 /// rendering leaves out, and that a marked rendering projects to it under

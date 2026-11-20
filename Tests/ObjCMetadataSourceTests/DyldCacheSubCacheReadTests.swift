@@ -3,6 +3,7 @@ import Foundation
 import MachOKit
 import MachOKitExtensions
 @testable import MachOObjCSection
+internal import FileIO
 
 /// Two images of the running system's dyld cache whose headers sit in two
 /// different sub-cache files, neither of them the main file: reading the

@@ -4,6 +4,7 @@ import MachOKit
 import ObjCDeclarationRendering
 import ObjCIndexing
 @testable import ObjCInterface
+import Semantic
 
 /// `stripProtocolConformance` drops every member a class's adopted protocols
 /// declare — required and optional, along the whole protocol inheritance
@@ -80,7 +81,7 @@ struct StripProtocolConformanceTests {
     }
 
     /// Compiled once per process.
-    private static let fixtureCompilationResult: Result<URL, Swift.Error> = {
+    private static let fixtureCompilationResult: Result<URL, any Swift.Error> = {
         Result {
             let workingDirectory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("StripProtocolConformanceFixture-\(UUID().uuidString)")

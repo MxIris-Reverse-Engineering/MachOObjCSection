@@ -1,4 +1,5 @@
 import Semantic
+import Foundation
 
 /// A comment a declaration rendering writes, described once: the text it
 /// reads as, split into the segments a host draws apart — the comment

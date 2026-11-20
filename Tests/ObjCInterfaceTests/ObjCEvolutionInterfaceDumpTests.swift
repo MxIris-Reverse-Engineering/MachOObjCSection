@@ -4,6 +4,8 @@ import ObjCDiffing
 import ObjCIndexing
 import ObjCInterface
 import Testing
+import Semantic
+internal import MachOKitExtensions
 
 /// The merged header of AppKit's image group — AppKit, UIFoundation,
 /// CollectionViewCore and CoreAutoLayout — across every archived macOS

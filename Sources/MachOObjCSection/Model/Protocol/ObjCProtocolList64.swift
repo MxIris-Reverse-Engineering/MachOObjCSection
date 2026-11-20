@@ -8,6 +8,7 @@
 
 import Foundation
 @_spi(Support) import MachOKit
+internal import MachOKitExtensions
 
 public struct ObjCProtocolList64: ObjCProtocolListProtocol {
     public typealias Header = ObjCProtocolListHeader64

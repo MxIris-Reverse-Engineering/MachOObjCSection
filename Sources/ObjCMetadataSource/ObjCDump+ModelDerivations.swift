@@ -10,6 +10,7 @@
 //
 
 import ObjCDump
+import ObjCTypeDecodeKit
 
 extension ObjCCategoryInfo {
     /// The category spelled the way it is indexed and displayed:

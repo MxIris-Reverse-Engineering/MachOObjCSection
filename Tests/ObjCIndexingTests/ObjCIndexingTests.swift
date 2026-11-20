@@ -8,6 +8,7 @@ import ObjCDump
 import ObjectiveC
 import Semantic
 @testable import ObjCIndexing
+internal import MachOKitExtensions
 
 /// Anchors the test bundle's own Mach-O image so a test can index it.
 ///

@@ -6,6 +6,7 @@ import MachOObjCSection
 import ObjCDeclarationRendering
 import ObjCIndexing
 import ObjCInterface
+import Semantic
 
 /// Every method list a protocol record declares, in the order the runtime
 /// keeps them.

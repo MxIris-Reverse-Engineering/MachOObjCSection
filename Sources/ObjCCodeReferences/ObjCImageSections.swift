@@ -1,6 +1,7 @@
 import Foundation
 import MachOKit
 @_spi(Internals) import MachOCodeReferences
+internal import MachOKitExtensions
 
 /// The Objective-C sections of one image a scan reads: its own selector
 /// stubs, its selector, class and superclass references. Kept on the image's

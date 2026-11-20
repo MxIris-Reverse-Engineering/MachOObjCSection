@@ -2,6 +2,7 @@ import Testing
 import Foundation
 @testable import MachOKit
 @testable import MachOObjCSection
+internal import MachOKitExtensions
 
 /// The image a dyld cache address lies in, looked up in a table built once
 /// per cache instead of walking the cache's images for every pointer —
