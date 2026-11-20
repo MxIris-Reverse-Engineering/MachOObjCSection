@@ -5,6 +5,7 @@ import ObjCDeclarationRendering
 import ObjCIndexing
 import Semantic
 @testable import ObjCInterface
+import ObjCDump
 
 /// A marked rendering, projected to any combination of the switches, reads
 /// exactly as the plain rendering with those switches — checked for every

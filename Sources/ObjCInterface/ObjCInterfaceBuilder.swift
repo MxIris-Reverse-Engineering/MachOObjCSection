@@ -7,6 +7,7 @@ import ObjCDump
 import ObjCIndexing
 import ObjCMetadataSource
 import Semantic
+import ObjCTypeDecodeKit
 
 /// Turns an indexed Mach-O into rendered Objective-C declarations.
 ///

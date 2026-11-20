@@ -4,6 +4,7 @@ import MachOKit
 import MachOObjCSection
 import ObjCIndexing
 import ObjCMetadataSource
+import MachOKitExtensions
 
 /// The export verdicts `ObjCInterfaceIndexer.prepare()` keeps, and what its
 /// two queries answer for names it holds no verdict for.

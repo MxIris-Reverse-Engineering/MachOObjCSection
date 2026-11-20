@@ -9,6 +9,7 @@ import ObjCIndexing
 import ObjCInterface
 import ObjCMetadataSource
 import Semantic
+import MachOKitExtensions
 
 /// How the classes a host supplies render, and that they reach the API
 /// snapshot (proposal "host-supplied classes").

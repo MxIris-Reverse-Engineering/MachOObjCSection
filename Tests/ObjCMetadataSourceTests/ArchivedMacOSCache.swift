@@ -1,6 +1,7 @@
 import Testing
 import Foundation
 import MachOKit
+import MachOKitExtensions
 
 /// An archived macOS arm64e dyld shared cache, addressed by OS version.
 ///

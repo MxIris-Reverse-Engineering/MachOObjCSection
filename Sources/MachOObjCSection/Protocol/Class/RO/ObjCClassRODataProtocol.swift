@@ -8,6 +8,7 @@
 
 import Foundation
 @_spi(Support) import MachOKit
+internal import FileIO
 
 public protocol ObjCClassRODataProtocol: _FixupResolvable
 where LayoutField == ObjCClassRODataLayoutField,

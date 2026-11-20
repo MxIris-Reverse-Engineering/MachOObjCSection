@@ -9,6 +9,7 @@
 import Foundation
 @_spi(Support) import MachOKit
 import MachOObjCSectionC
+internal import MachOKitExtensions
 
 public protocol ObjCClassProtocol: _FixupResolvable
 where LayoutField == ObjCClassLayoutField,

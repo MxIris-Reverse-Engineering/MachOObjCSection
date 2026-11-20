@@ -8,6 +8,7 @@
 
 import Foundation
 @_spi(Support) import MachOKit
+internal import FileIO
 
 extension MachOFile {
     public struct ObjectiveC: ObjCSectionRepresentable {

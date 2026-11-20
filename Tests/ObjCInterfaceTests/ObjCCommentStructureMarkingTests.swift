@@ -4,6 +4,7 @@ import ObjCDeclarationRendering
 import ObjCIndexing
 import Semantic
 @testable import ObjCInterface
+import ObjCMetadataSource
 
 /// A builder made with `marksCommentStructure`, over every declaration of
 /// Foundation: separating the marks gives back exactly what the builder

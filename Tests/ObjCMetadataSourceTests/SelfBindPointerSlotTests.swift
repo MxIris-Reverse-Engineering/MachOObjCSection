@@ -185,7 +185,7 @@ enum SelfBindFixture {
         var description: String { "self-bind fixture compilation failed:\n\(diagnostics)" }
     }
 
-    private static func compile(format: FixupFormat) -> Result<URL, Swift.Error> {
+    private static func compile(format: FixupFormat) -> Result<URL, any Swift.Error> {
         Result {
             let workingDirectory = FileManager.default.temporaryDirectory
                 .appendingPathComponent("SelfBindFixture-\(format.rawValue)-\(UUID().uuidString)")

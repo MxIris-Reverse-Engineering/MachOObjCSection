@@ -4,6 +4,8 @@ import ObjCDiffing
 import ObjCIndexing
 import Testing
 @testable import ObjCInterface
+import Semantic
+internal import MachOKitExtensions
 
 /// AppKit merged across three archived macOS caches, one per relative method
 /// list layout (`DyldCacheRelativeMethodNameTests` explains the three). The

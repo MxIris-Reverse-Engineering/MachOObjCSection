@@ -9,6 +9,7 @@
 import Foundation
 import MachOKit
 import ObjCDump
+internal import FileIO
 
 /// Options that control how Objective-C class and category metadata is converted.
 public struct ObjCInfoOptions: Sendable {

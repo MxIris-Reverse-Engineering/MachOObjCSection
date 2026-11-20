@@ -4,6 +4,7 @@ import MachO
 import MachOKit
 import MachOObjCSection
 import ObjectiveC
+import ObjCDump
 
 /// An ivar layout is a run of bytes, each a count of words to skip in the high
 /// nibble and a count of strong words in the low one. A class with eight or

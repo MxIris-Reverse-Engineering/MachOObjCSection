@@ -8,6 +8,9 @@ import ObjCDump
 import ObjCIndexing
 import Semantic
 @testable import ObjCInterface
+import ObjCMetadataSource
+internal import MachOKitExtensions
+import ObjCTypeDecodeKit
 
 /// Builds interfaces out of an image already loaded into this process, so the
 /// tests need no fixture binary on disk.
