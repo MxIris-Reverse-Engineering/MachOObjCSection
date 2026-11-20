@@ -47,6 +47,31 @@ struct ObjectiveCSymbolLanguageTests {
 
     /// Foundation exports its classes' runtime symbols. MachOKitExtensions'
     /// C/C++ index keeps none of them, and keeps the C names.
+    /// A static link (a Tuist static framework, a static library) loads
+    /// symbol_language_registration.c, and the constructor that registers
+    /// the language, only because SymbolLanguage+ObjectiveC.swift refers to
+    /// its anchor: the constructor is static, so the file defines nothing
+    /// else, and -ObjC does not load it either. SwiftPM links every target
+    /// whole, so no test here can watch an archive leave the file out; this
+    /// pins both halves of the reference instead.
+    @Test func languageFileRefersToTheRegistrationAnchor() throws {
+        let packageRoot = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+        let registrationSource = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/MachOObjCSectionC/symbol_language_registration.c"),
+            encoding: .utf8
+        )
+        let languageSource = try String(
+            contentsOf: packageRoot.appendingPathComponent("Sources/MachOObjCSection/Support/SymbolLanguage+ObjectiveC.swift"),
+            encoding: .utf8
+        )
+        // Not static: a static function is no symbol a reference can name.
+        #expect(registrationSource.contains("\nvoid objc_section_registration_anchor(void) {"))
+        #expect(languageSource.contains("\n    objc_section_registration_anchor()\n"))
+    }
+
     @Test func cAndCPlusPlusStoreLeavesObjectiveCNamesOut() throws {
         let foundation = try #require(MachOImage(name: "Foundation"))
         var objectiveCNameCount = 0
