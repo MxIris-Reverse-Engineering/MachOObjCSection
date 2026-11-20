@@ -1,4 +1,5 @@
 import MachOSymbols
+import MachOObjCSectionC
 
 extension SymbolLanguage {
     /// An Objective-C method implementation (`-[…]`, `+[…]`) or a symbol of
@@ -47,4 +48,9 @@ enum ObjectiveCSymbolNameRecognition {
 @_cdecl("objc_section_register_symbol_language")
 func registerObjectiveCSymbolLanguage() {
     SymbolLanguageRegistry.shared.register(.objectiveC, where: ObjectiveCSymbolNameRecognition.recognizes)
+    // Does nothing at run time. The reference is what counts: a static link
+    // that loads this file (any link with -ObjC) loads
+    // symbol_language_registration.c and its constructor with it, which
+    // nothing else refers to. See that file.
+    objc_section_registration_anchor()
 }

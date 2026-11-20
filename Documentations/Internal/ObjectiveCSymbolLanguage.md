@@ -14,7 +14,7 @@
 
 Swift 没有加载时初始化，所以借 C target：`MachOObjCSectionC` 里的 `symbol_language_registration.c` 有一个 `__attribute__((constructor))`，在镜像加载时调用 `MachOObjCSection` 用 `@_cdecl("objc_section_register_symbol_language")` 导出的 Swift 函数，向 `SymbolLanguageRegistry.shared` 登记 `.objectiveC`。
 
-- `MachOObjCSection` 本来就依赖 `MachOObjCSectionC`，链接主模块就带上了这个 constructor，调用方什么都不用做。
+- `MachOObjCSection` 本来就依赖 `MachOObjCSectionC`。SwiftPM 与 Xcode 自带的包集成整块链接每个 target，constructor 总会带上；从静态归档链接时（Tuist 的静态 framework、静态库），链接器只拉被符号引用到的成员，而 constructor 是 `static` 的、`-ObjC` 也不拉它，所以这个 C 文件另外导出一个什么都不做的锚点 `objc_section_registration_anchor`，由 `SymbolLanguage+ObjectiveC.swift` 的注册函数调用：那个 Swift 文件定义了 extension，带 `-ObjC` 的链接一定拉进它，它对锚点的引用再把 C 文件连同 constructor 拉进来。调用方什么都不用做；别删那个调用（`ObjectiveCSymbolLanguageTests.languageFileRefersToTheRegistrationAnchor` 钉住引用的两端）。2026-11-20 起；之前 RuntimeViewer 的 Tuist workspace 里这门语言一直没注册上（MachOSwiftSection 账本第 144 节）。
 - 用 `@_cdecl` 而不是 SE-0495 的 `@c`：本包的工具版本还是 6.2，`@c` 要 6.3。
 - 2026-11-19 在 MachOKitExtensions 的提案里做过原型：探针程序不引用注册模块的任何符号，`swift build` 的 debug、release 与 `xcodebuild` 的 Release 都在加载时拿到了注册。纯 Swift 的 SE-0492 `@section` 写进 `__mod_init_func` 链接失败。
 
