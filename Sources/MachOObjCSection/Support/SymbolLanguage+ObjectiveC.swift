@@ -45,8 +45,16 @@ enum ObjectiveCSymbolNameRecognition {
 
 /// Registers ``SymbolLanguage/objectiveC``. `MachOObjCSectionC`'s
 /// constructor calls it once, when the image loads.
+///
+/// Public, behind an SPI nobody imports, only so that its C symbol keeps
+/// external linkage. Internal, the symbol is hidden, and Xcode links each
+/// package target into a single relocatable object (`ld -r`) first, which
+/// turns a hidden symbol local: the constructor, in another target, then
+/// fails to link in a Release build ("Undefined symbols:
+/// _objc_section_register_symbol_language").
+@_spi(SymbolLanguageRegistration)
 @_cdecl("objc_section_register_symbol_language")
-func registerObjectiveCSymbolLanguage() {
+public func registerObjectiveCSymbolLanguage() {
     SymbolLanguageRegistry.shared.register(.objectiveC, where: ObjectiveCSymbolNameRecognition.recognizes)
     // Does nothing at run time. The reference is what counts: a static link
     // that loads this file (any link with -ObjC) loads
