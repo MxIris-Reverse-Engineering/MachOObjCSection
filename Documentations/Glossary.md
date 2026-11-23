@@ -166,14 +166,16 @@ pattern 中的 `class_ro_t` 模板，`name` 为 NULL、ivar 偏移槽为空）�
 
 ### Swift import notes（Swift 导入标注）
 
-头文件里只影响 Swift 怎么导入成员的那些宏所说的事——现在是 `NS_REFINED_FOR_SWIFT`（Swift 里名字前加
-`__`，原名留给包装它的 Swift 声明）。二进制不留它们的痕迹，本库自己读不出；读得到 Swift 一侧的宿主
-（MachOSwiftSection）推出一部分，按成员交给 `ObjCInterfaceBuilder`（`ObjCSwiftImportNotes`），
-渲染时打成声明末尾、分号前的宏。形状照 Clang API notes 文件里的一个类：方法按 selector 与实例/类方法，
-属性按名字与实例/类属性；每个成员的标注是一个按宏加属性的值（`isRefinedForSwift` 对应 API notes 的
-`SwiftPrivate`），`NS_SWIFT_NAME` 留作下一个。不是可选内容，不受 `ObjCGenerationOptions` 的开关管。
+头文件里只影响 Swift 怎么导入类、协议与成员的那些宏所说的事：`NS_SWIFT_NAME(...)`（Swift 里用的名字）与
+`NS_REFINED_FOR_SWIFT`（Swift 里名字前加 `__`，原名留给包装它的 Swift 声明）。二进制不留它们的痕迹，本库
+自己读不出；宿主有两个来源——读得到 Swift 一侧的（MachOSwiftSection）推出成员的 `NS_REFINED_FOR_SWIFT`，
+`ObjCTypeIndexing` 从 SDK 的 API notes 读出两种——交给 `ObjCInterfaceBuilder`（`ObjCSwiftImportNotes`，两份用
+`merging(_:)` 合并），渲染时成员的打在声明末尾、分号前，类与协议本身的（`declarationNote`）单独一行打在
+`@interface` / `@protocol` 上面。形状照 Clang API notes 文件里的一个类：方法按 selector 与实例/类方法，属性按
+名字与实例/类属性；每个标注是一个按宏加属性的值（`swiftName` 对应 `SwiftName`，`isRefinedForSwift` 对应
+`SwiftPrivate`）。不是可选内容，不受 `ObjCGenerationOptions` 的开关管。
 
-- **主要出现在**：`Sources/ObjCDeclarationRendering/ObjCSwiftImportNotes.swift`、`ObjCInterfaceBuilder.swift`
+- **主要出现在**：`Sources/ObjCDeclarationRendering/ObjCSwiftImportNotes.swift`、`ObjCInterfaceBuilder.swift`、`Sources/ObjCTypeIndexing/`
 - **延伸阅读**：[使用指南](Guides/ObjCSectionCommandLine.md#库调用方宿主给的-swift-导入标注)；跨仓库提案
   MachOSwiftSection 的 [0096 swift-first-imported-declarations](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/0096-swift-first-imported-declarations.md)
 

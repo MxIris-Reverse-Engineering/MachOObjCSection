@@ -333,30 +333,58 @@ func makeIndexer() -> ObjCInterfaceIndexer<MachOImage>
 
 ## 库调用方：宿主给的 Swift 导入标注
 
-头文件里有些宏只影响 Swift 怎么导入成员，二进制不留它们的痕迹。读得到 Swift 一侧的宿主（RuntimeViewer 借
-MachOSwiftSection）能推出其中一部分，经 `ObjCSwiftImportNotes` 交给 `classInterface(named:…:swiftImportNotes:)`
-或 `markedClassInterface(named:…:swiftImportNotes:)`，渲染时打成宏，术语见
-[Swift 导入标注](../Glossary.md#swift-import-notesswift-导入标注)。命令行不接这个入口。
+头文件里有些宏只影响 Swift 怎么导入类、协议与成员——`NS_SWIFT_NAME(...)` 与 `NS_REFINED_FOR_SWIFT`——二进制不留
+它们的痕迹。宿主有两个来源：读得到 Swift 一侧的（RuntimeViewer 借 MachOSwiftSection）能推出成员的
+`NS_REFINED_FOR_SWIFT`；`ObjCTypeIndexing` 从本机 SDK 的 API notes 读出两种宏（见下一小节）。两者都经
+`ObjCSwiftImportNotes` 交给类、协议与 category 的入口（`classInterface` / `protocolInterface` /
+`categoryInterface` 与它们的 `marked…` 版本的 `swiftImportNotes:` 参数），渲染时打成宏，两份标注用
+`merging(_:)` 合并。术语见 [Swift 导入标注](../Glossary.md#swift-import-notesswift-导入标注)。本库的 `objc-section`
+命令行不接这个入口；MachOSwiftSection 的 `swift-section objc interface --mark-sdk-swift-names` 接。
 
 ```swift
 var notes = ObjCSwiftImportNotes()
+notes.declarationNote = .init(swiftName: "SHPresentation")
 notes[.property(name: "settings")] = .init(isRefinedForSwift: true)
-notes[.method(selector: "isHostingSceneLayer:")] = .init(isRefinedForSwift: true)
+notes[.method(selector: "isHostingSceneLayer:")] = .init(isRefinedForSwift: true, swiftName: "isHosting(_:)")
 let header = builder.classInterface(named: "SHScenePresentation", swiftImportNotes: notes)
+// NS_SWIFT_NAME(SHPresentation)
+// @interface SHScenePresentation : NSObject
 // @property (nonatomic, strong) SHScenePresentationSettings *settings NS_REFINED_FOR_SWIFT;
-// - (BOOL)isHostingSceneLayer:(id)isHostingSceneLayer NS_REFINED_FOR_SWIFT;
+// - (BOOL)isHostingSceneLayer:(id)isHostingSceneLayer NS_SWIFT_NAME(isHosting(_:)) NS_REFINED_FOR_SWIFT;
 ```
 
 - **键照 API notes。** 方法按 selector 加是否类方法，属性按名字加是否类属性；两者的默认都是实例成员。
   类属性的标注不会落到同名的实例属性上，实例方法的标注也不会落到同名的类方法上。
-- **宏打在分号前，注释在后。** 开着 IMP、属性特性之类的注释开关时是
-  `… NS_REFINED_FOR_SWIFT; // IMP: …`。只标在 `@property` 那一行：属性的 getter / setter 方法行
+- **成员的宏打在分号前，注释在后。** `NS_SWIFT_NAME(...)` 在前、`NS_REFINED_FOR_SWIFT` 在后，照 Apple 头文件
+  的写法；开着 IMP、属性特性之类的注释开关时是 `… NS_REFINED_FOR_SWIFT; // IMP: …`。
+- **类与协议本身的标注（`declarationNote`）单独一行，在 `@interface` / `@protocol` 上面。** category
+  不是类的声明，它的渲染不打类本身的标注，只打成员的。只标在 `@property` 那一行：属性的 getter / setter 方法行
   不跟着打，要标它们得另给方法的标注。
-- **对不上的标注静默不打。** 类里没有的成员、被开关剥掉的成员、`isRefinedForSwift` 为 `false` 的标注都
-  什么也不打，输出与不传时逐字一致。
+- **对不上的标注静默不打。** 类里没有的成员、被开关剥掉的成员、两个属性都没设的标注都什么也不打，
+  输出与不传时逐字一致。
 - **不是可选内容。** 宏不受 `ObjCGenerationOptions` 的开关管，标记渲染里不加 `VisibilityRegion`，
   所以同一份标注下，标记渲染的投影与普通渲染照旧逐字一致——RuntimeViewer 的 Find 语料与显示要传同一份标注。
-- **只接类。** category 与协议的入口还没有这个参数。
+
+### 从 SDK 的 API notes 取标注
+
+`ObjCTypeIndexing`（只在 macOS 上有内容）借 [swift-type-indexing](https://github.com/MxIris-Reverse-Engineering/swift-type-indexing)
+读本机开发者目录里 SDK 的 `.apinotes`：
+
+```swift
+import ObjCTypeIndexing
+import TypeIndexing
+
+let typeDatabase = TypeDatabase(platform: .macOS)            // Mac Catalyst 的 UIKit 用 .macCatalyst
+try await typeDatabase.index(dependencies: [], moduleFilter: { _ in false })   // 只读 API notes
+let notes = await ObjCSwiftImportNotes(apiNotesForClassNamed: "PKDrawing", in: typeDatabase)
+// notes.declarationNote == .init(swiftName: "PKDrawingReference")
+```
+
+- `SwiftName` 成为 `NS_SWIFT_NAME(...)`，`SwiftPrivate: true` 成为 `NS_REFINED_FOR_SWIFT`；只认这两个属性，nullability
+  等其余 API notes 属性不打。
+- 协议用 `ObjCSwiftImportNotes(apiNotesForProtocolNamed:in:)`；category 的成员标注取它所扩展的类的。
+- 同一个 `TypeDatabase` 还能把这个镜像的 ObjC 元数据当成私有类型的归属来源：`ObjCDeclaredTypeNames(machO:imagePath:)`
+  传给 `index(dependencies:moduleFilter:)`。
 
 ## 库调用方：只打印导出的声明
 
