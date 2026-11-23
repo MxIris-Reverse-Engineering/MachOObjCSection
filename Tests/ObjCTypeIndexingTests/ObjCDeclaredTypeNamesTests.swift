@@ -32,9 +32,9 @@ struct ObjCDeclaredTypeNamesTests {
     /// A private class no SDK file mentions resolves to Foundation through the
     /// runtime-metadata layer. The name is taken from the image itself, so the
     /// test does not hang on one OS version's private classes.
-    @available(macOS 13.0, *)
     @Test
     func typeDatabaseAttributesPrivateClassThroughObjCDeclaredTypeNames() async throws {
+        guard #available(macOS 13.0, *) else { return }
         let source = try Self.foundationSource()
         let privateClassName = try #require(
             try await source.declaredTypeNames().first { $0.hasPrefix("__NS") || $0.hasPrefix("_NS") }

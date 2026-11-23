@@ -8,7 +8,6 @@ import TypeIndexing
 
 /// The notes a class's or protocol's API notes give, through a
 /// `TypeDatabase` over this Mac's macOS SDK plus a supplementary file.
-@available(macOS 13.0, *)
 @Suite("Swift import notes from API notes")
 struct ObjCSwiftImportNotesFromAPINotesTests {
     private static let supplementaryAPINotesYAML = """
@@ -32,6 +31,7 @@ struct ObjCSwiftImportNotesFromAPINotesTests {
       SwiftPrivate: true
     """
 
+    @available(macOS 13.0, *)
     private static func makeTypeDatabase() async throws -> (typeDatabase: TypeDatabase, temporaryDirectoryURL: URL) {
         let temporaryDirectoryURL = FileManager.default.temporaryDirectory
             .appending(component: "ObjCSwiftImportNotesFromAPINotesTests-\(UUID().uuidString)")
@@ -49,6 +49,7 @@ struct ObjCSwiftImportNotesFromAPINotesTests {
 
     @Test
     func apiNotesForClassBecomeNotes() async throws {
+        guard #available(macOS 13.0, *) else { return }
         let (typeDatabase, temporaryDirectoryURL) = try await Self.makeTypeDatabase()
         defer { try? FileManager.default.removeItem(at: temporaryDirectoryURL) }
 
@@ -61,6 +62,7 @@ struct ObjCSwiftImportNotesFromAPINotesTests {
 
     @Test
     func apiNotesForProtocolBecomeNotes() async throws {
+        guard #available(macOS 13.0, *) else { return }
         let (typeDatabase, temporaryDirectoryURL) = try await Self.makeTypeDatabase()
         defer { try? FileManager.default.removeItem(at: temporaryDirectoryURL) }
 
@@ -71,6 +73,7 @@ struct ObjCSwiftImportNotesFromAPINotesTests {
 
     @Test
     func classTheAPINotesDoNotMentionHasNoNotes() async throws {
+        guard #available(macOS 13.0, *) else { return }
         let (typeDatabase, temporaryDirectoryURL) = try await Self.makeTypeDatabase()
         defer { try? FileManager.default.removeItem(at: temporaryDirectoryURL) }
 
@@ -81,6 +84,7 @@ struct ObjCSwiftImportNotesFromAPINotesTests {
     /// `SwiftName: PKDrawingReference`.
     @Test
     func sdkClassSwiftNameBecomesTheDeclarationNote() async throws {
+        guard #available(macOS 13.0, *) else { return }
         let (typeDatabase, temporaryDirectoryURL) = try await Self.makeTypeDatabase()
         defer { try? FileManager.default.removeItem(at: temporaryDirectoryURL) }
 
