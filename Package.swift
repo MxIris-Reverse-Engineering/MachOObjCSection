@@ -91,6 +91,11 @@ let package = Package(
             name: "ObjCDiffing",
             targets: ["ObjCDiffing"]
         ),
+        // The bridge to swift-type-indexing's SDK index, macOS only.
+        .library(
+            name: "ObjCTypeIndexing",
+            targets: ["ObjCTypeIndexing"]
+        ),
         // The Objective-C layer of MachOSwiftSection's cross-reference analysis.
         // Its interfaces are `@_spi(Internals)`: they serve MachOSwiftSection's
         // `CrossReferenceAnalysis` and promise no stable API (MachOSwiftSection
@@ -190,6 +195,22 @@ let package = Package(
             remote: .package(
                 url: "https://github.com/Mx-Iris/FrameworkToolbox",
                 from: "0.9.0"
+            )
+        ),
+        // The SDK index (API notes and module interfaces) `ObjCTypeIndexing`
+        // bridges to: it reads a class's or protocol's Swift naming from API
+        // notes, and attributes a type to its module through this package's
+        // Objective-C metadata. Every source of it is macOS-only, so the one
+        // target that uses it depends on it with a macOS condition. 0.1.0 is
+        // its first release.
+        .package(
+            local: .package(
+                path: "../swift-type-indexing",
+                isRelative: true
+            ),
+            remote: .package(
+                url: "https://github.com/MxIris-Reverse-Engineering/swift-type-indexing",
+                from: "0.1.0"
             )
         ),
         // Command-line only. The library targets stay free of both.
@@ -319,6 +340,21 @@ let package = Package(
                 .product(name: "FoundationToolbox", package: "FrameworkToolbox"),
             ]
         ),
+        // The bridge to swift-type-indexing: `ObjCDeclaredTypeNames`, an
+        // image's Objective-C metadata as the `DeclaredTypeNameSource` its
+        // `TypeDatabase` reads private types from, and the API notes' Swift
+        // naming of a class or protocol as `ObjCSwiftImportNotes`. A target of
+        // its own, so the indexing and rendering layers stay free of the SDK
+        // index, which only builds for macOS.
+        .target(
+            name: "ObjCTypeIndexing",
+            dependencies: [
+                "ObjCMetadataSource",
+                "ObjCIndexing",
+                "ObjCDeclarationRendering",
+                .product(name: "TypeIndexing", package: "swift-type-indexing", condition: .when(platforms: [.macOS])),
+            ]
+        ),
         .executableTarget(
             name: "objc-section",
             dependencies: [
@@ -407,6 +443,17 @@ let package = Package(
             name: "ObjCCodeReferencesTests",
             dependencies: [
                 "ObjCCodeReferences",
+            ]
+        ),
+        .testTarget(
+            name: "ObjCTypeIndexingTests",
+            dependencies: [
+                "ObjCTypeIndexing",
+                "ObjCIndexing",
+                "ObjCDeclarationRendering",
+                "MachOKit",
+                .product(name: "MachOKitExtensions", package: "MachOKitExtensions"),
+                .product(name: "TypeIndexing", package: "swift-type-indexing", condition: .when(platforms: [.macOS])),
             ]
         ),
         .testTarget(
