@@ -109,10 +109,11 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
     /// unexported.
     ///
     /// `swiftImportNotes` are what the host knows the header says about how
-    /// Swift imports the class's members; each prints as its macro
-    /// (`NS_REFINED_FOR_SWIFT`) ahead of the declaration's `;`. A note about a
-    /// member the rendering leaves out, or the class does not have, prints
-    /// nothing. See ``ObjCDeclarationRendering/ObjCSwiftImportNotes``.
+    /// Swift imports the class and its members; a member's print as their
+    /// macros (`NS_SWIFT_NAME(...)`, `NS_REFINED_FOR_SWIFT`) ahead of the
+    /// declaration's `;`, the class's on a line above `@interface`. A note
+    /// about a member the rendering leaves out, or the class does not have,
+    /// prints nothing. See ``ObjCDeclarationRendering/ObjCSwiftImportNotes``.
     public func classInterface(
         named name: String,
         options: ObjCGenerationOptions = .default,
@@ -333,17 +334,23 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
 
     /// The rendered `@protocol` for the protocol named `name`, or `nil` when
     /// the indexed image has no such protocol.
+    ///
+    /// `swiftImportNotes` print as in
+    /// `classInterface(named:options:cTypeReplacements:ivarOffsetCommentBuilder:swiftImportNotes:)`:
+    /// the protocol's own note on a line above `@protocol`.
     public func protocolInterface(
         named name: String,
         options: ObjCGenerationOptions = .default,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
-        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil,
+        swiftImportNotes: ObjCSwiftImportNotes = ObjCSwiftImportNotes()
     ) -> SemanticString? {
         renderProtocolInterface(
             named: name,
             options: options,
             cTypeReplacements: cTypeReplacements,
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            swiftImportNotes: swiftImportNotes,
             marksOptionalContent: false
         )
     }
@@ -354,13 +361,15 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
     public func markedProtocolInterface(
         named name: String,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
-        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil,
+        swiftImportNotes: ObjCSwiftImportNotes = ObjCSwiftImportNotes()
     ) -> SemanticString? {
         renderProtocolInterface(
             named: name,
             options: .default,
             cTypeReplacements: cTypeReplacements,
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            swiftImportNotes: swiftImportNotes,
             marksOptionalContent: true
         )
     }
@@ -370,6 +379,7 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         options: ObjCGenerationOptions,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String],
         ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?,
+        swiftImportNotes: ObjCSwiftImportNotes,
         marksOptionalContent: Bool
     ) -> SemanticString? {
         guard let currentProtocolInfo = indexer.protocolGroup(forName: name)?.info else { return nil }
@@ -379,6 +389,7 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
             cTypeReplacements: cTypeReplacements,
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder
         )
+        context.swiftImportNotes = swiftImportNotes
 
         let strippedMembersByOption = strippedMembers(ofProtocol: currentProtocolInfo)
 
@@ -442,17 +453,23 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
     /// apply, and `printExportedDeclarationsOnly`: a category on a class this
     /// image lists and provably does not export renders as an empty string.
     /// One on another image's class stays whole.
+    ///
+    /// `swiftImportNotes` print for the category's members as for a class's.
+    /// A category is no declaration of its class, so a note about the class
+    /// itself (`declarationNote`) prints nothing here.
     public func categoryInterface(
         uniqueName: String,
         options: ObjCGenerationOptions = .default,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
-        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil,
+        swiftImportNotes: ObjCSwiftImportNotes = ObjCSwiftImportNotes()
     ) -> SemanticString? {
         renderCategoryInterface(
             uniqueName: uniqueName,
             options: options,
             cTypeReplacements: cTypeReplacements,
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            swiftImportNotes: swiftImportNotes,
             marksOptionalContent: false
         )
     }
@@ -463,13 +480,15 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
     public func markedCategoryInterface(
         uniqueName: String,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String] = [:],
-        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil
+        ivarOffsetCommentBuilder: (@Sendable (Int) -> String)? = nil,
+        swiftImportNotes: ObjCSwiftImportNotes = ObjCSwiftImportNotes()
     ) -> SemanticString? {
         renderCategoryInterface(
             uniqueName: uniqueName,
             options: .default,
             cTypeReplacements: cTypeReplacements,
             ivarOffsetCommentBuilder: ivarOffsetCommentBuilder,
+            swiftImportNotes: swiftImportNotes,
             marksOptionalContent: true
         )
     }
@@ -479,6 +498,7 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         options: ObjCGenerationOptions,
         cTypeReplacements: [ObjCPrimitiveTypePattern: String],
         ivarOffsetCommentBuilder: (@Sendable (Int) -> String)?,
+        swiftImportNotes: ObjCSwiftImportNotes,
         marksOptionalContent: Bool
     ) -> SemanticString? {
         guard let categoryInfo = indexer.categoryGroup(forName: uniqueName)?.info else { return nil }
@@ -501,6 +521,9 @@ public struct ObjCInterfaceBuilder<MachO: ObjCMetadataSource> {
         if marksOptionalContent {
             context.optionalContentMarking = ObjCOptionalContentMarking()
         }
+        var memberNotes = swiftImportNotes
+        memberNotes.declarationNote = nil
+        context.swiftImportNotes = memberNotes
 
         if marksOptionalContent || options.addPropertyAccessorAddressComments {
             for method in categoryInfo.methods where method.imp != 0 {

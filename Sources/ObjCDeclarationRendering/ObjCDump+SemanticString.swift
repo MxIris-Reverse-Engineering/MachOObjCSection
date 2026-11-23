@@ -71,8 +71,9 @@ public final class ObjCRenderingContext<MachO: ObjCMetadataSource> {
     public var marksCommentStructure: Bool
 
     /// What the host knows the header says about how Swift imports the
-    /// members of the class being rendered, printed as the macros
-    /// (`NS_REFINED_FOR_SWIFT`) at the end of their declarations. Empty by
+    /// declaration being rendered and its members, printed as the macros
+    /// (`NS_SWIFT_NAME(...)`, `NS_REFINED_FOR_SWIFT`): a member's at the end of
+    /// its declaration, a class's or protocol's on a line above it. Empty by
     /// default: a binary keeps no trace of them.
     public var swiftImportNotes: ObjCSwiftImportNotes
 
@@ -155,6 +156,7 @@ package enum ObjCDeclarationHeader {
 extension ObjCClassInfo {
     @SemanticStringBuilder
     public func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
+        context.swiftImportDeclarationAttributes()
         ObjCDeclarationHeader.classInterface(name: name, superclassName: superClassName, protocolNames: protocols.map(\.name))
 
         Joined {
@@ -202,6 +204,7 @@ extension ObjCClassInfo {
 extension ObjCProtocolInfo {
     @SemanticStringBuilder
     public func semanticString<MachO: ObjCMetadataSource>(using context: ObjCRenderingContext<MachO>) -> SemanticString {
+        context.swiftImportDeclarationAttributes()
         ObjCDeclarationHeader.protocolDeclaration(name: name, protocolNames: protocols.map(\.name))
 
         BreakLine()

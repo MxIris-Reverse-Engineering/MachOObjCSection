@@ -493,6 +493,9 @@ ObjCDeclarationRendering  ObjCClassInfo & co. → SemanticString
 ObjCIndexing              per-binary index; broadcasts inheritance / conformance
         ↑
 ObjCInterface             strip filtering + rendering entry point
+
+ObjCTypeIndexing          (macOS) the SDK's API notes and module attribution,
+                          through swift-type-indexing
 ```
 
 Everything above `ObjCMetadataSource` works the same whether you hand it a `MachOFile` read
@@ -823,6 +826,30 @@ import ObjCDeclarationRendering
 let context = ObjCRenderingContext(machO: machO, options: options)
 let declaration = classInfo.semanticString(using: context)
 ```
+
+### ObjCTypeIndexing
+
+A macOS-only bridge to [swift-type-indexing](https://github.com/MxIris-Reverse-Engineering/swift-type-indexing),
+which reads the SDKs of the active developer directory. Two things a binary keeps no trace of:
+
+- **Swift naming from API notes.** `ObjCSwiftImportNotes(apiNotesForClassNamed:in:)` and
+  `ObjCSwiftImportNotes(apiNotesForProtocolNamed:in:)` turn the SDK's `SwiftName` / `SwiftPrivate` into the
+  notes `ObjCInterfaceBuilder` prints as `NS_SWIFT_NAME(...)` / `NS_REFINED_FOR_SWIFT`:
+
+  ```swift
+  import ObjCTypeIndexing
+  import TypeIndexing
+
+  let typeDatabase = TypeDatabase(platform: .macOS)
+  try await typeDatabase.index(dependencies: [], moduleFilter: { _ in false })
+  let notes = await ObjCSwiftImportNotes(apiNotesForClassNamed: "PKDrawing", in: typeDatabase)
+  let header = builder.classInterface(named: "PKDrawing", swiftImportNotes: notes)
+  // NS_SWIFT_NAME(PKDrawingReference)
+  // @interface PKDrawing : NSObject <NSCopying, NSSecureCoding>
+  ```
+
+- **The module a private type belongs to.** `ObjCDeclaredTypeNames(machO:imagePath:)` hands an image's
+  Objective-C metadata to `TypeDatabase`, which reads it only for names the SDK does not attribute.
 
 ## License
 
