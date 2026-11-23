@@ -166,9 +166,14 @@ struct SwiftImportNotesRenderingTests {
     func protocolInterfaceTakesNotes() async throws {
         let (indexer, machO) = try await ObjCInterfaceTests.SharedFixture.shared.load()
         let builder = ObjCInterfaceBuilder(indexer: indexer, machO: machO)
-        let (protocolName, method) = try #require(indexer.protocolNames.sorted().lazy.compactMap { protocolName in
-            indexer.protocolGroup(forName: protocolName)?.info.methods.first.map { (protocolName, $0) }
-        }.first)
+        var protocolSample: (name: String, method: ObjCMethodInfo)?
+        for protocolName in indexer.protocolNames.sorted() {
+            if let method = indexer.protocolGroup(forName: protocolName)?.info.methods.first {
+                protocolSample = (protocolName, method)
+                break
+            }
+        }
+        let (protocolName, method) = try #require(protocolSample)
         var notes = ObjCSwiftImportNotes()
         notes.declarationNote = .init(swiftName: "RenamedProtocol")
         notes[.method(selector: method.name)] = .init(isRefinedForSwift: true)
@@ -186,9 +191,14 @@ struct SwiftImportNotesRenderingTests {
     func categoryMembersTakeNotes() async throws {
         let (indexer, machO) = try await ObjCInterfaceTests.SharedFixture.shared.load()
         let builder = ObjCInterfaceBuilder(indexer: indexer, machO: machO)
-        let (categoryName, method) = try #require(indexer.categoryNames.sorted().lazy.compactMap { categoryName in
-            indexer.categoryGroup(forName: categoryName)?.info.methods.first.map { (categoryName, $0) }
-        }.first)
+        var categorySample: (name: String, method: ObjCMethodInfo)?
+        for categoryName in indexer.categoryNames.sorted() {
+            if let method = indexer.categoryGroup(forName: categoryName)?.info.methods.first {
+                categorySample = (categoryName, method)
+                break
+            }
+        }
+        let (categoryName, method) = try #require(categorySample)
         var notes = ObjCSwiftImportNotes()
         notes.declarationNote = .init(isRefinedForSwift: true)
         notes[.method(selector: method.name)] = .init(isRefinedForSwift: true)

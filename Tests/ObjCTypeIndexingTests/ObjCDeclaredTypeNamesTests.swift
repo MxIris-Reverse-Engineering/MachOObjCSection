@@ -4,6 +4,7 @@ import Foundation
 import MachOKit
 import Testing
 import TypeIndexing
+import ObjCIndexing
 internal import MachOKitExtensions
 @testable import ObjCTypeIndexing
 
@@ -14,19 +15,32 @@ struct ObjCDeclaredTypeNamesTests {
         case foundationImageUnavailable
     }
 
-    private static func foundationSource() throws -> ObjCDeclaredTypeNames<MachOImage> {
+    private static func foundationImage() throws -> MachOImage {
         guard let machO = MachOImage(name: "Foundation") else {
             throw FixtureError.foundationImageUnavailable
         }
+        return machO
+    }
+
+    private static func foundationSource() throws -> ObjCDeclaredTypeNames<MachOImage> {
+        let machO = try foundationImage()
         return ObjCDeclaredTypeNames(machO: machO, imagePath: machO.imagePath)
     }
 
+    /// Exactly the classes, protocols, structs and unions an indexer of the
+    /// image lists — compared with the indexer rather than spelled out, so
+    /// the test does not hang on what one release of Foundation declares.
     @Test
     func declaredTypeNamesListFoundationClassesProtocolsAndStructs() async throws {
-        let declaredNames = Set(try await Self.foundationSource().declaredTypeNames())
-        #expect(declaredNames.contains("NSURLSession"))
-        #expect(declaredNames.contains("NSURLSessionDelegate"))
-        #expect(declaredNames.contains("_NSRange"))
+        let declaredNames = try await Self.foundationSource().declaredTypeNames()
+        let machO = try Self.foundationImage()
+        let interfaceIndexer = ObjCInterfaceIndexer(machO: machO, imagePath: machO.imagePath)
+        try await interfaceIndexer.prepare()
+        let indexedNames = interfaceIndexer.classNames + interfaceIndexer.protocolNames + interfaceIndexer.structNames + interfaceIndexer.unionNames
+        #expect(Set(declaredNames) == Set(indexedNames))
+        #expect(declaredNames.contains("NSError"))
+        #expect(!interfaceIndexer.protocolNames.isEmpty)
+        #expect(!interfaceIndexer.structNames.isEmpty)
     }
 
     /// A private class no SDK file mentions resolves to Foundation through the
