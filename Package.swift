@@ -152,11 +152,10 @@ let package = Package(
             ),
             remote: .package(
                 url: "https://github.com/MxIris-Reverse-Engineering/swift-semantic-string",
-                // TEMPORARY: the feature branch, for `SemanticType.macro` and
-                // `Macro` (proposal swift-type-indexing-package), until
-                // swift-semantic-string 0.7.0 is released; the proposal's
-                // wrap-up puts `from: "0.7.0"` here.
-                branch: "feature/swift-type-indexing-package"
+                // 0.7.0 brings `SemanticType.macro` and `Macro`, which the
+                // Swift naming annotations print `NS_SWIFT_NAME` and
+                // `NS_REFINED_FOR_SWIFT` with (proposal swift-type-indexing-package).
+                from: "0.7.0"
             )
         ),
         .package(
