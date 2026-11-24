@@ -177,7 +177,8 @@ pattern 中的 `class_ro_t` 模板，`name` 为 NULL、ivar 偏移槽为空）�
 
 - **主要出现在**：`Sources/ObjCDeclarationRendering/ObjCSwiftImportNotes.swift`、`ObjCInterfaceBuilder.swift`、`Sources/ObjCTypeIndexing/`
 - **延伸阅读**：[使用指南](Guides/ObjCSectionCommandLine.md#库调用方宿主给的-swift-导入标注)；跨仓库提案
-  MachOSwiftSection 的 [0096 swift-first-imported-declarations](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/0096-swift-first-imported-declarations.md)
+  MachOSwiftSection 的 [0096 swift-first-imported-declarations](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/0096-swift-first-imported-declarations.md)、
+  [0105 swift-type-indexing-package](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/0105-swift-type-indexing-package.md)（`NS_SWIFT_NAME` 与 SDK 的 API notes 这一来源）
 
 ### uniqueName
 
