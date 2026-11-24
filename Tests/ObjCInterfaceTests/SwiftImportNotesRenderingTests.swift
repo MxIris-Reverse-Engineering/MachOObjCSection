@@ -162,6 +162,31 @@ struct SwiftImportNotesRenderingTests {
         #expect(refinedLines.dropFirst().first?.hasPrefix("@interface \(Self.sampleClass)") == true)
     }
 
+    /// Xcode colours `NS_SWIFT_NAME` and `NS_REFINED_FOR_SWIFT` in an SDK
+    /// header with its macro colour, never as keywords: its Objective-C grammar
+    /// lists both among the known macros, and the index colours them as macros
+    /// from a system header (`xcode.syntax.identifier.macro.system`). So they
+    /// are `.macro` runs, on the declaration's own line and after a member, and
+    /// the Swift name between the parentheses stays plain text.
+    @Test("the macros are macro runs, not keywords, and the Swift name between the parentheses is plain text")
+    func macrosAreMacroRuns() async throws {
+        let sample = try await Self.sample()
+        var notes = sample.notes
+        notes[.method(selector: sample.instanceMethod.name)] = .init(isRefinedForSwift: true, swiftName: "renamedMethod(_:)")
+        notes.declarationNote = .init(isRefinedForSwift: true, swiftName: "SwiftError")
+        let rendering = try #require(sample.builder.classInterface(named: Self.sampleClass, swiftImportNotes: notes))
+
+        func types(of text: String) -> [SemanticType] {
+            rendering.components.filter { $0.string == text }.map(\.type)
+        }
+        // The declaration's line and the noted instance method name NS_SWIFT_NAME;
+        // the declaration and all three members are refined.
+        #expect(types(of: "NS_SWIFT_NAME") == [.macro, .macro])
+        #expect(types(of: "NS_REFINED_FOR_SWIFT") == [.macro, .macro, .macro, .macro])
+        #expect(types(of: "SwiftError") == [.standard])
+        #expect(types(of: "renamedMethod(_:)") == [.standard])
+    }
+
     @Test("a protocol prints its own note and its members' notes")
     func protocolInterfaceTakesNotes() async throws {
         let (indexer, machO) = try await ObjCInterfaceTests.SharedFixture.shared.load()

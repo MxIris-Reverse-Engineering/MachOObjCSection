@@ -124,6 +124,9 @@ extension ObjCRenderingContext {
     /// headers write it. Not optional content: a host that supplies a note
     /// wants it shown under every switch, so a marked rendering carries it
     /// unmarked and its projections read as the plain renderings do.
+    ///
+    /// The macros are `.macro` runs, not keywords: Xcode colours both in an
+    /// SDK header with its macro colour (`xcode.syntax.identifier.macro.system`).
     @SemanticStringBuilder
     package func swiftImportAttributes(of member: ObjCSwiftImportNotes.Member) -> SemanticString {
         if let note = swiftImportNotes[member] {
@@ -133,7 +136,7 @@ extension ObjCRenderingContext {
             }
             if note.isRefinedForSwift {
                 Space()
-                Keyword("NS_REFINED_FOR_SWIFT")
+                Macro("NS_REFINED_FOR_SWIFT")
             }
         }
     }
@@ -152,16 +155,17 @@ extension ObjCRenderingContext {
                 }
             }
             if note.isRefinedForSwift {
-                Keyword("NS_REFINED_FOR_SWIFT")
+                Macro("NS_REFINED_FOR_SWIFT")
             }
             BreakLine()
         }
     }
 
-    /// `NS_SWIFT_NAME(name)`.
+    /// `NS_SWIFT_NAME(name)`: the macro, then the Swift name as plain text,
+    /// which Xcode does not colour either.
     @SemanticStringBuilder
     private static func swiftNameMacro(_ swiftName: String) -> SemanticString {
-        Keyword("NS_SWIFT_NAME")
+        Macro("NS_SWIFT_NAME")
         "("
         Standard(swiftName)
         ")"
