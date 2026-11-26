@@ -12,6 +12,12 @@ import MachOKit
     func recordClassReference(_ classObject: ObjectiveCClassObject, at site: ScanSite)
     /// A load of an instance variable's offset variable.
     func recordInstanceVariableReference(className: String, name: String, at site: ScanSite)
+    /// A load of the selector reference to `selector` that no send used: the
+    /// selector handed on as data — to `respondsToSelector:`,
+    /// `performSelector:`, a control's action. Recorded when the scan leaves
+    /// the function that loads it, and only when the session finds selector
+    /// references.
+    func recordSelectorReference(selector: String, at site: ScanSite)
 }
 
 /// What a runtime function returns of the class it is handed in `x0`.
@@ -95,9 +101,10 @@ import MachOKit
     /// A session for one scan of the image `table` covers. `findsClassReferences`:
     /// whether the scan looks for class references at all — a query for the
     /// callers of a selector keeps none; a send's class-literal receiver is
-    /// still told, at the send.
-    @_spi(Internals) public func makeSession(table: ImageFunctionTable, recording: any ObjCCodeReferenceRecording, findsClassReferences: Bool) -> ObjCCodeReferenceRecognitionSession {
-        ObjCCodeReferenceRecognitionSession(recognizer: self, table: table, recording: recording, findsClassReferences: findsClassReferences)
+    /// still told, at the send. `findsSelectorReferences`: whether it also
+    /// records the selectors code loads but sends nothing with.
+    @_spi(Internals) public func makeSession(table: ImageFunctionTable, recording: any ObjCCodeReferenceRecording, findsClassReferences: Bool, findsSelectorReferences: Bool = false) -> ObjCCodeReferenceRecognitionSession {
+        ObjCCodeReferenceRecognitionSession(recognizer: self, table: table, recording: recording, findsClassReferences: findsClassReferences, findsSelectorReferences: findsSelectorReferences)
     }
 
     /// The image's class index, built on first use and then kept.
@@ -158,6 +165,7 @@ import MachOKit
     private let sections: ObjCImageSections
     private let recording: any ObjCCodeReferenceRecording
     private let findsClassReferences: Bool
+    private let findsSelectorReferences: Bool
     /// The image's GOT and class references: the slots a receiver may come
     /// from.
     private let ownReferenceSlotRanges: [Range<UInt64>]
@@ -193,21 +201,31 @@ import MachOKit
     /// yielded: a super send in it starts above that class.
     @exclusivity(unchecked)
     private var superclassReferenceClassName: String?
+    /// The current function's loads from `__objc_selrefs` no send has used
+    /// yet, in instruction order: when the scan leaves the function, the
+    /// ones left are selectors handed on as data.
+    @exclusivity(unchecked)
+    private var pendingSelectorLoads: [(slot: UInt64, site: ScanSite)] = []
 
-    init(recognizer: ObjCCodeReferenceRecognizer, table: ImageFunctionTable, recording: any ObjCCodeReferenceRecording, findsClassReferences: Bool) {
+    init(recognizer: ObjCCodeReferenceRecognizer, table: ImageFunctionTable, recording: any ObjCCodeReferenceRecording, findsClassReferences: Bool, findsSelectorReferences: Bool) {
         self.recognizer = recognizer
         self.images = recognizer.images
         self.table = table
         self.sections = ObjCImageSections.of(table)
         self.recording = recording
         self.findsClassReferences = findsClassReferences
+        self.findsSelectorReferences = findsSelectorReferences
         self.ownReferenceSlotRanges = table.globalOffsetTableRanges + sections.classReferenceRanges
     }
 
     @_spi(Internals) public var referenceSlotRanges: [Range<UInt64>] { sections.classReferenceRanges }
 
     @_spi(Internals) public var watchedSlotRanges: [Range<UInt64>] {
-        [sections.superclassReferenceRange, findsClassReferences ? sections.instanceVariableOffsetRange : nil].compactMap(\.self)
+        [
+            sections.superclassReferenceRange,
+            findsClassReferences ? sections.instanceVariableOffsetRange : nil,
+            findsSelectorReferences ? sections.selectorReferenceRange : nil,
+        ].compactMap(\.self)
     }
 
     @_spi(Internals) public var looksForAddressReferences: Bool { findsClassReferences }
@@ -215,6 +233,7 @@ import MachOKit
     @_spi(Internals) public func enterFunction(at functionIndex: Int, registers: RegisterFile) {
         currentFunctionIndex = functionIndex
         superclassReferenceClassName = nil
+        pendingSelectorLoads.removeAll(keepingCapacity: true)
         isObjectiveCMethod = false
         isObjectiveCClassMethod = false
         guard let name = table.primaryName(ofFunctionAt: functionIndex) else { return }
@@ -270,9 +289,11 @@ import MachOKit
     @_spi(Internals) public func recordCallStandIn(_ call: ScannedCall, registers: RegisterFile) -> Bool {
         switch rolePlans[Int(call.role) - 1] {
         case .classicSend:
+            consumeSelectorLoad(registers)
             guard let selector = selectorInSelectorRegister(registers) else { return false }
             recording.recordMessageSend(selector: selector, receiver: receiverHint(registers), at: call.site)
         case .superSend:
+            consumeSelectorLoad(registers)
             guard let selector = selectorInSelectorRegister(registers) else { return false }
             recording.recordSuperMessageSend(selector: selector, className: superclassSendClassName(), at: call.site)
         case .selector(let selector):
@@ -315,6 +336,10 @@ import MachOKit
     }
 
     @_spi(Internals) public func noteWatchedSlotLoad(from slot: UInt64, at site: ScanSite) {
+        if let selectorReferences = sections.selectorReferenceRange, selectorReferences.contains(slot) {
+            if findsSelectorReferences { pendingSelectorLoads.append((slot, site)) }
+            return
+        }
         if let instanceVariables = sections.instanceVariableOffsetRange, instanceVariables.contains(slot) {
             if let variable = ObjCInstanceVariableNames.of(table).instanceVariablesBySlot[slot] {
                 recording.recordInstanceVariableReference(className: variable.className, name: variable.name, at: site)
@@ -347,6 +372,28 @@ import MachOKit
         let index = recognizer.classIndex(ofImageAt: imageIndex)
         classIndexes[imageIndex] = index
         return index
+    }
+
+    // MARK: - Selector references
+
+    /// A classic or super send uses the selector in `x1`: the latest load of
+    /// that selector reference is the send's, not a selector handed on.
+    private func consumeSelectorLoad(_ registers: RegisterFile) {
+        guard !pendingSelectorLoads.isEmpty, let slot = registers.slotAddress(of: 1),
+              let index = pendingSelectorLoads.lastIndex(where: { $0.slot == slot })
+        else { return }
+        pendingSelectorLoads.remove(at: index)
+    }
+
+    /// The selector reference loads no send used: selectors the function
+    /// hands on — as an argument, as a return value, into a control.
+    @_spi(Internals) public func leaveFunction() {
+        guard !pendingSelectorLoads.isEmpty else { return }
+        for load in pendingSelectorLoads {
+            guard let selector = ObjCImageSections.selectorString(inSlotAt: load.slot, of: table) else { continue }
+            recording.recordSelectorReference(selector: selectorName(selector), at: load.site)
+        }
+        pendingSelectorLoads.removeAll(keepingCapacity: true)
     }
 
     // MARK: - Receivers and selectors
