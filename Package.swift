@@ -446,6 +446,9 @@ let package = Package(
             name: "ObjCCodeReferencesTests",
             dependencies: [
                 "ObjCCodeReferences",
+                "MachOKit",
+                .product(name: "MachOCodeReferences", package: "MachOKitExtensions"),
+                .product(name: "MachOFixtureSupport", package: "MachOKitExtensions"),
             ]
         ),
         .testTarget(
