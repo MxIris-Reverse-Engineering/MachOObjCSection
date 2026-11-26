@@ -22,6 +22,15 @@ MachOSwiftSection 交叉引用分析的 Objective-C 层：经 `objc_msgSend`、s
 
 识别器接进扫描的五个时机、发送入口、类引用、ivar、预筛与吞吐，写在 MachOSwiftSection 的 [Modules/CrossReferenceAnalysis.md](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Internal/Modules/CrossReferenceAnalysis.md)：三层的代码一起演进，那份文档是它们的总说明，这里不重复。
 
+## selector 引用（提案 cross-reference-recall-gaps）
+
+载入了却没用来发送的 selector 记成 selector 引用（`ObjCCodeReferenceRecording.recordSelectorReference(selector:at:)`）：`respondsToSelector:` 的参数、`performSelector:` 的参数、返回的 selector、控件的 action。只在 `makeSession(…, findsSelectorReferences: true)` 时找，提案是 MachOSwiftSection 的 [cross-reference-recall-gaps](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/draft-cross-reference-recall-gaps.md)。
+
+- 会话这时也观察 `__objc_selrefs`：每次载入先记为待定（槽与载入处）；经典发送与 `super` 发送用 `x1` 里的 selector 发送时，从末尾往前消掉第一个同槽的待定载入；扫描器调 `leaveFunction()` 时，剩下的逐条记下。进入函数时也清一次。
+- libobjc 的发送入口（`objc_opt_respondsToSelector` 等）不消掉：那里 `x1` 是参数，不是发送的 selector。经 `__objc_stubs` 的发送在代码里不载入 selref，也就没有待定载入可消。
+- `noteWatchedSlotLoad` 先判断 `__objc_selrefs`：以前只有 `__objc_superrefs` 与 `__objc_ivar` 走到这里，末尾那段「读出类名作 super 发送的类」只该对 superrefs 做。
+- dyld cache 的构建器把镜像里的 selref 载入改写成直接取 selector 字符串的地址，所以 cache 里的镜像只认得出发送，认不出 selector 引用；独立文件两者都有。
+
 ## 测试
 
-`ObjCCodeReferencesTests` 只有上面两条源码扫描。ObjC 层的行为测试都要经分析器建镜像集、跑扫描，留在 MachOSwiftSection 的 `CrossReferenceAnalysisTests`（发送入口、类引用、方法名回退、文件模式等）。
+`ObjCCodeReferencesTests`：上面两条源码扫描；`SelectorReferenceRecognitionTests` 用 `FixtureCompiler` 把一个小 ObjC 库分别按选择器桩（clang 默认）与经典发送（`-fno-objc-msgsend-selector-stubs`）编译、只装 ObjC 会话扫描——`respondsToSelector:` 的参数、返回的 selector、`performSelector:` 的参数是 selector 引用，发送不留引用，不要求时什么都不记。其余行为测试要经分析器，留在 MachOSwiftSection 的 `CrossReferenceAnalysisTests`（发送入口、类引用、方法名回退、文件模式、selector 引用经常驻索引等）。
