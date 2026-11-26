@@ -22,6 +22,10 @@ public struct ObjCMethod {
     ///
     /// If it is obtained from a dyld cache file, it is the offset from the start address of the main cache.
     public let imp: UInt64
+    /// Position of this entry itself.
+    ///
+    /// It has the same origin as ``ObjCMethodList/offset`` of the list that contains this entry.
+    public let offset: Int
 }
 
 extension ObjCMethod {
@@ -40,11 +44,12 @@ extension ObjCMethod {
         public let imp: OpaquePointer
     }
 
-    init(_ pointer: Pointer) {
+    init(_ pointer: Pointer, offset: Int) {
         self.init(
             name: .init(cString: pointer.name),
             types: .init(cString: pointer.types),
-            imp: numericCast(UInt(bitPattern: pointer.imp))
+            imp: numericCast(UInt(bitPattern: pointer.imp)),
+            offset: offset
         )
     }
 }
@@ -101,6 +106,7 @@ extension ObjCMethod {
     init(
         _ relativeDirect: RelativeDirect,
         at pointer: UnsafeRawPointer,
+        offset: Int,
         isRelativeDirectType: Bool
     ) {
 #if !canImport(ObjectiveC)
@@ -145,12 +151,13 @@ extension ObjCMethod {
                     .address(from: typeBase)
                     .assumingMemoryBound(to: CChar.self)
             ),
-            imp: numericCast(
+            imp: relativeDirect.imp.isNull ? 0 : numericCast(
                 UInt(
                     bitPattern: relativeDirect.imp
                         .address(from: pointer.advanced(by: 8))
                 )
-            )
+            ),
+            offset: offset
         )
     }
 }
@@ -162,7 +169,11 @@ extension ObjCMethod {
         public let imp: RelativeDirectPointer<OpaquePointer>
     }
 
-    init(_ relativeIndirect: RelativeInDirect, at pointer: UnsafeRawPointer) {
+    init(
+        _ relativeIndirect: RelativeInDirect,
+        at pointer: UnsafeRawPointer,
+        offset: Int
+    ) {
         self.init(
             name: .init(
                 cString: relativeIndirect.name
@@ -175,12 +186,13 @@ extension ObjCMethod {
                     .address(from: pointer.advanced(by: 4))
                     .assumingMemoryBound(to: CChar.self)
             ),
-            imp: numericCast(
+            imp: relativeIndirect.imp.isNull ? 0 : numericCast(
                 UInt(
                     bitPattern: relativeIndirect.imp
                         .address(from: pointer.advanced(by: 8))
                 )
-            )
+            ),
+            offset: offset
         )
     }
 }

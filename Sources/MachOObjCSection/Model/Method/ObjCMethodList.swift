@@ -17,7 +17,12 @@ internal import FileIO
 public struct ObjCMethodList: EntrySizeListProtocol {
     public typealias Entry = ObjCMethod
 
-    /// Offset from machO header start
+    /// Position of this list.
+    ///
+    /// The origin depends on where the Mach-O comes from.
+    /// - Mach-O file: file offset from the start of the Mach-O header.
+    /// - Mach-O in a dyld cache file: offset in the address space from the start (header) of the main cache.
+    /// - Loaded Mach-O (`MachOImage`): offset from the start of the Mach-O header.
     public let offset: Int
     public let header: Header
     public let is64Bit: Bool
@@ -94,8 +99,10 @@ extension ObjCMethodList {
     public func methods(
         in machO: MachOImage
     ) -> [ObjCMethod] {
-        // TODO: Support listOfLists
-        guard !isListOfLists else { return [] }
+        guard !isListOfLists else {
+            assertionFailure()
+            return []
+        }
 
         let ptr = machO.ptr.advanced(by: offset)
         let start = ptr.advanced(by: MemoryLayout<Header>.size)
@@ -108,8 +115,15 @@ extension ObjCMethodList {
                 ),
                 numberOfElements: count
             )
+            let size = MemoryLayout<ObjCMethod.Pointer>.size
             return sequence
-                .map { ObjCMethod($0) }
+                .enumerated()
+                .map {
+                    ObjCMethod(
+                        $1,
+                        offset: entryOffset(at: $0, entrySize: size)
+                    )
+                }
 
         case .relativeDirectSelectors:
             let sequence = MemorySequence(
@@ -125,6 +139,7 @@ extension ObjCMethodList {
                     ObjCMethod(
                         $1,
                         at: start.advanced(by: size * $0),
+                        offset: entryOffset(at: $0, entrySize: size),
                         isRelativeDirectType: false
                     )
                 }
@@ -143,6 +158,7 @@ extension ObjCMethodList {
                     ObjCMethod(
                         $1,
                         at: start.advanced(by: size * $0),
+                        offset: entryOffset(at: $0, entrySize: size),
                         isRelativeDirectType: true
                     )
                 }
@@ -158,7 +174,11 @@ extension ObjCMethodList {
             return sequence
                 .enumerated()
                 .map {
-                    ObjCMethod($1, at: start.advanced(by: size * $0))
+                    ObjCMethod(
+                        $1,
+                        at: start.advanced(by: size * $0),
+                        offset: entryOffset(at: $0, entrySize: size)
+                    )
                 }
         }
     }
@@ -295,7 +315,8 @@ extension ObjCMethodList {
             imp: resolveOffset(
                 in: machO,
                 slot: .init(fieldOffset: entryOffset + 16, value: pointer.imp)
-            )
+            ),
+            offset: entryOffset
         )
     }
 
@@ -316,7 +337,8 @@ extension ObjCMethodList {
             imp: resolveOffset(
                 in: machO,
                 slot: .init(fieldOffset: entryOffset + 8, value: numericCast(pointer.imp))
-            )
+            ),
+            offset: entryOffset
         )
     }
 
@@ -358,11 +380,15 @@ extension ObjCMethodList {
             adjustment: 4
         ) ?? 0
 
-        let imp = resolvedOffset(
-            base: entryOffset,
-            relative: relativeIndirect.imp.offset,
-            adjustment: 8
-        ) ?? 0
+        let imp: UInt64 = if relativeIndirect.imp.isNull {
+            0
+        } else {
+            resolvedOffset(
+                base: entryOffset,
+                relative: relativeIndirect.imp.offset,
+                adjustment: 8
+            ) ?? 0
+        }
 
         return ObjCMethod(
             name: resolveString(
@@ -375,7 +401,8 @@ extension ObjCMethodList {
             types: fileHandle.readString(
                 offset: numericCast(types)
             ) ?? "",
-            imp: imp
+            imp: imp,
+            offset: numericCast(entryOffset)
         )
     }
 
@@ -417,11 +444,15 @@ extension ObjCMethodList {
             )
         }
 
-        let imp = resolvedOffset(
-            base: entryOffset,
-            relative: relativeDirect.imp.offset,
-            adjustment: 8
-        ) ?? 0
+        let imp: UInt64 = if relativeDirect.imp.isNull {
+            0
+        } else {
+            resolvedOffset(
+                base: entryOffset,
+                relative: relativeDirect.imp.offset,
+                adjustment: 8
+            ) ?? 0
+        }
 
         return ObjCMethod(
             name: nameOffset.map {
@@ -430,12 +461,17 @@ extension ObjCMethodList {
             types: typesOffset.map {
                 resolveString(in: machO, forOffset: $0)
             } ?? "",
-            imp: imp
+            imp: imp,
+            offset: numericCast(entryOffset)
         )
     }
 }
 
 extension ObjCMethodList {
+    private func entryOffset(at index: Int, entrySize: Int) -> Int {
+        offset + MemoryLayout<Header>.size + entrySize * index
+    }
+
     private func resolvedOffset<Offset: BinaryInteger>(
         base: UInt64,
         relative: Offset,

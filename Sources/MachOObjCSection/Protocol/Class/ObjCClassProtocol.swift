@@ -73,6 +73,31 @@ extension ObjCClassProtocol {
     }
 }
 
+// Upstream 0.10.0 took `swiftClassFlags` out of `Layout` and reads it here, past
+// the end of the layout. The fork keeps the field in `Layout`, where
+// MachOSwiftSection reads it, so both overloads answer from the layout already
+// read: `MemoryLayout<Layout>.size` takes the field in and is no longer where
+// it starts.
+extension ObjCClassProtocol {
+    /// Flags of a Swift class (`swiftClassFlags` in `objc_class`).
+    ///
+    /// This field is only present if the class is a Swift class (has the Swift fast bits set).
+    /// - Returns: `nil` if the class is not a Swift class.
+    public func swiftClassFlags(in machO: MachOFile) -> UInt32? {
+        guard isSwift else { return nil }
+        return layout.swiftClassFlags
+    }
+
+    /// Flags of a Swift class (`swiftClassFlags` in `objc_class`).
+    ///
+    /// This field is only present if the class is a Swift class (has the Swift fast bits set).
+    /// - Returns: `nil` if the class is not a Swift class.
+    public func swiftClassFlags(in machO: MachOImage) -> UInt32? {
+        guard isSwift else { return nil }
+        return layout.swiftClassFlags
+    }
+}
+
 extension ObjCClassProtocol {
     public func metaClass(in machO: MachOFile) -> (MachOFile, Self)? {
         _readClass(

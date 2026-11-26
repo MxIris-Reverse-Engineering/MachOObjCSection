@@ -12,7 +12,12 @@ import Foundation
 public struct ObjCPropertyList: EntrySizeListProtocol {
     public typealias Entry = ObjCProperty
 
-    /// Offset from machO header start
+    /// Position of this list.
+    ///
+    /// The origin depends on where the Mach-O comes from.
+    /// - Mach-O file: file offset from the start of the Mach-O header.
+    /// - Mach-O in a dyld cache file: offset in the address space from the start (header) of the main cache.
+    /// - Loaded Mach-O (`MachOImage`): offset from the start of the Mach-O header.
     public let offset: Int
     public let header: Header
     public let is64Bit: Bool
@@ -54,8 +59,10 @@ extension ObjCPropertyList {
     public func properties(
         in machO: MachOImage
     ) -> [ObjCProperty] {
-        // TODO: Support listOfLists
-        guard !isListOfLists else { return [] }
+        guard !isListOfLists else {
+            assertionFailure()
+            return []
+        }
 
         let ptr = machO.ptr.advanced(by: offset)
         let start = ptr.advanced(by: MemoryLayout<Header>.size)
@@ -65,8 +72,15 @@ extension ObjCPropertyList {
             ),
             numberOfElements: count
         )
+        let size = MemoryLayout<ObjCProperty.Property>.size
         return sequence
-            .map { ObjCProperty($0) }
+            .enumerated()
+            .map {
+                ObjCProperty(
+                    $1,
+                    offset: entryOffset(at: $0, entrySize: size)
+                )
+            }
     }
 
     public func properties(
@@ -89,9 +103,10 @@ extension ObjCPropertyList {
                 )
             return sequence.enumerated()
                 .map { i, property in
-                    let fieldOffset: Int = offset
-                    + MemoryLayout<Header>.size
-                    + MemoryLayout<ObjCProperty.Property64>.size * i
+                    let fieldOffset = entryOffset(
+                        at: i,
+                        entrySize: MemoryLayout<ObjCProperty.Property64>.size
+                    )
                     return ObjCProperty.UnresolvedProperty(
                         name: .init(
                             fieldOffset: fieldOffset,
@@ -100,7 +115,8 @@ extension ObjCPropertyList {
                         attributes: .init(
                             fieldOffset: fieldOffset + 8,
                             value: property.attributes
-                        )
+                        ),
+                        offset: fieldOffset
                     )
                 }
                 .compactMap {
@@ -123,7 +139,8 @@ extension ObjCPropertyList {
 
                     return ObjCProperty(
                         name: name,
-                        attributes: attributes
+                        attributes: attributes,
+                        offset: $0.offset
                     )
                 }
         } else {
@@ -134,9 +151,10 @@ extension ObjCPropertyList {
                 )
             return sequence.enumerated()
                 .map { i, property in
-                    let fieldOffset: Int = offset
-                    + MemoryLayout<Header>.size
-                    + MemoryLayout<ObjCProperty.Property32>.size * i
+                    let fieldOffset = entryOffset(
+                        at: i,
+                        entrySize: MemoryLayout<ObjCProperty.Property32>.size
+                    )
                     return ObjCProperty.UnresolvedProperty(
                         name: .init(
                             fieldOffset: fieldOffset,
@@ -145,7 +163,8 @@ extension ObjCPropertyList {
                         attributes: .init(
                             fieldOffset: fieldOffset + 4,
                             value: numericCast(property.attributes)
-                        )
+                        ),
+                        offset: fieldOffset
                     )
                 }
                 .compactMap {
@@ -168,10 +187,17 @@ extension ObjCPropertyList {
 
                     return ObjCProperty(
                         name: name,
-                        attributes: attributes
+                        attributes: attributes,
+                        offset: $0.offset
                     )
                 }
         }
+    }
+}
+
+extension ObjCPropertyList {
+    private func entryOffset(at index: Int, entrySize: Int) -> Int {
+        offset + MemoryLayout<Header>.size + entrySize * index
     }
 }
 
@@ -185,7 +211,8 @@ extension MachOFile {
         }
         return ObjCProperty.ResolvedProperty(
             name: name,
-            attributes: attributes
+            attributes: attributes,
+            offset: unresolvedValue.offset
         )
     }
 }

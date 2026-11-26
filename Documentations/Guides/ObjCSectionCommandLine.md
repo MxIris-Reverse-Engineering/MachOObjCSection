@@ -131,6 +131,8 @@ fat 二进制不指定 `-a` 会报错，并把可选架构列出来。
 | `--emit-method-imp-addresses` | 每个方法后面加 `// IMP: 0x…` |
 | `--emit-property-accessor-addresses` | 每个属性后面加 getter / setter 的 IMP 地址 |
 
+协议声明的方法没有实现，`--emit-method-imp-addresses` 给它们写 `// IMP: <invalid 0x0>`。合并上游 0.10.0 之前，relative 格式的方法列表把空的 imp 读成 imp 字段自己的位置，打出来的是一个看起来正常、其实不指向任何代码的地址。
+
 库里还有第十一个开关 `printExportedDeclarationsOnly`，命令行没有对应的 flag，见下文
 [库调用方：只打印导出的声明](#库调用方只打印导出的声明)。
 

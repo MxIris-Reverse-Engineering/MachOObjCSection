@@ -62,6 +62,7 @@ extension ObjCProtocolProtocol {
     }
 
     public func protocolList(in machO: MachOImage) -> ObjCProtocolList? {
+        guard layout.protocols & 1 == 0 else { return nil }
         let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.protocols)))
         guard let ptr = UnsafeRawPointer(
             bitPattern: strippedAddress
@@ -75,6 +76,7 @@ extension ObjCProtocolProtocol {
     }
 
     public func instanceMethodList(in machO: MachOImage) -> ObjCMethodList? {
+        guard layout.instanceMethods & 1 == 0 else { return nil }
         let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.instanceMethods)))
         guard let ptr = UnsafeRawPointer(
             bitPattern: strippedAddress
@@ -89,6 +91,7 @@ extension ObjCProtocolProtocol {
     }
 
     public func classMethodList(in machO: MachOImage) -> ObjCMethodList? {
+        guard layout.classMethods & 1 == 0 else { return nil }
         let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.classMethods)))
         guard let ptr = UnsafeRawPointer(
             bitPattern: strippedAddress
@@ -103,6 +106,7 @@ extension ObjCProtocolProtocol {
     }
 
     public func optionalInstanceMethodList(in machO: MachOImage) -> ObjCMethodList? {
+        guard layout.optionalInstanceMethods & 1 == 0 else { return nil }
         let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.optionalInstanceMethods)))
         guard let ptr = UnsafeRawPointer(
             bitPattern: strippedAddress
@@ -117,6 +121,7 @@ extension ObjCProtocolProtocol {
     }
 
     public func optionalClassMethodList(in machO: MachOImage) -> ObjCMethodList? {
+        guard layout.optionalClassMethods & 1 == 0 else { return nil }
         let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.optionalClassMethods)))
         guard let ptr = UnsafeRawPointer(
             bitPattern: strippedAddress
@@ -131,6 +136,7 @@ extension ObjCProtocolProtocol {
     }
 
     public func instancePropertyList(in machO: MachOImage) -> ObjCPropertyList? {
+        guard layout.instanceProperties & 1 == 0 else { return nil }
         let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout.instanceProperties)))
         guard let ptr = UnsafeRawPointer(
             bitPattern: strippedAddress
@@ -184,6 +190,7 @@ extension ObjCProtocolProtocol {
         guard size >= offset + MemoryLayout<Layout.Pointer>.size else {
             return nil
         }
+        guard layout._classProperties & 1 == 0 else { return nil }
         let strippedAddress = UInt(machO.stripPointerTags(of: numericCast(layout._classProperties)))
         guard let ptr = UnsafeRawPointer(
             bitPattern: strippedAddress
@@ -215,6 +222,8 @@ extension ObjCProtocolProtocol {
         guard layout.protocols > 0 else { return nil }
 
         let unresolved = unresolvedValue(of: .protocols)
+        guard unresolved.value & 1 == 0 else { return nil }
+
         guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
         guard let (fileHandle, fileOffset) = machO.fileHandleAndOffset(forResolvedValue: resolved) else {
@@ -339,6 +348,7 @@ extension ObjCProtocolProtocol {
     ) -> ObjCMethodList? {
         let unresolved = unresolvedValue(of: field)
         guard unresolved.value > 0 else { return nil }
+        guard unresolved.value & 1 == 0 else { return nil }
 
         guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
@@ -364,6 +374,7 @@ extension ObjCProtocolProtocol {
     ) -> ObjCPropertyList? {
         let unresolved = unresolvedValue(of: field)
         guard unresolved.value > 0 else { return nil }
+        guard unresolved.value & 1 == 0 else { return nil }
 
         guard let resolved = machO.resolveRebase(unresolved) else { return nil }
 
