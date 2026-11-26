@@ -22,9 +22,9 @@ MachOSwiftSection 交叉引用分析的 Objective-C 层：经 `objc_msgSend`、s
 
 识别器接进扫描的五个时机、发送入口、类引用、ivar、预筛与吞吐，写在 MachOSwiftSection 的 [Modules/CrossReferenceAnalysis.md](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Internal/Modules/CrossReferenceAnalysis.md)：三层的代码一起演进，那份文档是它们的总说明，这里不重复。
 
-## selector 引用（提案 cross-reference-recall-gaps）
+## selector 引用（MachOSwiftSection 提案 0113）
 
-载入了却没用来发送的 selector 记成 selector 引用（`ObjCCodeReferenceRecording.recordSelectorReference(selector:at:)`）：`respondsToSelector:` 的参数、`performSelector:` 的参数、返回的 selector、控件的 action。只在 `makeSession(…, findsSelectorReferences: true)` 时找，提案是 MachOSwiftSection 的 [cross-reference-recall-gaps](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/draft-cross-reference-recall-gaps.md)。
+载入了却没用来发送的 selector 记成 selector 引用（`ObjCCodeReferenceRecording.recordSelectorReference(selector:at:)`）：`respondsToSelector:` 的参数、`performSelector:` 的参数、返回的 selector、控件的 action。只在 `makeSession(…, findsSelectorReferences: true)` 时找，提案是 MachOSwiftSection 的 [0113-cross-reference-recall-gaps](https://github.com/MxIris-Reverse-Engineering/MachOSwiftSection/blob/next/Documentations/Evolutions/0113-cross-reference-recall-gaps.md)。
 
 - 会话这时也观察 `__objc_selrefs`：每次载入先记为待定（槽与载入处）；经典发送与 `super` 发送用 `x1` 里的 selector 发送时，从末尾往前消掉第一个同槽的待定载入；扫描器调 `leaveFunction()` 时，剩下的逐条记下。进入函数时也清一次。
 - libobjc 的发送入口（`objc_opt_respondsToSelector` 等）不消掉：那里 `x1` 是参数，不是发送的 selector。经 `__objc_stubs` 的发送在代码里不载入 selref，也就没有待定载入可消。
